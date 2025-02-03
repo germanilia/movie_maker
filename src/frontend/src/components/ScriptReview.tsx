@@ -62,6 +62,8 @@ interface ScriptReviewProps {
   projectName: string;
 }
 
+const SCRIPT_STORAGE_KEY = 'current_script';
+
 const ScriptReview: React.FC<ScriptReviewProps> = ({
   script,
   setScript,
@@ -72,9 +74,19 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [isSaving, setIsSaving] = React.useState(false);
   const [isGenerating, setIsGenerating] = React.useState(false);
 
+  // Load script from local storage on initial mount
   useEffect(() => {
-    // Debug log to verify script data
-    console.log('Script in ScriptReview:', script);
+    const storedScript = localStorage.getItem(SCRIPT_STORAGE_KEY);
+    if (storedScript && !script) {
+      setScript(JSON.parse(storedScript));
+    }
+  }, []);
+
+  // Update local storage whenever script changes
+  useEffect(() => {
+    if (script) {
+      localStorage.setItem(SCRIPT_STORAGE_KEY, JSON.stringify(script));
+    }
   }, [script]);
 
   const handleChapterChange = (chapterIndex: number, field: string, value: any) => {
@@ -111,6 +123,46 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     setScript(updatedScript);
   };
 
+  const handleShotChange = async (
+    chapterIndex: number,
+    sceneIndex: number,
+    shotIndex: number,
+    field: string,
+    value: any
+  ) => {
+    if (!script) return;
+    
+    setIsSaving(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/update-shot-description/${projectName}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chapter_index: chapterIndex,
+          scene_index: sceneIndex,
+          shot_index: shotIndex,
+          field: field,
+          value: value
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update shot description');
+      }
+
+      const updatedScript = await response.json();
+      setScript(updatedScript);
+      // Update local storage with the server response
+      localStorage.setItem(SCRIPT_STORAGE_KEY, JSON.stringify(updatedScript));
+    } catch (error) {
+      console.error('Error updating shot description:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!script) return;
     setIsSaving(true);
@@ -129,6 +181,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
       const updatedScript = await response.json();
       setScript(updatedScript);
+      // Update local storage with the server response
+      localStorage.setItem(SCRIPT_STORAGE_KEY, JSON.stringify(updatedScript));
     } catch (error) {
       console.error('Error saving script:', error);
     } finally {

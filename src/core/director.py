@@ -335,27 +335,3 @@ class Director:
             logger.error(f"Failed to save script: {str(e)}")
             raise
 
-    async def update_shot_description(self, chapter_index: int, scene_index: int, shot_index: int, description: str) -> None:
-        """Update a specific shot's description and save the updated script."""
-        try:
-            # Get current script
-            script = await self.get_script()
-            
-            # Update the specific shot description
-            chapter = script.chapters[chapter_index]
-            scene = chapter.scenes[scene_index]
-            shot = scene.shots[shot_index]
-            shot.detailed_shot_description = description
-            
-            # Save the updated script (this will save both locally and to AWS)
-            await self._save_script(script)
-            
-            logger.info(f"Successfully updated shot description for project {self.project_name}")
-        except IndexError:
-            logger.error(f"Invalid indices provided: chapter={chapter_index}, scene={scene_index}, shot={shot_index}")
-            raise
-        except Exception as e:
-            logger.error(f"Failed to update shot description: {str(e)}")
-            raise
-
-   

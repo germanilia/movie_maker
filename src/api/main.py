@@ -72,13 +72,14 @@ async def update_shot_description(project_name: str, update_data: dict):
        
         script = await director.get_script()
         if update_data["action"] == "opening":
-            script.chapters[update_data["chapter_index"]].scenes[update_data["scene_index"]].shots[update_data["shot_index"]].detailed_opening_scene_description = update_data["description"]
+            script.chapters[update_data["chapter_index"]-1].scenes[update_data["scene_index"]-1].shots[update_data["shot_index"]-1].detailed_opening_scene_description = update_data["description"]
         else:
-            script.chapters[update_data["chapter_index"]].scenes[update_data["scene_index"]].shots[update_data["shot_index"]].detailed_closing_scene_description = update_data["description"]
-
+            script.chapters[update_data["chapter_index"]-1].scenes[update_data["scene_index"]-1].shots[update_data["shot_index"]-1].detailed_closing_scene_description = update_data["description"]
+        temp = script.chapters[update_data["chapter_index"]-1].scenes[update_data["scene_index"]-1].shots[update_data["shot_index"]-1].detailed_opening_scene_description
+        print(temp)
         await director.save_script(script)
-
-        return {"status": "success"}
+        temp = script.chapters[update_data["chapter_index"]-1].scenes[update_data["scene_index"]-1].shots[update_data["shot_index"]-1].detailed_opening_scene_description
+        return script  # Return the entire updated script instead of just status
     except IndexError:
         raise HTTPException(
             status_code=400, detail="Invalid chapter, scene, or shot index"
@@ -146,20 +147,19 @@ async def regenerate_image(
         if not script or not script.chapters:
             raise HTTPException(status_code=404, detail="Script or chapters not found")
 
-        chapter = script.chapters[request.chapter_index]
-        if not chapter or not chapter.scenes:
-            raise HTTPException(status_code=404, detail="Chapter or scenes not found")
-
-        scene = chapter.scenes[request.scene_index]
-        if not scene or not scene.shots:
-            raise HTTPException(status_code=404, detail="Scene or shots not found")
-
-        shot = scene.shots[request.shot_index]
-        if not shot:
-            raise HTTPException(status_code=404, detail="Shot not found")
+        try:
+            chapter = script.chapters[request.chapter_index - 1]
+            if not chapter.scenes:
+                raise HTTPException(status_code=404, detail="No scenes found in chapter")
+            scene = chapter.scenes[request.scene_index - 1]
+            if not scene.shots:
+                raise HTTPException(status_code=404, detail="No shots found in scene")
+            shot = scene.shots[request.shot_index - 1]
+        except IndexError:
+            raise HTTPException(status_code=400, detail="Invalid chapter, scene, or shot index")
 
         # Add 1 to each index to match the folder structure
-        opening_image_path = f"chapter_{request.chapter_index + 1}/scene_{request.scene_index + 1}/shot_{request.shot_index + 1}_opening.png"
+        opening_image_path = f"chapter_{request.chapter_index}/scene_{request.scene_index}/shot_{request.shot_index}_opening.png"
 
         # Use custom prompt if provided, otherwise use the original prompt
         prompt = (
@@ -213,16 +213,12 @@ async def get_images(project_name: str):
                     )
 
                     if opening_exists:
-                        # Get image data as base64
-                        # opening_image_data = await aws_service.get_file_as_base64(f"{project_name}/{opening_image_path}")
-                        # print(f"Opening image data length: {len(opening_image_data) if opening_image_data else 0}")  # Debug line
                         images.append(
                             {
                                 "url": f"{aws_service.s3_object_uri}/{opening_image_path}",
-                                # "base64": opening_image_data,
-                                "chapter_index": chapter_idx,
-                                "scene_index": scene_idx,
-                                "shot_index": shot_idx,
+                                "chapter_index": chapter_idx + 1,
+                                "scene_index": scene_idx + 1,
+                                "shot_index": shot_idx + 1,
                                 "type": "opening",
                                 "status": "completed",
                                 "description": shot.detailed_opening_scene_description,
@@ -230,16 +226,12 @@ async def get_images(project_name: str):
                         )
 
                     if closing_exists:
-                        # Get image data as base64
-                        # closing_image_data = await aws_service.get_file_as_base64(f"{project_name}/{closing_image_path}")
-                        # print(f"Closing image data length: {len(closing_image_data) if closing_image_data else 0}")  # Debug line
                         images.append(
                             {
                                 "url": f"{aws_service.s3_object_uri}/{closing_image_path}",
-                                # "base64": closing_image_data,
-                                "chapter_index": chapter_idx,
-                                "scene_index": scene_idx,
-                                "shot_index": shot_idx,
+                                "chapter_index": chapter_idx + 1,
+                                "scene_index": scene_idx + 1,
+                                "shot_index": shot_idx + 1,
                                 "type": "closing",
                                 "status": "completed",
                                 "description": shot.detailed_closing_scene_description,
@@ -251,9 +243,9 @@ async def get_images(project_name: str):
                         images.append(
                             {
                                 "url": f"{aws_service.s3_object_uri}/{closing_image_path}",
-                                "chapter_index": chapter_idx,
-                                "scene_index": scene_idx,
-                                "shot_index": shot_idx,
+                                "chapter_index": chapter_idx + 1,
+                                "scene_index": scene_idx + 1,
+                                "shot_index": shot_idx + 1,
                                 "type": "opening",
                                 "status": "pending",
                                 "description": shot.detailed_opening_scene_description,
@@ -264,9 +256,9 @@ async def get_images(project_name: str):
                         images.append(
                             {
                                 "url": f"{aws_service.s3_base_uri}/{closing_image_path}",
-                                "chapter_index": chapter_idx,
-                                "scene_index": scene_idx,
-                                "shot_index": shot_idx,
+                                "chapter_index": chapter_idx + 1,
+                                "scene_index": scene_idx + 1,
+                                "shot_index": shot_idx + 1,
                                 "type": "closing",
                                 "status": "pending",
                                 "description": shot.detailed_closing_scene_description,
