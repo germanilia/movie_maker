@@ -1,0 +1,34 @@
+Generate artistic instructions for a {genre} screenplay about "{subject}". 
+special instructions:
+{special_instructions}
+#####
+story background: 
+{story_background}
+####
+chapter_high_level_description:
+{chapter_high_level_description}
+####
+
+You are required to generate a list of scenes for the chapter.
+Each scene should be a description of the scene, the key events and the main characters.
+The chapter overview is provided to you, so you can continue the scene generation from where it was left,
+focus on the chapter_high_level_description go generate the relevant scenes.
+
+Each scene should have a narration text that is used to generate the voice over for the scene.
+The length of the scene is 60 seconds, so the narration text should be 60 seconds long.
+The requested number of scenes is {number_of_scenes}. These scenes must cover the entire chapter and be in chronological order.
+
+Output Structure:
+{{
+  "scenes": [
+    {{
+      "scene_number": "[Scene number; e.g., 1]",
+      "scene_description": "[Scene description; e.g., 'The boy is born']",
+      "key_events": "[Key events; e.g., 'The boy is born', 'The boy is sent to a concentration camp']",
+      "main_characters": "[Main characters; e.g., 'The boy', 'The girl']",
+      "narration_text": "[Narration text; e.g., 'The boy is born', 'The boy is sent to a concentration camp' should be limited to 70 words]",
+      "sound_effects": "[A list of sound effects that are relevant to the scene and will be in the background of the narration]"
+    }}
+  ]
+}}
+

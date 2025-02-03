@@ -1,0 +1,113 @@
+Generate artistic instructions for a {genre} screenplay: "{subject}"
+
+# Core Parameters
+- Genre: {genre}
+- Subject: {subject}
+- Number of shots required: {number_of_shots}
+- Shot duration: 10 seconds each
+- Time period(s): [Specify the year(s) for the scene]
+
+# Background Information
+Special Instructions:
+{special_instructions}
+
+Story Background:
+{story_background}
+
+Chapter Overview:
+{chapter_high_level_description}
+
+Scene Overview:
+{scene_overview}
+
+# Shot Requirements
+## Technical Specifications
+1. Camera Details:
+   - Camera type and model
+   - Lens specifications
+   - Camera movement (if applicable)
+   - Shot type (wide, medium, close-up, etc.)
+   - Frame composition
+
+2. Lighting Requirements:
+   - Time of day
+   - Natural/Artificial lighting
+   - Key light positioning
+   - Fill light details
+   - Mood lighting elements
+
+3. Setting Details:
+   - Location description
+   - Time period markers
+   - Environmental elements
+   - Weather conditions
+   - Set dressing specifics
+
+4. Character Elements:
+   - Costume details
+   - Makeup specifications
+   - Character positioning
+   - Facial expressions
+   - Body language
+
+## Shot Types
+- Static Shots:
+  - Must be used at least once
+  - Preferably with main character presence
+  - No camera movement
+  - Limited to one per scene
+
+- Dynamic Shots:
+  - Camera movement specifications
+  - Transition requirements
+  - Action sequence details
+
+## Required Elements
+- Opening Shot:
+  - Must establish time period
+  - Main character presence (if applicable)
+  - Scene setting establishment
+
+- Closing Shot:
+  - Must provide scene resolution
+  - Main character presence (if applicable)
+  - Time period confirmation
+
+# Image Generation Requirements
+- Two images per shot required
+- Ultra-realistic style
+- Stable diffusion model compatibility
+- Detailed environmental elements
+- Period-accurate details
+- Lighting and atmosphere specifications
+
+At least one shot should be a still image, and one should be a dynamic shot.
+Don't generate all shots as still images, or all shots as dynamic shots.
+
+Image Prompt Examples:
+- "Prompt: Sepia grainy photo by Robert Doisneau, beautiful French girl and her jaguar pet in a cafe, Paris, 1963, 60-s vibe, playful and romantic, coffee, jaguar tries to drink from a cup, girl is stroking jaguar, waiter is shocked, funny setting."
+- "Prompt: cinematic and super realistic analog photo still of a graceful french girl with red curly hair,half body shot,wearing vibrant vintage clothing,standing in front of a vintage wood open window in paris,light from behind,35mm,portra 800,detailed face,style raw."
+- "Prompt: professional photo, closeup portrait photo of caucasian man, wearing black t-shirt and blue jeans, warm smile, dramatic lighting, nature, bokeh, <lora:epi_noiseoffset2:1>."
+
+
+Output Format:
+{{
+  "shots": [
+    {{
+      "shot_number": "[Sequential number]",
+      "still_image": "True/False",
+      "detailed_opening_scene_description": "[DATE: XXXX] [Comprehensive visual description serving as image prompt 1]",
+      "detailed_opening_scene_description_main_character_presence": "True/False",
+      "detailed_closing_scene_description": "[DATE: XXXX] [Comprehensive visual description serving as image prompt 2]",
+      "detailed_closing_scene_description_main_character_presence": "True/False",
+      "detailed_shot_description": "[Complete technical and artistic direction for crew implementation]"
+    }}
+  ]
+}}
+
+Notes:
+- Each shot must be feasible within 10-second duration
+- Events must be logically connected and proximity-appropriate
+- All time periods must be clearly indicated
+- Main character presence must be noted in either opening or closing shots
+- Image prompts must be detailed enough for AI image generation

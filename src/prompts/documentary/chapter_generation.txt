@@ -1,0 +1,26 @@
+Generate artistic instructions for a {genre} screenplay about "{subject}". 
+special instructions:
+{special_instructions}
+#####
+story background: 
+{story_background}
+####
+
+Based on the story background, create a list of chapters for the screenplay.
+Each chapter should contain the high level description of the chapter, the key events and the main characters.
+The requested number of chapters is {number_of_chapters}. These chapters must cover the entire story and be in chronological order.
+
+The chapters should start with a more calm and natural tone, the first chapter should be a prologue.
+As the story progresses, the chapters should become more engaging and interesting.
+Output Structure:
+{{
+  "chapters": [
+    {{
+      "chapter_number": "[Chapter number; e.g., 1]",
+      "chapter_title": "[Chapter title; e.g., 'The Beginning']",
+      "chapter_description": "[Chapter description; e.g., 'The story of a Jewish boy in Nazi Germany']",
+      "key_events": "[Key events; e.g., 'The boy is born', 'The boy is sent to a concentration camp']",
+      "main_characters": "[Main characters; e.g., 'The boy', 'The girl']"
+    }}
+  ]
+}}

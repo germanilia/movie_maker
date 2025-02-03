@@ -1,0 +1,27 @@
+video_generator/
+├── src/
+│   ├── __init__.py
+│   ├── config/
+│   │   └── __init__.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── director.py
+│   │   ├── screenwriter.py
+│   │   ├── researcher.py
+│   │   ├── image_generator.py
+│   │   ├── video_generator.py
+│   │   └── voice_generator.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── aws_service.py
+│   │   ├── llm_service.py
+│   │   └── search_service.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── scene.py
+│   │   └── video_request.py
+│   └── utils/
+│       ├── __init__.py
+│       └── exceptions.py
+└── tests/
+    └── __init__.py 
