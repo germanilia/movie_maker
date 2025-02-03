@@ -1,15 +1,41 @@
 {
     "version": "0.2.0",
+    "compounds": [
+        {
+            "name": "Full Stack: Frontend + Backend",
+            "configurations": ["Python: FastAPI", "React: Chrome"],
+            "preLaunchTask": "Start Dev Servers",
+            "stopAll": true
+        }
+    ],
     "configurations": [
         {
-            "name": "Python: Video Creator",
+            "name": "Python: FastAPI",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/src/main.py",
-            "console": "integratedTerminal",
+            "module": "uvicorn",
+            "args": [
+                "src.api.main:app",
+                "--reload",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000"
+            ],
+            "jinja": true,
             "justMyCode": true,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "React: Chrome",
+            "type": "chrome",
+            "request": "launch",
+            "url": "http://localhost:3000",
+            "webRoot": "${workspaceFolder}/src/frontend",
+            "sourceMapPathOverrides": {
+                "webpack:///src/*": "${webRoot}/*"
             }
         },
         {

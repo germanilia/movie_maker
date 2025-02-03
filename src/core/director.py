@@ -1,16 +1,16 @@
 import json
-from pathlib import Path
 import logging
+import asyncio
 from typing import List
-
-from models.models import (
+from pathlib import Path
+from src.models.models import (
     VideoRequest,
     Script,
     Chapter,
     Scene,
     Shot,
 )
-from services.aws_service import AWSService
+from src.services.aws_service import AWSService
 
 logger = logging.getLogger(__name__)
 
@@ -317,5 +317,22 @@ class Director:
         # Upload to S3
         s3_path = f"{self.aws_service.s3_base_uri}/script.json"
         await self.aws_service.upload_file(str(script_path), s3_path)
+
+    async def get_script(self) -> Script:
+        """Get the current script for the project."""
+        try:
+            return await self._load_script(self.temp_base_path / self.project_name)
+        except Exception as e:
+            logger.error(f"Failed to get script: {str(e)}")
+            raise
+
+    async def save_script(self, script: Script) -> None:
+        """Save the provided script for the project."""
+        try:
+            await self._save_script(script)
+            logger.info(f"Successfully saved script for project {self.project_name}")
+        except Exception as e:
+            logger.error(f"Failed to save script: {str(e)}")
+            raise
 
    

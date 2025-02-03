@@ -1,0 +1,11 @@
+Metadata-Version: 2.2
+Name: video_creator
+Version: 0.1.0
+Requires-Dist: fastapi
+Requires-Dist: uvicorn
+Requires-Dist: boto3
+Requires-Dist: python-dotenv
+Requires-Dist: runwayml
+Requires-Dist: pyht
+Requires-Dist: aiohttp
+Dynamic: requires-dist

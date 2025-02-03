@@ -1,0 +1,6 @@
+setup.py
+video_creator.egg-info/PKG-INFO
+video_creator.egg-info/SOURCES.txt
+video_creator.egg-info/dependency_links.txt
+video_creator.egg-info/requires.txt
+video_creator.egg-info/top_level.txt

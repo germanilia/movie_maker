@@ -44,9 +44,10 @@ class AWSService:
         self.s3_bucket = os.getenv('S3_BUCKET')
         if not self.s3_bucket:
             raise ValueError("S3_BUCKET environment variable must be set")
-            
+            #https://moviemaker-videos.s3.us-east-1.amazonaws.com/my_early_years/chapter_1/scene_1/shot_1_opening.png
         self.project_path = f"{project_name.lower().replace(' ', '_')}"
         self.s3_base_uri = f"s3://{self.s3_bucket}/{self.project_path}"
+        self.s3_object_uri = f"https://moviemaker-videos.s3.us-east-1.amazonaws.com/{self.project_path}"
         
         # Add temp directory configuration
         self.temp_dir = Path("temp") / self.project_path
@@ -299,3 +300,69 @@ class AWSService:
         except Exception as e:
             logger.error(f"Failed to process and upload base64 file: {str(e)}")
             raise 
+
+    async def get_project_images(self) -> list[dict]:
+        """
+        Get all images for the current project from S3.
+        Returns:
+            list[dict]: List of image information including URLs and metadata
+        """
+        try:
+            images = []
+            paginator = self.s3_client.get_paginator('list_objects_v2')
+            
+            for page in paginator.paginate(Bucket=self.s3_bucket, Prefix=f"{self.project_path}/"):
+                if 'Contents' in page:
+                    for obj in page['Contents']:
+                        key = obj['Key']
+                        if key.endswith('.png'):  # Only process PNG files
+                            # Extract chapter, scene, and shot information from the path
+                            parts = key.split('/')
+                            if len(parts) >= 4:  # Ensure we have enough parts for chapter/scene/shot
+                                chapter_part = parts[1]  # e.g., "chapter_1"
+                                scene_part = parts[2]    # e.g., "scene_1"
+                                shot_part = parts[3]     # e.g., "shot_1_opening.png"
+                                
+                                try:
+                                    chapter_index = int(chapter_part.split('_')[1]) - 1
+                                    scene_index = int(scene_part.split('_')[1]) - 1
+                                    shot_info = shot_part.split('_')
+                                    shot_index = int(shot_info[1]) - 1
+                                    
+                                    # Generate a presigned URL for the image
+                                    url = self.s3_client.generate_presigned_url(
+                                        'get_object',
+                                        Params={
+                                            'Bucket': self.s3_bucket,
+                                            'Key': key
+                                        },
+                                        ExpiresIn=3600  # URL expires in 1 hour
+                                    )
+                                    
+                                    images.append({
+                                        'url': url,
+                                        'chapter_index': chapter_index,
+                                        'scene_index': scene_index,
+                                        'shot_index': shot_index
+                                    })
+                                except (IndexError, ValueError):
+                                    logger.warning(f"Skipping malformed image path: {key}")
+                                    continue
+            
+            return sorted(images, key=lambda x: (x['chapter_index'], x['scene_index'], x['shot_index']))
+            
+        except Exception as e:
+            logger.error(f"Failed to get project images: {str(e)}")
+            raise
+
+    async def get_file_as_base64(self, file_path: str) -> str:
+        """Get a file from S3 and return it as base64 encoded string"""
+        try:
+            response = self.s3_client.get_object(
+                Bucket=self.s3_bucket,
+                Key=file_path
+            )
+            file_data = response['Body'].read()  # Removed await since this is not an async operation
+            return base64.b64encode(file_data).decode('utf-8')
+        except Exception as e:
+            raise Exception(f"Error getting file as base64: {str(e)}")

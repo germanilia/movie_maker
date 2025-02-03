@@ -1,0 +1,45 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "npm",
+            "script": "start",
+            "path": "src/frontend",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "custom",
+                "pattern": {
+                    "regexp": "^$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Starting the development server",
+                    "endsPattern": "Compiled successfully|Failed to compile"
+                }
+            },
+            "label": "npm: start",
+            "detail": "Start React development server"
+        },
+        {
+            "label": "Start Dev Servers",
+            "type": "shell",
+            "command": "cd src/frontend && npm start",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "custom",
+                "pattern": {
+                    "regexp": "^$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Starting the development server",
+                    "endsPattern": "Compiled successfully|Failed to compile"
+                }
+            }
+        }
+    ]
+} 

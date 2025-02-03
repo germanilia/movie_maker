@@ -6,7 +6,7 @@ import aiohttp
 from typing import Dict, Literal
 from runwayml import RunwayML
 from src.models.models import Script, Shot
-from services.aws_service import AWSService
+from src.services.aws_service import AWSService
 from runwayml.types.image_to_video_create_params import PromptImagePromptImage
 
 logger = logging.getLogger(__name__)

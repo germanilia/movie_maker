@@ -4,7 +4,7 @@ from typing import Dict
 from pyht import Client
 from pyht.client import TTSOptions
 from src.models.models import Script
-from services.aws_service import AWSService
+from src.services.aws_service import AWSService
 
 logger = logging.getLogger(__name__)
 

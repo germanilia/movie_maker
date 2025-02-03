@@ -50,3 +50,10 @@ class Script(BaseModel):
 
 class ReviewedScript(BaseModel):
     scenes: List[Scene]
+
+
+class RegenerateImageRequest(BaseModel):
+    chapter_index: int
+    scene_index: int
+    shot_index: int
+    custom_prompt: str | None = None
