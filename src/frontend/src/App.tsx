@@ -130,26 +130,36 @@ function App() {
 
   return (
     <ChakraProvider>
-      <Box maxWidth="1200px" margin="0 auto" padding={8}>
-        <Stepper index={activeStep} marginBottom={8}>
-          {steps.map((step, index) => (
-            <Step key={index}>
-              <StepIndicator>
-                <StepStatus
-                  complete={<StepIcon />}
-                  incomplete={<StepNumber />}
-                  active={<StepNumber />}
-                />
-              </StepIndicator>
-              <Box flexShrink='0'>
-                <StepTitle>{step.title}</StepTitle>
-                <StepDescription>{step.description}</StepDescription>
-              </Box>
-              <StepSeparator />
-            </Step>
-          ))}
-        </Stepper>
-        {renderStep()}
+      <Box height="100vh" display="flex" flexDirection="column" overflow="hidden">
+        <Box p={8} bg="white" borderBottomWidth={1} borderBottomColor="gray.200" flexShrink={0}>
+          <Stepper index={activeStep}>
+            {steps.map((step, index) => (
+              <Step key={index}>
+                <StepIndicator>
+                  <StepStatus
+                    complete={<StepIcon />}
+                    incomplete={<StepNumber />}
+                    active={<StepNumber />}
+                  />
+                </StepIndicator>
+                <Box flexShrink='0'>
+                  <StepTitle>{step.title}</StepTitle>
+                  <StepDescription>{step.description}</StepDescription>
+                </Box>
+                <StepSeparator />
+              </Step>
+            ))}
+          </Stepper>
+        </Box>
+
+        <Box 
+          flex="1" 
+          overflow="hidden" 
+          position="relative"
+          height="calc(100vh - 180px)" // Adjusted to account for header and footer
+        >
+          {renderStep()}
+        </Box>
       </Box>
     </ChakraProvider>
   );

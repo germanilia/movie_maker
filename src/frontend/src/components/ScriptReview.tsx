@@ -238,253 +238,275 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   }
 
   return (
-    <Box>
-      <VStack spacing={4} align="stretch">
-        <Heading size="lg" mb={4}>Script Review</Heading>
-        
-        <Accordion allowMultiple defaultIndex={[0]}>
-          {script.chapters.map((chapter: any, chapterIndex: number) => (
-            <AccordionItem key={chapterIndex}>
-              <AccordionButton>
-                <Box flex="1" textAlign="left">
-                  <Heading size="md">Chapter {chapter.chapter_number}: {chapter.chapter_title}</Heading>
-                </Box>
-                <AccordionIcon />
-              </AccordionButton>
-              <AccordionPanel>
-                <VStack spacing={4} align="stretch">
-                  <FormControl>
-                    <FormLabel>Chapter Title</FormLabel>
-                    <Input
-                      value={chapter.chapter_title}
-                      onChange={(e) =>
-                        handleChapterChange(chapterIndex, 'chapter_title', e.target.value)
-                      }
-                    />
-                  </FormControl>
+    <Box height="100vh" overflow="hidden">
+      <Box height="calc(100vh - 80px)" overflowY="auto" p={4} pb="100px">
+        <VStack spacing={4} align="stretch">
+          <Heading size="lg" mb={4}>Script Review</Heading>
+          
+          <Accordion allowMultiple defaultIndex={[0]}>
+            {script.chapters.map((chapter: any, chapterIndex: number) => (
+              <AccordionItem key={chapterIndex}>
+                <AccordionButton>
+                  <Box flex="1" textAlign="left">
+                    <Heading size="md">Chapter {chapter.chapter_number}: {chapter.chapter_title}</Heading>
+                  </Box>
+                  <AccordionIcon />
+                </AccordionButton>
+                <AccordionPanel>
+                  <VStack spacing={4} align="stretch">
+                    <FormControl>
+                      <FormLabel>Chapter Title</FormLabel>
+                      <Input
+                        value={chapter.chapter_title}
+                        onChange={(e) =>
+                          handleChapterChange(chapterIndex, 'chapter_title', e.target.value)
+                        }
+                      />
+                    </FormControl>
 
-                  <FormControl>
-                    <FormLabel>Chapter Description</FormLabel>
-                    <Textarea
-                      value={chapter.chapter_description}
-                      onChange={(e) =>
-                        handleChapterChange(chapterIndex, 'chapter_description', e.target.value)
-                      }
-                      rows={4}
-                    />
-                  </FormControl>
+                    <FormControl>
+                      <FormLabel>Chapter Description</FormLabel>
+                      <Textarea
+                        value={chapter.chapter_description}
+                        onChange={(e) =>
+                          handleChapterChange(chapterIndex, 'chapter_description', e.target.value)
+                        }
+                        rows={4}
+                      />
+                    </FormControl>
 
-                  <FormControl>
-                    <FormLabel>Key Events</FormLabel>
-                    <Textarea
-                      value={chapter.key_events.join('\n')}
-                      onChange={(e) =>
-                        handleChapterChange(chapterIndex, 'key_events', e.target.value.split('\n'))
-                      }
-                      rows={3}
-                      placeholder="One event per line"
-                    />
-                  </FormControl>
+                    <FormControl>
+                      <FormLabel>Key Events</FormLabel>
+                      <Textarea
+                        value={chapter.key_events.join('\n')}
+                        onChange={(e) =>
+                          handleChapterChange(chapterIndex, 'key_events', e.target.value.split('\n'))
+                        }
+                        rows={3}
+                        placeholder="One event per line"
+                      />
+                    </FormControl>
 
-                  <FormControl>
-                    <FormLabel>Main Characters</FormLabel>
-                    <Textarea
-                      value={chapter.main_characters.join('\n')}
-                      onChange={(e) =>
-                        handleChapterChange(chapterIndex, 'main_characters', e.target.value.split('\n'))
-                      }
-                      rows={3}
-                      placeholder="One character per line"
-                    />
-                  </FormControl>
+                    <FormControl>
+                      <FormLabel>Main Characters</FormLabel>
+                      <Textarea
+                        value={chapter.main_characters.join('\n')}
+                        onChange={(e) =>
+                          handleChapterChange(chapterIndex, 'main_characters', e.target.value.split('\n'))
+                        }
+                        rows={3}
+                        placeholder="One character per line"
+                      />
+                    </FormControl>
 
-                  <Accordion allowMultiple>
-                    {chapter.scenes.map((scene: any, sceneIndex: number) => (
-                      <AccordionItem key={sceneIndex}>
-                        <AccordionButton>
-                          <Box flex="1" textAlign="left">
-                            <Heading size="sm">Scene {scene.scene_number}</Heading>
-                          </Box>
-                          <AccordionIcon />
-                        </AccordionButton>
-                        <AccordionPanel>
-                          <VStack spacing={4} align="stretch">
-                            <FormControl>
-                              <FormLabel>Scene Description</FormLabel>
-                              <Textarea
-                                value={scene.general_scene_description_and_motivations}
-                                onChange={(e) =>
-                                  handleSceneChange(
-                                    chapterIndex,
-                                    sceneIndex,
-                                    'general_scene_description_and_motivations',
-                                    e.target.value
-                                  )
-                                }
-                                rows={4}
-                              />
-                            </FormControl>
+                    <Accordion allowMultiple>
+                      {chapter.scenes.map((scene: any, sceneIndex: number) => (
+                        <AccordionItem key={sceneIndex}>
+                          <AccordionButton>
+                            <Box flex="1" textAlign="left">
+                              <Heading size="sm">Scene {scene.scene_number}</Heading>
+                            </Box>
+                            <AccordionIcon />
+                          </AccordionButton>
+                          <AccordionPanel>
+                            <VStack spacing={4} align="stretch">
+                              <FormControl>
+                                <FormLabel>Scene Description</FormLabel>
+                                <Textarea
+                                  value={scene.general_scene_description_and_motivations}
+                                  onChange={(e) =>
+                                    handleSceneChange(
+                                      chapterIndex,
+                                      sceneIndex,
+                                      'general_scene_description_and_motivations',
+                                      e.target.value
+                                    )
+                                  }
+                                  rows={4}
+                                />
+                              </FormControl>
 
-                            <FormControl>
-                              <FormLabel>Key Events</FormLabel>
-                              <Textarea
-                                value={scene.key_events.join('\n')}
-                                onChange={(e) =>
-                                  handleSceneChange(
-                                    chapterIndex,
-                                    sceneIndex,
-                                    'key_events',
-                                    e.target.value.split('\n')
-                                  )
-                                }
-                                rows={3}
-                                placeholder="One event per line"
-                              />
-                            </FormControl>
+                              <FormControl>
+                                <FormLabel>Key Events</FormLabel>
+                                <Textarea
+                                  value={scene.key_events.join('\n')}
+                                  onChange={(e) =>
+                                    handleSceneChange(
+                                      chapterIndex,
+                                      sceneIndex,
+                                      'key_events',
+                                      e.target.value.split('\n')
+                                    )
+                                  }
+                                  rows={3}
+                                  placeholder="One event per line"
+                                />
+                              </FormControl>
 
-                            <FormControl>
-                              <FormLabel>Main Characters</FormLabel>
-                              <Textarea
-                                value={scene.main_characters.join('\n')}
-                                onChange={(e) =>
-                                  handleSceneChange(
-                                    chapterIndex,
-                                    sceneIndex,
-                                    'main_characters',
-                                    e.target.value.split('\n')
-                                  )
-                                }
-                                rows={3}
-                                placeholder="One character per line"
-                              />
-                            </FormControl>
+                              <FormControl>
+                                <FormLabel>Main Characters</FormLabel>
+                                <Textarea
+                                  value={scene.main_characters.join('\n')}
+                                  onChange={(e) =>
+                                    handleSceneChange(
+                                      chapterIndex,
+                                      sceneIndex,
+                                      'main_characters',
+                                      e.target.value.split('\n')
+                                    )
+                                  }
+                                  rows={3}
+                                  placeholder="One character per line"
+                                />
+                              </FormControl>
 
-                            <FormControl>
-                              <FormLabel>Narration Text</FormLabel>
-                              <Textarea
-                                value={scene.narration_text}
-                                onChange={(e) =>
-                                  handleSceneChange(
-                                    chapterIndex,
-                                    sceneIndex,
-                                    'narration_text',
-                                    e.target.value
-                                  )
-                                }
-                                rows={4}
-                              />
-                            </FormControl>
+                              <FormControl>
+                                <FormLabel>Narration Text</FormLabel>
+                                <Textarea
+                                  value={scene.narration_text}
+                                  onChange={(e) =>
+                                    handleSceneChange(
+                                      chapterIndex,
+                                      sceneIndex,
+                                      'narration_text',
+                                      e.target.value
+                                    )
+                                  }
+                                  rows={4}
+                                />
+                              </FormControl>
 
-                            <FormControl>
-                              <FormLabel>Sound Effects</FormLabel>
-                              <Textarea
-                                value={Array.isArray(scene.sound_effects) ? scene.sound_effects.join('\n') : scene.sound_effects}
-                                onChange={(e) =>
-                                  handleSceneChange(
-                                    chapterIndex,
-                                    sceneIndex,
-                                    'sound_effects',
-                                    e.target.value.split('\n')
-                                  )
-                                }
-                                rows={3}
-                                placeholder="One sound effect per line"
-                              />
-                            </FormControl>
+                              <FormControl>
+                                <FormLabel>Sound Effects</FormLabel>
+                                <Textarea
+                                  value={Array.isArray(scene.sound_effects) ? scene.sound_effects.join('\n') : scene.sound_effects}
+                                  onChange={(e) =>
+                                    handleSceneChange(
+                                      chapterIndex,
+                                      sceneIndex,
+                                      'sound_effects',
+                                      e.target.value.split('\n')
+                                    )
+                                  }
+                                  rows={3}
+                                  placeholder="One sound effect per line"
+                                />
+                              </FormControl>
 
-                            {scene.shots && (
-                              <Accordion allowMultiple>
-                                {scene.shots.map((shot: any, shotIndex: number) => (
-                                  <AccordionItem key={shotIndex}>
-                                    <AccordionButton>
-                                      <Box flex="1" textAlign="left">
-                                        <Heading size="xs">Shot {shot.shot_number}</Heading>
-                                      </Box>
-                                      <AccordionIcon />
-                                    </AccordionButton>
-                                    <AccordionPanel>
-                                      <VStack spacing={4} align="stretch">
-                                        <FormControl>
-                                          <FormLabel>Opening Scene Description</FormLabel>
-                                          <Textarea
-                                            value={shot.detailed_opening_scene_description}
-                                            isReadOnly
-                                            rows={3}
-                                          />
-                                        </FormControl>
+                              {scene.shots && (
+                                <Accordion allowMultiple>
+                                  {scene.shots.map((shot: any, shotIndex: number) => (
+                                    <AccordionItem key={shotIndex}>
+                                      <AccordionButton>
+                                        <Box flex="1" textAlign="left">
+                                          <Heading size="xs">Shot {shot.shot_number}</Heading>
+                                        </Box>
+                                        <AccordionIcon />
+                                      </AccordionButton>
+                                      <AccordionPanel>
+                                        <VStack spacing={4} align="stretch">
+                                          <FormControl>
+                                            <FormLabel>Opening Scene Description</FormLabel>
+                                            <Textarea
+                                              value={shot.detailed_opening_scene_description}
+                                              isReadOnly
+                                              rows={3}
+                                            />
+                                          </FormControl>
 
-                                        <FormControl>
-                                          <FormLabel>Opening Scene Main Character Presence</FormLabel>
-                                          <Select
-                                            value={String(shot.detailed_opening_scene_description_main_character_presence)}
-                                            isReadOnly
-                                          >
-                                            <option value="true">True</option>
-                                            <option value="false">False</option>
-                                          </Select>
-                                        </FormControl>
+                                          <FormControl>
+                                            <FormLabel>Opening Scene Main Character Presence</FormLabel>
+                                            <Select
+                                              value={String(shot.detailed_opening_scene_description_main_character_presence)}
+                                              isReadOnly
+                                            >
+                                              <option value="true">True</option>
+                                              <option value="false">False</option>
+                                            </Select>
+                                          </FormControl>
 
-                                        <FormControl>
-                                          <FormLabel>Closing Scene Description</FormLabel>
-                                          <Textarea
-                                            value={shot.detailed_closing_scene_description}
-                                            isReadOnly
-                                            rows={3}
-                                          />
-                                        </FormControl>
+                                          <FormControl>
+                                            <FormLabel>Closing Scene Description</FormLabel>
+                                            <Textarea
+                                              value={shot.detailed_closing_scene_description}
+                                              isReadOnly
+                                              rows={3}
+                                            />
+                                          </FormControl>
 
-                                        <FormControl>
-                                          <FormLabel>Closing Scene Main Character Presence</FormLabel>
-                                          <Select
-                                            value={String(shot.detailed_closing_scene_description_main_character_presence)}
-                                            isReadOnly
-                                          >
-                                            <option value="true">True</option>
-                                            <option value="false">False</option>
-                                          </Select>
-                                        </FormControl>
+                                          <FormControl>
+                                            <FormLabel>Closing Scene Main Character Presence</FormLabel>
+                                            <Select
+                                              value={String(shot.detailed_closing_scene_description_main_character_presence)}
+                                              isReadOnly
+                                            >
+                                              <option value="true">True</option>
+                                              <option value="false">False</option>
+                                            </Select>
+                                          </FormControl>
 
-                                        <FormControl>
-                                          <FormLabel>Shot Description</FormLabel>
-                                          <Textarea
-                                            value={shot.detailed_shot_description}
-                                            isReadOnly
-                                            rows={3}
-                                          />
-                                        </FormControl>
+                                          <FormControl>
+                                            <FormLabel>Shot Description</FormLabel>
+                                            <Textarea
+                                              value={shot.detailed_shot_description}
+                                              isReadOnly
+                                              rows={3}
+                                            />
+                                          </FormControl>
 
-                                        <FormControl>
-                                          <FormLabel>Still Image</FormLabel>
-                                          <Select
-                                            value={String(shot.still_image)}
-                                            isReadOnly
-                                          >
-                                            <option value="true">True</option>
-                                            <option value="false">False</option>
-                                          </Select>
-                                        </FormControl>
-                                      </VStack>
-                                    </AccordionPanel>
-                                  </AccordionItem>
-                                ))}
-                              </Accordion>
-                            )}
-                          </VStack>
-                        </AccordionPanel>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                </VStack>
-              </AccordionPanel>
-            </AccordionItem>
-          ))}
-        </Accordion>
+                                          <FormControl>
+                                            <FormLabel>Still Image</FormLabel>
+                                            <Select
+                                              value={String(shot.still_image)}
+                                              isReadOnly
+                                            >
+                                              <option value="true">True</option>
+                                              <option value="false">False</option>
+                                            </Select>
+                                          </FormControl>
+                                        </VStack>
+                                      </AccordionPanel>
+                                    </AccordionItem>
+                                  ))}
+                                </Accordion>
+                              )}
+                            </VStack>
+                          </AccordionPanel>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </VStack>
+                </AccordionPanel>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </VStack>
+      </Box>
 
-        <HStack spacing={4} justify="flex-end" mt={4}>
-          <Button onClick={onBack}>Back</Button>
+      <Box
+        position="fixed"
+        bottom={0}
+        left={0}
+        right={0}
+        p={4}
+        bg="white"
+        borderTopWidth={1}
+        borderTopColor="gray.200"
+        zIndex={2}
+        boxShadow="0 -2px 10px rgba(0,0,0,0.1)"
+      >
+        <HStack spacing={4} justify="flex-end">
+          <Button 
+            onClick={onBack}
+            size="lg"
+            variant="ghost"
+          >
+            Back
+          </Button>
           <Button 
             colorScheme="blue" 
             variant="outline"
+            size="lg"
             onClick={handleSave}
             isLoading={isSaving}
             loadingText="Saving..."
@@ -493,6 +515,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           </Button>
           <Button 
             colorScheme="blue"
+            size="lg"
             onClick={handleGenerateImages}
             isLoading={isGenerating}
             loadingText="Generating Images..."
@@ -500,7 +523,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             Generate Images
           </Button>
         </HStack>
-      </VStack>
+      </Box>
     </Box>
   );
 };

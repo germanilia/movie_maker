@@ -237,270 +237,291 @@ const ImageReview: React.FC<ImageReviewProps> = ({
   }
 
   return (
-    <Box p={4}>
-      <VStack spacing={6} align="stretch">
-        <Heading size="lg">Image Review</Heading>
+    <Box height="100vh" overflow="hidden">
+      <Box height="calc(100vh - 80px)" overflowY="auto" p={4} pb="100px">
+        <VStack spacing={6} align="stretch">
+          <Heading size="lg">Image Review</Heading>
 
-        {!script ? (
-          <Center h="200px">
-            <VStack>
-              <Spinner />
-              <Text>Loading script data...</Text>
-            </VStack>
-          </Center>
-        ) : (
-          <Accordion allowMultiple defaultIndex={[0]}>
-            {script.chapters.map((chapter: any, chapterIndex: number) => (
-              <AccordionItem key={chapterIndex}>
-                <AccordionButton>
-                  <Box flex="1" textAlign="left">
-                    <Heading size="md">
-                      Chapter {chapter.chapter_number}: {chapter.chapter_title}
-                    </Heading>
-                  </Box>
-                  <AccordionIcon />
-                </AccordionButton>
-                
-                <AccordionPanel>
-                  <VStack spacing={6} align="stretch">
-                    <Text color="gray.600">{chapter.chapter_description}</Text>
-                    
-                    {chapter.scenes.map((scene: any, sceneIndex: number) => (
-                      <Box key={sceneIndex} borderWidth="1px" borderRadius="lg" p={4}>
-                        <Heading size="sm" mb={3}>
-                          Scene {scene.scene_number}
-                        </Heading>
-                        <Text color="gray.600" mb={4}>
-                          {scene.general_scene_description_and_motivations}
-                        </Text>
+          {!script ? (
+            <Center h="200px">
+              <VStack>
+                <Spinner />
+                <Text>Loading script data...</Text>
+              </VStack>
+            </Center>
+          ) : (
+            <Accordion allowMultiple defaultIndex={[0]}>
+              {script.chapters.map((chapter: any, chapterIndex: number) => (
+                <AccordionItem key={chapterIndex}>
+                  <AccordionButton>
+                    <Box flex="1" textAlign="left">
+                      <Heading size="md">
+                        Chapter {chapter.chapter_number}: {chapter.chapter_title}
+                      </Heading>
+                    </Box>
+                    <AccordionIcon />
+                  </AccordionButton>
+                  
+                  <AccordionPanel>
+                    <VStack spacing={6} align="stretch">
+                      <Text color="gray.600">{chapter.chapter_description}</Text>
+                      
+                      {chapter.scenes.map((scene: any, sceneIndex: number) => (
+                        <Box key={sceneIndex} borderWidth="1px" borderRadius="lg" p={4}>
+                          <Heading size="sm" mb={3}>
+                            Scene {scene.scene_number}
+                          </Heading>
+                          <Text color="gray.600" mb={4}>
+                            {scene.general_scene_description_and_motivations}
+                          </Text>
+                          <Box mb={4} bg="gray.50" p={3} borderRadius="md">
+                            <Text fontWeight="bold" mb={2}>Narration:</Text>
+                            <Text color="gray.700">
+                              {scene.narration_text}
+                            </Text>
+                          </Box>
 
-                        <VStack spacing={4} align="stretch">
-                          {scene.shots.map((shot: any, shotIndex: number) => {
-                            const shotImages = findImages(chapterIndex, sceneIndex, shotIndex);
-                            const openingImage = shotImages.find(img => img.type === 'opening');
-                            const closingImage = shotImages.find(img => img.type === 'closing');
+                          <VStack spacing={4} align="stretch">
+                            {scene.shots.map((shot: any, shotIndex: number) => {
+                              const shotImages = findImages(chapterIndex, sceneIndex, shotIndex);
+                              const openingImage = shotImages.find(img => img.type === 'opening');
+                              const closingImage = shotImages.find(img => img.type === 'closing');
 
-                            if (!openingImage && !closingImage) return null;
+                              if (!openingImage && !closingImage) return null;
 
-                            return (
-                              <Box key={shotIndex} borderWidth="1px" borderRadius="md" p={4}>
-                                <VStack spacing={4}>
-                                  {/* Opening Image */}
-                                  {openingImage && (
-                                    <Box width="100%">
-                                      <Heading size="xs" mb={2}>Opening Shot</Heading>
-                                      <HStack align="start" spacing={6}>
-                                        <Box flex="1">
-                                          <Box position="relative">
-                                            {openingImage.status === 'pending' ? (
-                                              <Center h="200px" borderWidth="1px" borderRadius="md">
-                                                <VStack>
-                                                  <Spinner />
-                                                  <Text>Generating image...</Text>
-                                                </VStack>
-                                              </Center>
-                                            ) : (
-                                              <Image 
-                                                src={getImageUrl(openingImage)}
-                                                alt={`Opening Shot ${shot.shot_number}`}
-                                                fallback={
-                                                  <Center h="200px" borderWidth="1px" borderRadius="md">
-                                                    <VStack>
-                                                      <Text color="red.500">Failed to load image</Text>
-                                                      <Text fontSize="sm">Please try regenerating</Text>
-                                                    </VStack>
-                                                  </Center>
+                              return (
+                                <Box key={shotIndex} borderWidth="1px" borderRadius="md" p={4}>
+                                  <VStack spacing={4}>
+                                    {/* Opening Image */}
+                                    {openingImage && (
+                                      <Box width="100%">
+                                        <Heading size="xs" mb={2}>Opening Shot</Heading>
+                                        <HStack align="start" spacing={6}>
+                                          <Box flex="1">
+                                            <Box position="relative">
+                                              {openingImage.status === 'pending' ? (
+                                                <Center h="200px" borderWidth="1px" borderRadius="md">
+                                                  <VStack>
+                                                    <Spinner />
+                                                    <Text>Generating image...</Text>
+                                                  </VStack>
+                                                </Center>
+                                              ) : (
+                                                <Image 
+                                                  src={getImageUrl(openingImage)}
+                                                  alt={`Opening Shot ${shot.shot_number}`}
+                                                  fallback={
+                                                    <Center h="200px" borderWidth="1px" borderRadius="md">
+                                                      <VStack>
+                                                        <Text color="red.500">Failed to load image</Text>
+                                                        <Text fontSize="sm">Please try regenerating</Text>
+                                                      </VStack>
+                                                    </Center>
+                                                  }
+                                                />
+                                              )}
+                                              {regeneratingImages.has(getImageKey(openingImage)) && (
+                                                <Center position="absolute" inset={0} bg="blackAlpha.600">
+                                                  <VStack>
+                                                    <Spinner color="white" />
+                                                    <Text color="white">Regenerating...</Text>
+                                                  </VStack>
+                                                </Center>
+                                              )}
+                                            </Box>
+                                          </Box>
+
+                                          <VStack align="stretch" flex="1" spacing={4}>
+                                            <Box>
+                                              <Text fontSize="sm" color="gray.600" mt={2}>
+                                                {selectedImage === openingImage 
+                                                  ? editingPrompt 
+                                                  : shot.detailed_opening_scene_description}
+                                              </Text>
+                                            </Box>
+
+                                            <HStack>
+                                              <IconButton
+                                                aria-label="Regenerate image"
+                                                icon={<RepeatIcon />}
+                                                onClick={() => handleRegenerateImage(
+                                                  chapterIndex,
+                                                  sceneIndex,
+                                                  shotIndex,
+                                                  'opening'
+                                                )}
+                                                isDisabled={
+                                                  openingImage.status === 'pending' || 
+                                                  regeneratingImages.has(getImageKey(openingImage)) ||
+                                                  disabledButtons.has(getImageKey(openingImage))
                                                 }
                                               />
-                                            )}
-                                            {regeneratingImages.has(getImageKey(openingImage)) && (
-                                              <Center position="absolute" inset={0} bg="blackAlpha.600">
-                                                <VStack>
-                                                  <Spinner color="white" />
-                                                  <Text color="white">Regenerating...</Text>
-                                                </VStack>
-                                              </Center>
-                                            )}
-                                          </Box>
-                                        </Box>
-
-                                        <VStack align="stretch" flex="1" spacing={4}>
-                                          <Box>
-                                            <Text fontSize="sm" color="gray.600" mt={2}>
-                                              {selectedImage === openingImage 
-                                                ? editingPrompt 
-                                                : shot.detailed_opening_scene_description}
-                                            </Text>
-                                          </Box>
-
-                                          <HStack>
-                                            <IconButton
-                                              aria-label="Regenerate image"
-                                              icon={<RepeatIcon />}
-                                              onClick={() => handleRegenerateImage(
-                                                chapterIndex,
-                                                sceneIndex,
-                                                shotIndex,
-                                                'opening'
-                                              )}
-                                              isDisabled={
-                                                openingImage.status === 'pending' || 
-                                                regeneratingImages.has(getImageKey(openingImage)) ||
-                                                disabledButtons.has(getImageKey(openingImage))
-                                              }
-                                            />
-                                            <IconButton
-                                              aria-label="Edit prompt"
-                                              icon={<EditIcon />}
-                                              onClick={() => {
-                                                setSelectedImage(openingImage);
-                                                setEditingPrompt(openingImage.description);
-                                              }}
-                                              isDisabled={
-                                                openingImage.status === 'pending' || 
-                                                regeneratingImages.has(getImageKey(openingImage)) ||
-                                                disabledButtons.has(getImageKey(openingImage))
-                                              }
-                                            />
-                                          </HStack>
-
-                                          {selectedImage === openingImage && (
-                                            <VStack spacing={2}>
-                                              <Textarea
-                                                value={editingPrompt ?? openingImage.description}
-                                                onChange={(e) => setEditingPrompt(e.target.value)}
-                                              />
-                                              <Button
-                                                size="sm"
-                                                onClick={() => handlePromptChange(openingImage, editingPrompt || openingImage.description)}
-                                              >
-                                                Update Prompt
-                                              </Button>
-                                            </VStack>
-                                          )}
-                                        </VStack>
-                                      </HStack>
-                                    </Box>
-                                  )}
-
-                                  {/* Closing Image */}
-                                  {closingImage && (
-                                    <Box width="100%">
-                                      <Heading size="xs" mb={2}>Closing Shot</Heading>
-                                      <HStack align="start" spacing={6}>
-                                        <Box flex="1">
-                                          <Box position="relative">
-                                            {closingImage.status === 'pending' ? (
-                                              <Center h="200px" borderWidth="1px" borderRadius="md">
-                                                <VStack>
-                                                  <Spinner />
-                                                  <Text>Generating image...</Text>
-                                                </VStack>
-                                              </Center>
-                                            ) : (
-                                              <Image 
-                                                src={getImageUrl(closingImage)}
-                                                alt={`Closing Shot ${shot.shot_number}`}
-                                                fallback={
-                                                  <Center h="200px" borderWidth="1px" borderRadius="md">
-                                                    <VStack>
-                                                      <Text color="red.500">Failed to load image</Text>
-                                                      <Text fontSize="sm">Please try regenerating</Text>
-                                                    </VStack>
-                                                  </Center>
+                                              <IconButton
+                                                aria-label="Edit prompt"
+                                                icon={<EditIcon />}
+                                                onClick={() => {
+                                                  setSelectedImage(openingImage);
+                                                  setEditingPrompt(openingImage.description);
+                                                }}
+                                                isDisabled={
+                                                  openingImage.status === 'pending' || 
+                                                  regeneratingImages.has(getImageKey(openingImage)) ||
+                                                  disabledButtons.has(getImageKey(openingImage))
                                                 }
                                               />
-                                            )}
-                                            {regeneratingImages.has(getImageKey(closingImage)) && (
-                                              <Center position="absolute" inset={0} bg="blackAlpha.600">
-                                                <VStack>
-                                                  <Spinner color="white" />
-                                                  <Text color="white">Regenerating...</Text>
-                                                </VStack>
-                                              </Center>
-                                            )}
-                                          </Box>
-                                        </Box>
+                                            </HStack>
 
-                                        <VStack align="stretch" flex="1" spacing={4}>
-                                          <Box>
-                                            <Text fontSize="sm" color="gray.600" mt={2}>
-                                              {selectedImage === closingImage 
-                                                ? editingPrompt 
-                                                : shot.detailed_closing_scene_description}
-                                            </Text>
-                                          </Box>
+                                            {selectedImage === openingImage && (
+                                              <VStack spacing={2}>
+                                                <Textarea
+                                                  value={editingPrompt ?? openingImage.description}
+                                                  onChange={(e) => setEditingPrompt(e.target.value)}
+                                                />
+                                                <Button
+                                                  size="sm"
+                                                  onClick={() => handlePromptChange(openingImage, editingPrompt || openingImage.description)}
+                                                >
+                                                  Update Prompt
+                                                </Button>
+                                              </VStack>
+                                            )}
+                                          </VStack>
+                                        </HStack>
+                                      </Box>
+                                    )}
 
-                                          <HStack>
-                                            <IconButton
-                                              aria-label="Regenerate image"
-                                              icon={<RepeatIcon />}
-                                              onClick={() => handleRegenerateImage(
-                                                chapterIndex,
-                                                sceneIndex,
-                                                shotIndex,
-                                                'closing'
+                                    {/* Closing Image */}
+                                    {closingImage && (
+                                      <Box width="100%">
+                                        <Heading size="xs" mb={2}>Closing Shot</Heading>
+                                        <HStack align="start" spacing={6}>
+                                          <Box flex="1">
+                                            <Box position="relative">
+                                              {closingImage.status === 'pending' ? (
+                                                <Center h="200px" borderWidth="1px" borderRadius="md">
+                                                  <VStack>
+                                                    <Spinner />
+                                                    <Text>Generating image...</Text>
+                                                  </VStack>
+                                                </Center>
+                                              ) : (
+                                                <Image 
+                                                  src={getImageUrl(closingImage)}
+                                                  alt={`Closing Shot ${shot.shot_number}`}
+                                                  fallback={
+                                                    <Center h="200px" borderWidth="1px" borderRadius="md">
+                                                      <VStack>
+                                                        <Text color="red.500">Failed to load image</Text>
+                                                        <Text fontSize="sm">Please try regenerating</Text>
+                                                      </VStack>
+                                                    </Center>
+                                                  }
+                                                />
                                               )}
-                                              isDisabled={
-                                                closingImage.status === 'pending' || 
-                                                regeneratingImages.has(getImageKey(closingImage)) ||
-                                                disabledButtons.has(getImageKey(closingImage))
-                                              }
-                                            />
-                                            <IconButton
-                                              aria-label="Edit prompt"
-                                              icon={<EditIcon />}
-                                              onClick={() => {
-                                                setSelectedImage(closingImage);
-                                                setEditingPrompt(closingImage.description);
-                                              }}
-                                              isDisabled={
-                                                closingImage.status === 'pending' || 
-                                                regeneratingImages.has(getImageKey(closingImage)) ||
-                                                disabledButtons.has(getImageKey(closingImage))
-                                              }
-                                            />
-                                          </HStack>
+                                              {regeneratingImages.has(getImageKey(closingImage)) && (
+                                                <Center position="absolute" inset={0} bg="blackAlpha.600">
+                                                  <VStack>
+                                                    <Spinner color="white" />
+                                                    <Text color="white">Regenerating...</Text>
+                                                  </VStack>
+                                                </Center>
+                                              )}
+                                            </Box>
+                                          </Box>
 
-                                          {selectedImage === closingImage && (
-                                            <VStack spacing={2}>
-                                              <Textarea
-                                                value={editingPrompt ?? closingImage.description}
-                                                onChange={(e) => setEditingPrompt(e.target.value)}
+                                          <VStack align="stretch" flex="1" spacing={4}>
+                                            <Box>
+                                              <Text fontSize="sm" color="gray.600" mt={2}>
+                                                {selectedImage === closingImage 
+                                                  ? editingPrompt 
+                                                  : shot.detailed_closing_scene_description}
+                                              </Text>
+                                            </Box>
+
+                                            <HStack>
+                                              <IconButton
+                                                aria-label="Regenerate image"
+                                                icon={<RepeatIcon />}
+                                                onClick={() => handleRegenerateImage(
+                                                  chapterIndex,
+                                                  sceneIndex,
+                                                  shotIndex,
+                                                  'closing'
+                                                )}
+                                                isDisabled={
+                                                  closingImage.status === 'pending' || 
+                                                  regeneratingImages.has(getImageKey(closingImage)) ||
+                                                  disabledButtons.has(getImageKey(closingImage))
+                                                }
                                               />
-                                              <Button
-                                                size="sm"
-                                                onClick={() => handlePromptChange(closingImage, editingPrompt || closingImage.description)}
-                                              >
-                                                Update Prompt
-                                              </Button>
-                                            </VStack>
-                                          )}
-                                        </VStack>
-                                      </HStack>
-                                    </Box>
-                                  )}
-                                </VStack>
-                              </Box>
-                            );
-                          })}
-                        </VStack>
-                      </Box>
-                    ))}
-                  </VStack>
-                </AccordionPanel>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        )}
+                                              <IconButton
+                                                aria-label="Edit prompt"
+                                                icon={<EditIcon />}
+                                                onClick={() => {
+                                                  setSelectedImage(closingImage);
+                                                  setEditingPrompt(closingImage.description);
+                                                }}
+                                                isDisabled={
+                                                  closingImage.status === 'pending' || 
+                                                  regeneratingImages.has(getImageKey(closingImage)) ||
+                                                  disabledButtons.has(getImageKey(closingImage))
+                                                }
+                                              />
+                                            </HStack>
 
+                                            {selectedImage === closingImage && (
+                                              <VStack spacing={2}>
+                                                <Textarea
+                                                  value={editingPrompt ?? closingImage.description}
+                                                  onChange={(e) => setEditingPrompt(e.target.value)}
+                                                />
+                                                <Button
+                                                  size="sm"
+                                                  onClick={() => handlePromptChange(closingImage, editingPrompt || closingImage.description)}
+                                                >
+                                                  Update Prompt
+                                                </Button>
+                                              </VStack>
+                                            )}
+                                          </VStack>
+                                        </HStack>
+                                      </Box>
+                                    )}
+                                  </VStack>
+                                </Box>
+                              );
+                            })}
+                          </VStack>
+                        </Box>
+                      ))}
+                    </VStack>
+                  </AccordionPanel>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
+        </VStack>
+      </Box>
+
+      <Box
+        position="fixed"
+        bottom={0}
+        left={0}
+        right={0}
+        p={4}
+        bg="white"
+        borderTopWidth={1}
+        borderTopColor="gray.200"
+        zIndex={2}
+        boxShadow="0 -2px 10px rgba(0,0,0,0.1)"
+      >
         <HStack spacing={4} justify="flex-end">
           <Button onClick={onBack}>Back</Button>
           <Button colorScheme="blue" onClick={onNext}>
             Generate Video
           </Button>
         </HStack>
-      </VStack>
+      </Box>
     </Box>
   );
 };
