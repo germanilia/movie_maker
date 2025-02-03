@@ -38,6 +38,7 @@ const ImageReview: React.FC<ImageReviewProps> = ({
   const [imageTimestamps, setImageTimestamps] = useState<Record<string, number>>({});
   const [regenerationPollingTimes, setRegenerationPollingTimes] = useState<Record<string, number[]>>({});
   const [disabledButtons, setDisabledButtons] = useState<Set<string>>(new Set());
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
     // Initial fetch
@@ -286,6 +287,57 @@ const ImageReview: React.FC<ImageReviewProps> = ({
     }
   };
 
+  const handlePromptChange = async (image: any, newPrompt: string) => {
+    try {
+      const action = image.type
+      
+      const response = await fetch(`http://localhost:8000/api/update-shot-description/${projectName}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chapter_index: image.chapter_index,
+          scene_index: image.scene_index,
+          shot_index: image.shot_index,
+          description: newPrompt,
+          action: action
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update shot description');
+      }
+
+      // Update the local images state with the new description
+      setImages(images.map((img: any) => {
+        if (
+          img.chapter_index === image.chapter_index &&
+          img.scene_index === image.scene_index &&
+          img.shot_index === image.shot_index
+        ) {
+          return { ...img, description: newPrompt };
+        }
+        return img;
+      }));
+
+      // Reset editing state
+      setSelectedImage(action === 'closing' ? null : image);
+      setEditingPrompt(action === 'closing' ? undefined : newPrompt);
+      setHasUnsavedChanges(action === 'opening');
+
+    } catch (error) {
+      console.error('Error updating shot description:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update shot description',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
   return (
     <Box>
       <VStack spacing={4} align="stretch">
@@ -332,7 +384,7 @@ const ImageReview: React.FC<ImageReviewProps> = ({
                   <Text fontSize="xs" mb={2}>
                     {image.description}
                   </Text>
-                  {selectedImage === index && !isRegenerating ? (
+                  {selectedImage === image ? (
                     <VStack spacing={2}>
                       <Textarea
                         value={editingPrompt ?? image.description}
@@ -343,26 +395,10 @@ const ImageReview: React.FC<ImageReviewProps> = ({
                         <Button
                           size="sm"
                           onClick={() => {
-                            setSelectedImage(null);
-                            handleRegenerateImage(
-                              image.chapter_index,
-                              image.scene_index,
-                              image.shot_index,
-                              editingPrompt
-                            );
+                            handlePromptChange(image, editingPrompt || image.description);
                           }}
                         >
-                          Generate
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingPrompt(undefined);
-                            setSelectedImage(null);
-                          }}
-                        >
-                          Cancel
+                          Done
                         </Button>
                       </HStack>
                     </VStack>
@@ -389,7 +425,7 @@ const ImageReview: React.FC<ImageReviewProps> = ({
                         aria-label="Edit prompt"
                         icon={<EditIcon />}
                         onClick={() => {
-                          setSelectedImage(index);
+                          setSelectedImage(image);
                           setEditingPrompt(image.description);
                         }}
                         size="sm"

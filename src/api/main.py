@@ -1,3 +1,4 @@
+import json
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -60,6 +61,32 @@ async def generate_script(project_details: ProjectDetails):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.put("/api/update-shot-description/{project_name}")
+async def update_shot_description(project_name: str, update_data: dict):
+    try:
+        # Load the current script
+        director = Director(
+            aws_service=AWSService(project_name=project_name),
+            project_name=project_name,
+        )
+       
+        script = await director.get_script()
+        if update_data["action"] == "opening":
+            script.chapters[update_data["chapter_index"]].scenes[update_data["scene_index"]].shots[update_data["shot_index"]].detailed_opening_scene_description = update_data["description"]
+        else:
+            script.chapters[update_data["chapter_index"]].scenes[update_data["scene_index"]].shots[update_data["shot_index"]].detailed_closing_scene_description = update_data["description"]
+
+        await director.save_script(script)
+
+        return {"status": "success"}
+    except IndexError:
+        raise HTTPException(
+            status_code=400, detail="Invalid chapter, scene, or shot index"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.put("/api/update-script/{project_name}")
 async def update_script(project_name: str, script: Script) -> Script:
     """Update an existing script"""
@@ -99,7 +126,7 @@ async def generate_images(
 async def regenerate_image(
     project_name: str,
     request: RegenerateImageRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
 ):
     """Regenerate a specific image with optional custom prompt"""
     try:
@@ -109,47 +136,53 @@ async def regenerate_image(
             black_and_white=True,
             genre="documentary",
         )
-        
+
         # Get the script to access the original prompt if no custom prompt provided
-        script = await Director(aws_service=aws_service, project_name=project_name).get_script()
-        
+        script = await Director(
+            aws_service=aws_service, project_name=project_name
+        ).get_script()
+
         # Get the shot from the script
         if not script or not script.chapters:
             raise HTTPException(status_code=404, detail="Script or chapters not found")
-            
+
         chapter = script.chapters[request.chapter_index]
         if not chapter or not chapter.scenes:
             raise HTTPException(status_code=404, detail="Chapter or scenes not found")
-            
+
         scene = chapter.scenes[request.scene_index]
         if not scene or not scene.shots:
             raise HTTPException(status_code=404, detail="Scene or shots not found")
-            
+
         shot = scene.shots[request.shot_index]
         if not shot:
             raise HTTPException(status_code=404, detail="Shot not found")
-        
+
         # Add 1 to each index to match the folder structure
         opening_image_path = f"chapter_{request.chapter_index + 1}/scene_{request.scene_index + 1}/shot_{request.shot_index + 1}_opening.png"
-        
+
         # Use custom prompt if provided, otherwise use the original prompt
-        prompt = request.custom_prompt if request.custom_prompt else shot.detailed_opening_scene_description
-        
+        prompt = (
+            request.custom_prompt
+            if request.custom_prompt
+            else shot.detailed_opening_scene_description
+        )
+
         # Generate the image directly instead of using regenerate_single_image
         background_tasks.add_task(
             image_generator.generate_image,
             prompt=prompt,
             image_path=opening_image_path,
             seed=None,  # Generate new random seed
-            overwrite_image=True
+            overwrite_image=True,
         )
-        
+
         return {
-            "status": "success", 
+            "status": "success",
             "message": "Image regeneration started",
             "chapter_index": request.chapter_index,
             "scene_index": request.scene_index,
-            "shot_index": request.shot_index
+            "shot_index": request.shot_index,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
