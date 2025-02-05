@@ -1,0 +1,31 @@
+Generate artistic instructions for a {genre} screenplay about "{subject}". 
+special instructions:
+{special_instructions}
+#####
+story background: 
+{story_background}
+####
+chapter_high_level_description:
+{chapter_high_level_description}
+####
+previously generated scenes:
+{previous_scenes}
+####
+
+Based on the story background, chapter description, and maintaining continuity with the previously generated scenes, create the next scene for this chapter.
+The scene must follow chronologically from the previous scenes and maintain the chapter's progression.
+
+The scene should have a narration text that is used to generate the voice over.
+The length of the scene is 60 seconds, so the narration text should be 60 seconds long (approximately 70 words).
+
+Output Structure:
+{{
+  "scene": {{
+    "scene_number": "{next_scene_number}",
+    "scene_description": "[Scene description that follows the story progression]",
+    "key_events": "[Key events that occur in this scene]",
+    "main_characters": "[Main characters present in this scene]",
+    "narration_text": "[Narration text for the scene's voice over, limited to 70 words]",
+    "sound_effects": "[A list of sound effects that are relevant to the scene and will be in the background of the narration]"
+  }}
+}}

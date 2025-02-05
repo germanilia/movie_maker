@@ -1,0 +1,31 @@
+Generate artistic instructions for a {genre} screenplay about "{subject}". 
+special instructions:
+{special_instructions}
+#####
+story background: 
+{story_background}
+####
+previously generated chapters:
+{previous_chapters}
+####
+regeneration_instructions:
+{regeneration_instructions}
+####
+
+Based on the story background and maintaining continuity with the previously generated chapters, create the next chapter for the screenplay.
+The chapter should contain a high level description, key events, and main characters.
+The chapter must follow chronologically from the previous chapters and maintain the story's progression.
+Pay special attention to the regeneration instructions to address any specific changes or improvements requested.
+
+As the story progresses, the chapter should become more engaging and interesting than the previous ones.
+
+Output Structure:
+{{
+  "chapter": {{
+    "chapter_number": "{next_chapter_number}",
+    "chapter_title": "[Chapter title that follows the story progression]",
+    "chapter_description": "[Chapter description that builds upon previous chapters]",
+    "key_events": "[Key events that advance the story]",
+    "main_characters": "[Main characters, including both returning and new characters]"
+  }}
+}}

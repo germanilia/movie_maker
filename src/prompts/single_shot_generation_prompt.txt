@@ -1,0 +1,106 @@
+Generate artistic instructions for a {genre} screenplay: "{subject}"
+
+# Core Parameters
+- Genre: {genre}
+- Subject: {subject}
+- Shot to regenerate: Shot {shot_number} of {total_shots}
+- Shot duration: 10 seconds
+- Time period(s): [Specify the year(s) for the scene]
+
+# Context Information
+Special Instructions:
+{special_instructions}
+
+Story Background:
+{story_background}
+
+Chapter Overview:
+{chapter_high_level_description}
+
+Scene Overview:
+{scene_overview}
+
+Previous Shots in Scene:
+{previous_shots}
+
+Following Shots in Scene:
+{following_shots}
+
+# Shot Requirements
+## Technical Specifications
+1. Camera Details:
+   - Camera type and model
+   - Lens specifications
+   - Camera movement (if applicable)
+   - Shot type (wide, medium, close-up, etc.)
+   - Frame composition
+
+2. Lighting Requirements:
+   - Time of day
+   - Natural/Artificial lighting
+   - Key light positioning
+   - Fill light details
+   - Mood lighting elements
+
+3. Setting Details:
+   - Location description
+   - Time period markers
+   - Environmental elements
+   - Weather conditions
+   - Set dressing specifics
+
+4. Character Elements:
+   - Costume details
+   - Makeup specifications
+   - Character positioning
+   - Facial expressions
+   - Body language
+
+## Shot Type Requirements
+{shot_type_requirements}
+- If regenerating a static shot:
+  - No camera movement
+  - Main character presence preferred
+- If regenerating a dynamic shot:
+  - Include camera movement specifications
+  - Include transition requirements
+
+## Required Elements
+- Opening Shot:
+  - Must establish time period
+  - Main character presence (if applicable)
+  - Scene setting establishment
+- Closing Shot:
+  - Must provide scene resolution
+  - Main character presence (if applicable)
+  - Time period confirmation
+
+# Image Generation Requirements
+- Two images required (opening and closing)
+- Ultra-realistic style
+- Stable diffusion model compatibility
+- Detailed environmental elements
+- Period-accurate details
+- Lighting and atmosphere specifications
+- Must maintain visual continuity with adjacent shots
+
+Output Format:
+{{
+  "shot": {{
+    "shot_number": "{shot_number}",
+    "still_image": "True/False",
+    "detailed_opening_scene_description": "[DATE: XXXX] [Comprehensive visual description serving as image prompt 1]",
+    "detailed_opening_scene_description_main_character_presence": "True/False",
+    "detailed_closing_scene_description": "[DATE: XXXX] [Comprehensive visual description serving as image prompt 2]",
+    "detailed_closing_scene_description_main_character_presence": "True/False",
+    "detailed_shot_description": "[Complete technical and artistic direction for crew implementation]"
+  }}
+}}
+
+Notes:
+- Shot must be feasible within 10-second duration
+- Events must be logically connected to adjacent shots
+- Time period must be clearly indicated
+- Main character presence must be noted in either opening or closing shot
+- Image prompts must be detailed enough for AI image generation
+- Maintain visual and narrative continuity with adjacent shots
