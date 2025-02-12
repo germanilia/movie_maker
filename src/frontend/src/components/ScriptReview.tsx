@@ -23,12 +23,9 @@ import {
 interface Shot {
   shot_number: number;
   still_image: boolean | string;
+  shot_director_instructions: string;
   detailed_opening_scene_description: string;
-  detailed_opening_scene_description_main_character_presence: boolean | string;
   detailed_closing_scene_description: string;
-  detailed_closing_scene_description_main_character_presence: boolean | string;
-  detailed_shot_description: string;
-  shot_description: string;
 }
 
 interface Scene {
@@ -37,7 +34,7 @@ interface Scene {
   key_events: string[];
   main_characters: string[];
   narration_text: string;
-  shots: Shot[];
+  shots: Shot[] | null;
   sound_effects: string[] | string;
 }
 
@@ -46,12 +43,24 @@ interface Chapter {
   chapter_title: string;
   chapter_description: string;
   key_events: string[];
-  main_characters: string[];
-  scenes: Scene[];
+  scenes: Scene[] | null;
 }
 
 interface Script {
   chapters: Chapter[];
+}
+
+interface ProjectDetails {
+  project: string;
+  genre: string;
+  subject: string;
+  movie_general_instructions: string;
+  narration_instructions: string;
+  story_background: string;
+  number_of_chapters: number;
+  number_of_scenes: number;
+  number_of_shots: number;
+  black_and_white: boolean;
 }
 
 interface ScriptReviewProps {
@@ -112,55 +121,15 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       chapters: script.chapters.map((chapter: any, cIndex: number) =>
         cIndex === chapterIndex
           ? {
-              ...chapter,
-              scenes: chapter.scenes.map((scene: any, sIndex: number) =>
-                sIndex === sceneIndex ? { ...scene, [field]: value } : scene
-              ),
-            }
+            ...chapter,
+            scenes: chapter.scenes.map((scene: any, sIndex: number) =>
+              sIndex === sceneIndex ? { ...scene, [field]: value } : scene
+            ),
+          }
           : chapter
       ),
     };
     setScript(updatedScript);
-  };
-
-  const handleShotChange = async (
-    chapterIndex: number,
-    sceneIndex: number,
-    shotIndex: number,
-    field: string,
-    value: any
-  ) => {
-    if (!script) return;
-    
-    setIsSaving(true);
-    try {
-      const response = await fetch(`http://localhost:8000/api/update-shot-description/${projectName}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chapter_index: chapterIndex,
-          scene_index: sceneIndex,
-          shot_index: shotIndex,
-          field: field,
-          value: value
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update shot description');
-      }
-
-      const updatedScript = await response.json();
-      setScript(updatedScript);
-      // Update local storage with the server response
-      localStorage.setItem(SCRIPT_STORAGE_KEY, JSON.stringify(updatedScript));
-    } catch (error) {
-      console.error('Error updating shot description:', error);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleSave = async () => {
@@ -190,12 +159,32 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
-  const handleGenerateImages = async () => {
+  const handleGenerateShots = async () => {
     if (!script) return;
     setIsGenerating(true);
     try {
       await handleSave(); // First save the script
-      
+
+      // Generate shots
+      const generateShotsResponse = await fetch(
+        `http://localhost:8000/api/generate_shots/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+
+      if (!generateShotsResponse.ok) {
+        const errorData = await generateShotsResponse.json();
+        throw new Error(errorData.detail || 'Failed to generate shots');
+      }
+
+      const updatedScript = await generateShotsResponse.json();
+      setScript(updatedScript);
+      localStorage.setItem(SCRIPT_STORAGE_KEY, JSON.stringify(updatedScript));
+
       // Start image generation
       const response = await fetch(
         `http://localhost:8000/api/generate-images/${projectName}`,
@@ -204,17 +193,19 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(script),
+          body: JSON.stringify(updatedScript),
         }
       );
 
       if (!response.ok) {
-        throw new Error('Failed to start image generation');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to start image generation');
       }
 
       onNext(); // Proceed to image review page
     } catch (error) {
-      console.error('Error generating images:', error);
+      console.error('Error generating shots and images:', error);
+      // You might want to show an error toast or message to the user here
     } finally {
       setIsGenerating(false);
     }
@@ -242,7 +233,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       <Box height="calc(100vh - 80px)" overflowY="auto" p={4} pb="100px">
         <VStack spacing={4} align="stretch">
           <Heading size="lg" mb={4}>Script Review</Heading>
-          
+
           <Accordion allowMultiple defaultIndex={[0]}>
             {script.chapters.map((chapter: any, chapterIndex: number) => (
               <AccordionItem key={chapterIndex}>
@@ -284,18 +275,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                         }
                         rows={3}
                         placeholder="One event per line"
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel>Main Characters</FormLabel>
-                      <Textarea
-                        value={chapter.main_characters.join('\n')}
-                        onChange={(e) =>
-                          handleChapterChange(chapterIndex, 'main_characters', e.target.value.split('\n'))
-                        }
-                        rows={3}
-                        placeholder="One character per line"
                       />
                     </FormControl>
 
@@ -375,101 +354,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                                   rows={4}
                                 />
                               </FormControl>
-
-                              <FormControl>
-                                <FormLabel>Sound Effects</FormLabel>
-                                <Textarea
-                                  value={Array.isArray(scene.sound_effects) ? scene.sound_effects.join('\n') : scene.sound_effects}
-                                  onChange={(e) =>
-                                    handleSceneChange(
-                                      chapterIndex,
-                                      sceneIndex,
-                                      'sound_effects',
-                                      e.target.value.split('\n')
-                                    )
-                                  }
-                                  rows={3}
-                                  placeholder="One sound effect per line"
-                                />
-                              </FormControl>
-
-                              {scene.shots && (
-                                <Accordion allowMultiple>
-                                  {scene.shots.map((shot: any, shotIndex: number) => (
-                                    <AccordionItem key={shotIndex}>
-                                      <AccordionButton>
-                                        <Box flex="1" textAlign="left">
-                                          <Heading size="xs">Shot {shot.shot_number}</Heading>
-                                        </Box>
-                                        <AccordionIcon />
-                                      </AccordionButton>
-                                      <AccordionPanel>
-                                        <VStack spacing={4} align="stretch">
-                                          <FormControl>
-                                            <FormLabel>Opening Scene Description</FormLabel>
-                                            <Textarea
-                                              value={shot.detailed_opening_scene_description}
-                                              isReadOnly
-                                              rows={3}
-                                            />
-                                          </FormControl>
-
-                                          <FormControl>
-                                            <FormLabel>Opening Scene Main Character Presence</FormLabel>
-                                            <Select
-                                              value={String(shot.detailed_opening_scene_description_main_character_presence)}
-                                              isReadOnly
-                                            >
-                                              <option value="true">True</option>
-                                              <option value="false">False</option>
-                                            </Select>
-                                          </FormControl>
-
-                                          <FormControl>
-                                            <FormLabel>Closing Scene Description</FormLabel>
-                                            <Textarea
-                                              value={shot.detailed_closing_scene_description}
-                                              isReadOnly
-                                              rows={3}
-                                            />
-                                          </FormControl>
-
-                                          <FormControl>
-                                            <FormLabel>Closing Scene Main Character Presence</FormLabel>
-                                            <Select
-                                              value={String(shot.detailed_closing_scene_description_main_character_presence)}
-                                              isReadOnly
-                                            >
-                                              <option value="true">True</option>
-                                              <option value="false">False</option>
-                                            </Select>
-                                          </FormControl>
-
-                                          <FormControl>
-                                            <FormLabel>Shot Description</FormLabel>
-                                            <Textarea
-                                              value={shot.detailed_shot_description}
-                                              isReadOnly
-                                              rows={3}
-                                            />
-                                          </FormControl>
-
-                                          <FormControl>
-                                            <FormLabel>Still Image</FormLabel>
-                                            <Select
-                                              value={String(shot.still_image)}
-                                              isReadOnly
-                                            >
-                                              <option value="true">True</option>
-                                              <option value="false">False</option>
-                                            </Select>
-                                          </FormControl>
-                                        </VStack>
-                                      </AccordionPanel>
-                                    </AccordionItem>
-                                  ))}
-                                </Accordion>
-                              )}
                             </VStack>
                           </AccordionPanel>
                         </AccordionItem>
@@ -482,7 +366,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           </Accordion>
         </VStack>
       </Box>
-
       <Box
         position="fixed"
         bottom={0}
@@ -491,36 +374,17 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         p={4}
         bg="white"
         borderTopWidth={1}
-        borderTopColor="gray.200"
-        zIndex={2}
-        boxShadow="0 -2px 10px rgba(0,0,0,0.1)"
+        shadow="lg"
       >
         <HStack spacing={4} justify="flex-end">
-          <Button 
-            onClick={onBack}
-            size="lg"
-            variant="ghost"
-          >
-            Back
-          </Button>
+          <Button onClick={onBack}>Back</Button>
           <Button 
             colorScheme="blue" 
-            variant="outline"
-            size="lg"
-            onClick={handleSave}
-            isLoading={isSaving}
-            loadingText="Saving..."
-          >
-            Save Changes
-          </Button>
-          <Button 
-            colorScheme="blue"
-            size="lg"
-            onClick={handleGenerateImages}
+            onClick={handleGenerateShots}
             isLoading={isGenerating}
-            loadingText="Generating Images..."
+            loadingText="Generating shots..."
           >
-            Generate Images
+            Next
           </Button>
         </HStack>
       </Box>
@@ -528,4 +392,4 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   );
 };
 
-export default ScriptReview; 
+export default ScriptReview;

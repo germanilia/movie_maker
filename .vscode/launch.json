@@ -4,7 +4,6 @@
         {
             "name": "Full Stack: Frontend + Backend",
             "configurations": ["Python: FastAPI", "React: Chrome"],
-            "preLaunchTask": "Start Dev Servers",
             "stopAll": true
         }
     ],
@@ -49,5 +48,6 @@
                 "PYTHONPATH": "${workspaceFolder}"
             }
         }
-    ]
-} 
+    ],
+    "workbench.externalBrowser": "chrome"
+}

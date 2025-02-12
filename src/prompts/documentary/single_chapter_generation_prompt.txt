@@ -1,6 +1,6 @@
 Generate artistic instructions for a {genre} screenplay about "{subject}". 
 special instructions:
-{special_instructions}
+{movie_general_instructions}
 #####
 story background: 
 {story_background}

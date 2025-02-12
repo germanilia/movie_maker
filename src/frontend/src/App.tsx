@@ -22,7 +22,8 @@ interface ProjectData {
   project: string;
   genre: string;
   subject: string;
-  special_instructions: string;
+  movie_general_instructions: string;
+  narration_instructions: string;
   story_background: string;
   number_of_chapters: number;
   number_of_scenes: number;
@@ -66,9 +67,10 @@ function App() {
     project: '',
     genre: '',
     subject: '',
-    special_instructions: '',
+    movie_general_instructions: '',
     story_background: '',
     number_of_chapters: 4,
+    narration_instructions: '',
     number_of_scenes: 3,
     number_of_shots: 3,
     black_and_white: false,

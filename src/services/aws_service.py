@@ -179,8 +179,11 @@ class AWSService:
             self.s3_client.upload_file(local_path, bucket, key)
             logger.info(f"Successfully uploaded {local_path} to {s3_uri}")
 
+            # Extract file name from key
+            file_name = key.split('/')[-1]
+
             # Save to temp directory
-            temp_path = self.temp_dir / key
+            temp_path = self.temp_dir / file_name
             temp_path.parent.mkdir(parents=True, exist_ok=True)
             
             # If the source isn't already in the temp directory, copy it there

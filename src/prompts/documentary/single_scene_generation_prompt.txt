@@ -1,0 +1,32 @@
+Generate artistic instructions for a {genre} screenplay about "{subject}". 
+special instructions:
+{movie_general_instructions}
+#####
+story background: 
+{story_background}
+####
+chapter_high_level_description:
+{chapter_high_level_description}
+####
+previously generated scenes:
+{previous_scenes}
+####
+current Scene Number: {scene_number}
+####
+Total number of scenes in this chapter: {number_of_scenes}
+####
+Previous Generation Error:
+{previous_generation_error}
+####
+
+Based on the story background, chapter description, and maintaining continuity with the previously generated scenes, create the next scene for this chapter.
+
+Output Structure:
+{{
+  "scene": {{
+    "scene_description": "[Scene description that follows the story progression]",
+    "key_events": "[Key events that occur in this scene, must be the same number as the number of shots and also the scene must follow chronologically from the previous scenes and maintain the chapter's progression.]",
+    "main_characters": "[main_characters needs to include a detailed description of each character, the looks which should be very detailed and include hair style, hight, clothing, hight.]",
+    "narration_text": "[{narration_instructions}, limited to 70 words]",
+  }}
+}}

@@ -1,15 +1,17 @@
 Generate artistic instructions for a {genre} screenplay: "{subject}"
 
 # Core Parameters
-- Genre: {genre}
-- Subject: {subject}
+- Video Genre: {genre}
+- Video Subject: {subject}
 - Shot to regenerate: Shot {shot_number} of {total_shots}
 - Shot duration: 10 seconds
-- Time period(s): [Specify the year(s) for the scene]
 
 # Context Information
-Special Instructions:
-{special_instructions}
+Movie General Instructions:
+{movie_general_instructions}
+
+General Scene Description And Motivations
+{general_scene_description_and_motivations}
 
 Story Background:
 {story_background}
@@ -23,8 +25,8 @@ Scene Overview:
 Previous Shots in Scene:
 {previous_shots}
 
-Following Shots in Scene:
-{following_shots}
+Previous Generation Issues:
+{previous_generation_error}
 
 # Shot Requirements
 ## Technical Specifications
@@ -57,7 +59,6 @@ Following Shots in Scene:
    - Body language
 
 ## Shot Type Requirements
-{shot_type_requirements}
 - If regenerating a static shot:
   - No camera movement
   - Main character presence preferred
@@ -86,15 +87,12 @@ Following Shots in Scene:
 
 Output Format:
 {{
-  "shot": {{
-    "shot_number": "{shot_number}",
-    "still_image": "True/False",
-    "detailed_opening_scene_description": "[DATE: XXXX] [Comprehensive visual description serving as image prompt 1]",
-    "detailed_opening_scene_description_main_character_presence": "True/False",
-    "detailed_closing_scene_description": "[DATE: XXXX] [Comprehensive visual description serving as image prompt 2]",
-    "detailed_closing_scene_description_main_character_presence": "True/False",
-    "detailed_shot_description": "[Complete technical and artistic direction for crew implementation]"
-  }}
+  "reasoning": "A deep explanation on how the output follows the given instructions, why each part was chosen and how is it the best possible selection, need to be sure the opening and closing scenes make sense together",
+  "still_image": "True/False",
+  "sound_effects": "[description of the sound effects required for the shot]",
+  "detailed_opening_scene_description": "[Detailed description of the opening shot, it should be described in a way it would be completely possible to vision the scene, it should describe the clothing of the characters if any appear, the objects in the scene, the positioning of the people and object.]"
+  "detailed_closing_scene_description": "[Detailed description of the opening shot, it should be described in a way it would be completely possible to vision the scene, it should describe the clothing of the characters if any appear, the objects in the scene, the positioning of the people and object.]"
+  "shot_director_instructions": "[Complete technical and artistic direction for crew implementation, also it must contain the progress of the shot, from the detailed_opening_scene_description to the detailed_opening_scene_description]",
 }}
 
 Notes:
@@ -104,3 +102,6 @@ Notes:
 - Main character presence must be noted in either opening or closing shot
 - Image prompts must be detailed enough for AI image generation
 - Maintain visual and narrative continuity with adjacent shots
+
+Each output must contain only a json, therefore the first char in the response must be {{ and the last must be }}
+Do not use any single quotes in the response fields, I have issues parsing it so johon's is not a valid response.

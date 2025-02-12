@@ -1,6 +1,6 @@
 Generate artistic instructions for a {genre} screenplay about "{subject}". 
 special instructions:
-{special_instructions}
+{movie_general_instructions}
 #####
 story background: 
 {story_background}
@@ -12,6 +12,10 @@ The requested number of chapters is {number_of_chapters}. These chapters must co
 
 The chapters should start with a more calm and natural tone, the first chapter should be a prologue.
 As the story progresses, the chapters should become more engaging and interesting.
+
+chapter_description should provide a detailed overview of what happens in the chapter, it should tell the main events of the chapter
+in a detailed way, it should also mention the time of the chapter, i.e. spring 1938 amsterdam holland
+
 Output Structure:
 {{
   "chapters": [
@@ -19,8 +23,7 @@ Output Structure:
       "chapter_number": "[Chapter number; e.g., 1]",
       "chapter_title": "[Chapter title; e.g., 'The Beginning']",
       "chapter_description": "[Chapter description; e.g., 'The story of a Jewish boy in Nazi Germany']",
-      "key_events": "[Key events; e.g., 'The boy is born', 'The boy is sent to a concentration camp']",
-      "main_characters": "[Main characters; e.g., 'The boy', 'The girl']"
+      "key_events": "[Key events to be presented in this chapter, they should be logically make sense and follow a chronological order and story line ]"
     }}
   ]
 }}
