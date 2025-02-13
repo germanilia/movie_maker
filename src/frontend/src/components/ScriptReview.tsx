@@ -48,6 +48,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [imageData, setImageData] = useState<Record<string, string>>({});
   const [narrationData, setNarrationData] = useState<Record<string, string>>({});
   const [existingNarrations, setExistingNarrations] = useState<Record<string, boolean>>({});
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const toast = useToast();
   const isMounted = React.useRef(false);
 
@@ -188,6 +189,83 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
+  const getAllPendingImages = () => {
+    if (!script) return [];
+    
+    const pendingImages: { 
+      chapterIndex: number; 
+      sceneIndex: number; 
+      shotIndex: number; 
+      type: string; 
+      description: string; 
+    }[] = [];
+
+    script.chapters.forEach((chapter, chapterIndex) => {
+      chapter.scenes?.forEach((scene, sceneIndex) => {
+        scene.shots?.forEach((shot, shotIndex) => {
+          if (shot.detailed_opening_scene_description) {
+            pendingImages.push({
+              chapterIndex,
+              sceneIndex,
+              shotIndex,
+              type: 'opening',
+              description: shot.detailed_opening_scene_description
+            });
+          }
+          if (shot.detailed_closing_scene_description) {
+            pendingImages.push({
+              chapterIndex,
+              sceneIndex,
+              shotIndex,
+              type: 'closing',
+              description: shot.detailed_closing_scene_description
+            });
+          }
+        });
+      });
+    });
+
+    return pendingImages;
+  };
+
+  const handleGenerateAll = async () => {
+    const pendingImages = getAllPendingImages();
+    setIsGeneratingAll(true);
+
+    try {
+      for (const img of pendingImages) {
+        if (!isMounted.current) break;
+        
+        await handleGenerateImage(
+          img.chapterIndex,
+          img.sceneIndex,
+          img.shotIndex,
+          img.type,
+          img.description
+        );
+      }
+
+      toast({
+        title: 'Success',
+        description: 'All images have been generated',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error generating all images:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate all images',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsGeneratingAll(false);
+    }
+  };
+
   if (!script) {
     return (
       <Box p={4}>
@@ -244,6 +322,15 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         <HStack justify="space-between" align="center">
           <Heading size="lg">Script Review</Heading>
           <HStack spacing={4}>
+            <Button 
+              colorScheme="teal"
+              onClick={handleGenerateAll}
+              isLoading={isGeneratingAll}
+              loadingText="Generating All"
+              isDisabled={generatingImages.size > 0}
+            >
+              Generate All Images
+            </Button>
             <Button onClick={onBack}>Back</Button>
             <Button colorScheme="blue" onClick={onNext}>
               Next
@@ -373,17 +460,17 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                                       renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'closing')}
 
                                     {/* Sound Effects */}
-                                    {shot.sound_effects && (
+                                    {shot.background_music && (
                                       <Box bg="orange.50" p={3} borderRadius="md">
                                         <Text fontWeight="bold" mb={1}>Sound Effects:</Text>
-                                        {Array.isArray(shot.sound_effects) ? (
+                                        {Array.isArray(shot.background_music) ? (
                                           <UnorderedList>
-                                            {shot.sound_effects.map((effect, idx) => (
+                                            {shot.background_music.map((effect, idx) => (
                                               <ListItem key={idx} color="orange.800">{effect}</ListItem>
                                             ))}
                                           </UnorderedList>
                                         ) : (
-                                          <Text color="orange.800">{shot.sound_effects}</Text>
+                                          <Text color="orange.800">{shot.background_music}</Text>
                                         )}
                                       </Box>
                                     )}

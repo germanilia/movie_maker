@@ -22,7 +22,7 @@ class SoundGenerator:
         """Initialize the voice by checking for existing clone or creating new one."""
         try:
             # Construct the full path to the voice sample within the project directory
-            project_dir = self.temp_dir / project_name
+            project_dir = self.temp_dir
             sample_path = project_dir / sample_name
 
             if not sample_path.exists():

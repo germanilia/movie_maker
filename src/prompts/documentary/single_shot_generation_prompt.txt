@@ -49,7 +49,7 @@ Output Format:
   "director_instructions": "This string represents the director instructions for the entire scene, it needs to consider the previous shots and what was already covered from the scene",
   "detailed_opening_scene_description": "{black_and_white} this is the description of the opening scene of the shot, it needs to be a very detailed explanation which will fit the diffusion models",
   "detailed_closing_scene_description": "{black_and_white} this is the description of the closing scene of the shot, it needs to be a very detailed explanation which will fit the diffusion models",
-  "sound_effects": A string which represents the sound effects which should be in the background during the scene
+  "background_music": String which describes the background music which needs to be played in the background of this shot
 }}
 
 Notes:

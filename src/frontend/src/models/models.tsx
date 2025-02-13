@@ -15,7 +15,7 @@ export interface Shot {
   director_instructions?: string;
   detailed_opening_scene_description?: string;
   detailed_closing_scene_description?: string;
-  sound_effects?: string[] | string;
+  background_music?: string[] | string;
 }
 
 export interface Scene {

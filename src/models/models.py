@@ -20,7 +20,7 @@ class Shot(BaseModel):
     director_instructions: str = ""  # Changed to have a default empty string
     detailed_opening_scene_description: str | None = None
     detailed_closing_scene_description: str | None = None
-    sound_effects: List[str] | str | None = None
+    background_music: List[str] | str | None = None
 
 class Scene(BaseModel):
     reasoning: str | None = None
