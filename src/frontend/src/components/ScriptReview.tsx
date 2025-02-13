@@ -73,8 +73,9 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
         if (imageData.status === 'success' && imageData.images && isMounted.current) {
           const processedImages: Record<string, string> = {};
-          (Object.entries(imageData.images) as [string, string][]).forEach(([key, base64]) => {
-            processedImages[key] = `data:image/png;base64,${base64}`;
+          Object.entries(imageData.images).forEach(([key, base64]) => {
+            // Backend now returns full data URL, so we don't need to add the prefix
+            processedImages[key] = base64;
           });
           setImageData(processedImages);
         }
@@ -151,19 +152,23 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
       const data = await response.json();
 
-      // Store the base64 image data
-      setImageData(prev => ({
-        ...prev,
-        [imageKey]: `data:image/png;base64,${data.base64_image}`
-      }));
+      if (data.status === 'success' && data.base64_image) {
+        // Update the image data with the new base64 image
+        setImageData(prev => ({
+          ...prev,
+          [imageKey]: data.base64_image
+        }));
 
-      toast({
-        title: 'Success',
-        description: 'Image generation completed',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
+        toast({
+          title: 'Success',
+          description: 'Image generation completed',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        throw new Error(data.message || 'Failed to generate image');
+      }
 
     } catch (error) {
       console.error('Error generating image:', error);

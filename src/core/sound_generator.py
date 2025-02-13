@@ -1,34 +1,44 @@
-import os
 import logging
-from typing import Dict
-from pyht import Client
-from pyht.client import TTSOptions
-from src.models.models import Script
 from src.services.aws_service import AWSService
+from src.services.voice_service import VoiceService
 
 logger = logging.getLogger(__name__)
 
 
 class SoundGenerator:
-    def __init__(self, aws_service: AWSService, project_name: str):
+    def __init__(
+        self, aws_service: AWSService, project_name: str, verify_ssl: bool = False
+    ):
         """Initialize the SoundGenerator with Play.ht API credentials and AWS service."""
-        user_id = os.getenv("PLAY_HT_USER_ID")
-        api_key = os.getenv("PLAY_HT_API_KEY")
-
-        if not user_id or not api_key:
-            raise ValueError(
-                "PLAY_HT_USER_ID and PLAY_HT_API_KEY environment variables must be set"
-            )
-
-        self.client = Client(
-            user_id=user_id,
-            api_key=api_key,
-        )
+        self.voice_service = VoiceService(verify_ssl=verify_ssl)
         self.aws_service = aws_service
         self.temp_dir = aws_service.temp_dir
         self.project_name = project_name
-        self.voice_id = "s3://voice-cloning-zero-shot/775ae416-49bb-4fb6-bd45-740f205d20a1/jennifersaad/manifest.json"
-        
+        self.voice_id = None  # Will be set after checking/creating cloned voice
+
+    async def initialize_voice(
+        self, project_name: str, sample_name: str = "voice_sample.m4a"
+    ):
+        """Initialize the voice by checking for existing clone or creating new one."""
+        try:
+            # Construct the full path to the voice sample within the project directory
+            project_dir = self.temp_dir / project_name
+            sample_path = project_dir / sample_name
+
+            if not sample_path.exists():
+                raise FileNotFoundError(f"Voice sample not found at {sample_path}")
+
+            logger.info(f"Using voice sample from: {sample_path}")
+            self.voice_id = self.voice_service.get_or_create_cloned_voice(
+                str(sample_path), project_name
+            )
+            if not self.voice_id.startswith("s3://"):
+                self.voice_id = f"s3://{self.voice_id}"
+            logger.info(f"Initialized voice with ID: {self.voice_id}")
+        except Exception as e:
+            logger.error(f"Failed to initialize voice: {str(e)}")
+            raise
+
     async def ensure_audio_exists(self, audio_path: str) -> bool:
         """
         Check if audio exists locally or in S3, download if needed.
@@ -55,32 +65,34 @@ class SoundGenerator:
         text: str,
         output_path: str,
     ) -> str:
-        """Generate audio from text using Play.ht API and save to S3."""
+        """Generate audio from text using Play.ht API and save locally."""
+        if not self.voice_id:
+            raise ValueError("Voice has not been initialized. Call initialize_voice first.")
+
         # Check if audio already exists locally or in S3
         audio_exists = await self.ensure_audio_exists(output_path)
         local_path = self.temp_dir / output_path
         if audio_exists:
             logger.info(f"Audio already exists for {output_path}, skipping generation")
-            return output_path
+            return str(local_path)
+
         try:
             local_path.parent.mkdir(parents=True, exist_ok=True)
-            # Configure TTS options
-            options = TTSOptions(voice=self.voice_id)
-
-
-            # Generate and save audio
+            
+            # Get audio chunks iterator
+            audio_chunks = await self.voice_service.generate_voice(
+                text=text,
+                voice_id=self.voice_id
+            )
+            
+            # Write chunks to file
             with open(local_path, "wb") as audio_file:
-                for chunk in self.client.tts(
-                    text, options, voice_engine="PlayDialog-http"
-                ):
+                for chunk in audio_chunks:
                     audio_file.write(chunk)
-
-
-            logger.info(f"Generated and saved audio to {output_path}")
-            return local_path
+            
+            logger.info(f"Generated and saved audio to {local_path}")
+            return str(local_path)
 
         except Exception as e:
             logger.error(f"Failed to generate audio for {output_path}: {str(e)}")
             raise
-
-    

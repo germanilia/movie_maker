@@ -1,8 +1,19 @@
 import logging
 import sys
 
+from src.core.image_generator import ImageGenerator
 from src.core.sound_generator import SoundGenerator
-
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from src.models.models import ProjectDetails, Script, RegenerateImageRequest
+from src.core.director import Director
+from src.core.video_genrator import VideoGenerator
+from src.services.aws_service import AWSService
+# from src.services.image_generator import ImageGenerator
+import os
+from pydantic import BaseModel
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -20,20 +31,7 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 # Get the logger for this module
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from src.core.image_generator import ImageGenerator
-from src.models.models import ProjectDetails, Script, RegenerateImageRequest
-from src.core.director import Director
-from src.core.video_genrator import VideoGenerator
-from src.services.aws_service import AWSService
-from src.models.image import ImageRequest, ImageResponse
-# from src.services.image_generator import ImageGenerator
-import os
-from pydantic import BaseModel
-import uuid
+
 
 app = FastAPI(title="Video Creator API")
 # Add CORS middleware
@@ -217,7 +215,7 @@ async def get_image(
         
         return {
             "status": "success",
-            "base64_image": base64_image,
+            "base64_image": f"data:image/png;base64,{base64_image}",
             "chapter_index": chapter_index,
             "scene_index": scene_index,
             "shot_index": shot_index,
@@ -257,10 +255,16 @@ async def regenerate_image(
             overwrite_image=True
         )
         
+        if not base64_image:
+            return {
+                "status": "error",
+                "message": "Failed to generate image"
+            }
+            
         return {
             "status": "success",
             "message": "Image regeneration completed",
-            "base64_image": base64_image,
+            "base64_image": base64_image,  # Already includes data URL prefix from generate_image
             "chapter_index": request.chapter_index,
             "scene_index": request.scene_index,
             "shot_index": request.shot_index,
@@ -303,7 +307,7 @@ async def get_all_images(project_name: str):
                         with open(image_file, "rb") as f:
                             import base64
                             base64_image = base64.b64encode(f.read()).decode('utf-8')
-                            image_data[image_key] = base64_image
+                            image_data[image_key] = f"data:image/png;base64,{base64_image}"
         
         return {
             "status": "success",
@@ -328,15 +332,17 @@ async def generate_narration(project_name: str, request: NarrationRequest):
             aws_service=aws_service,
             project_name=project_name
         )
-
+        await sound_generator.initialize_voice(
+            project_name=project_name,
+        )
         # Generate a unique filename for this narration
         audio_path = f"chapter_{request.chapter_number}/scene_{request.scene_number}/narration.wav"
         
         # Generate the audio
-        await sound_generator._generate_audio_from_text(request.text, audio_path)
+        local_path = await sound_generator._generate_audio_from_text(request.text, audio_path)
         
         # Get the local path to the generated audio
-        local_path = sound_generator.temp_dir / audio_path
+        # local_path = sound_generator.temp_dir / audio_path
         
         # Return the audio file
         return FileResponse(
@@ -358,12 +364,6 @@ async def get_all_narrations(project_name: str):
             aws_service=aws_service,
             project_name=project_name
         )
-        director = Director(
-            aws_service=aws_service,
-            project_name=project_name
-        )
-
-        script = await director.get_script()
         project_dir = sound_generator.temp_dir
         narration_files = {}
 

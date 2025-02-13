@@ -1,82 +1,109 @@
 import logging
 from src.models.models import Script
 from src.services.aws_service import AWSService
-import json
+from src.services.image_service import ImageService
 import asyncio
-from enum import StrEnum
-import random
 import base64
+from typing import List, Tuple
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-
-class BedrockModels(StrEnum):
-    STABLE_DIFFUSION_XL = "stability.stable-diffusion-xl-v1"
-    STABLE_DIFFUSION_3 = "stability.sd3-large-v1:0"
-    STABLE_DIFFUSION_3_5 = "stability.sd3-5-large-v1:0"
-    STABLE_DIFFUSION_ULTRA = "stability.stable-image-ultra-v1:1"
-
-
 class ImageGenerator:
     def __init__(
-        self, aws_service: AWSService, model_id: BedrockModels = BedrockModels.STABLE_DIFFUSION_ULTRA, black_and_white: bool = False, genre: str = "documentary"
+        self, 
+        aws_service: AWSService, 
+        black_and_white: bool = False, 
+        genre: str = "documentary"
     ):
         """
         Initialize the ImageGenerator
         Args:
             aws_service (AWSService): AWS service instance for AWS interactions
-            model_id (BedrockModels): The model ID to use for image generation
+            black_and_white (bool): Whether to generate black and white images
+            genre (str): The genre style to apply to images
         """
         self.aws_service = aws_service
-        self.model_id = model_id
-        self.temp_dir = aws_service.temp_dir
-        self.black_and_white = black_and_white
-        self.genre = genre
+        self.image_service = ImageService(aws_service, black_and_white, genre)
+        self.temp_dir = Path(aws_service.temp_dir)
 
-    async def ensure_image_exists(
-        self, image_path: str
+    async def ensure_image_exists(self, image_path: str) -> bool:
+        """Check if image exists in the temp directory"""
+        full_path = self.temp_dir / image_path
+        return full_path.exists()
+
+    def _encode_image_to_base64(self, image_path: Path) -> str:
+        """Convert image to base64 with data URL prefix"""
+        try:
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+                return f"data:image/png;base64,{base64_image}"
+        except Exception as e:
+            logger.error(f"Failed to encode image to base64: {str(e)}")
+            return self.get_fallback_image()
+
+    def get_fallback_image(self) -> str:
+        """Get fallback image as base64 with data URL prefix"""
+        try:
+            stock_image_path = Path("stock_images/failed_generation.png")
+            return self._encode_image_to_base64(stock_image_path)
+        except Exception as e:
+            logger.error(f"Failed to get fallback image: {str(e)}")
+            return ""
+
+    async def generate_image(
+        self, 
+        prompt: str, 
+        image_path: str, 
+        seed: int | None = None, 
+        overwrite_image: bool = False
+    ) -> str:
+        """Generate image and return as base64 data URL"""
+        success, path = await self.image_service.generate_image(
+            prompt=prompt,
+            image_path=image_path,
+            seed=seed,
+            overwrite_image=overwrite_image
+        )
+        
+        if success and path:
+            return self._encode_image_to_base64(Path(path))
+        return self.get_fallback_image()
+
+    async def _generate_single_image(
+        self, 
+        prompt: str, 
+        image_path: str, 
+        failed_images: List[Tuple[str, str]]
     ) -> bool:
         """
-        Check if image exists locally or in S3, download if needed.
-
+        Generate a single image and handle failures.
         Args:
-            image_path (str): Full S3 path to the image
-
+            prompt: The image generation prompt
+            image_path: Path where the image should be saved
+            failed_images: List to track failed generations
         Returns:
-            bool: True if image exists or was downloaded successfully, False if not found
+            bool: True if generation was successful
         """
         try:
-            s3_uri = f"{self.aws_service.s3_base_uri}/{image_path}"
-            # Check if image exists in S3
-            if await self.aws_service.file_exists(s3_uri):
-                # Get local path
-                local_path = self.temp_dir / image_path
-
-                # Create local directory if it doesn't exist
-                local_path.parent.mkdir(parents=True, exist_ok=True)
-
-                # If not in temp directory, download it
-                if not local_path.exists():
-                    try:
-                        await self.aws_service.download_file(image_path, str(local_path))
-                        logger.info(f"Downloaded image {image_path} to {local_path}")
-                    except Exception as e:
-                        logger.error(f"Failed to download image {image_path}: {str(e)}")
-                        return False
-                else:
-                    logger.debug(f"Image already exists locally at {local_path}")
-
-                return True
-            else:
-                logger.debug(f"Image {image_path} does not exist in S3")
-                return False
-
+            base64_image = await self.generate_image(
+                prompt=prompt,
+                image_path=image_path,
+                overwrite_image=False
+            )
+            return bool(base64_image and not base64_image.endswith(self.get_fallback_image()))
         except Exception as e:
-            logger.error(f"Error checking image existence for {image_path}: {str(e)}")
+            error_msg = str(e)
+            logger.error(f"Failed to generate image {image_path}: {error_msg}")
+            failed_images.append((image_path, error_msg))
             return False
 
-    async def generate_images_for_script(self, script: Script) -> None:
-        """Generate images for all shots in the script."""
+    async def generate_images_for_script(self, script: Script) -> List[Tuple[str, str]]:
+        """
+        Generate images for all shots in the script.
+        Returns:
+            List[Tuple[str, str]]: List of failed image paths and their error messages
+        """
         logger.info("Starting image generation for script")
         failed_images = []
         
@@ -87,132 +114,36 @@ class ImageGenerator:
                 logger.info(f"Processing scene {scene_idx} in chapter {chapter_idx}")
                 
                 for shot_idx, shot in enumerate(scene.shots or [], 1):
-                    logger.info(f"Generating images for shot {shot_idx} in scene {scene_idx}, chapter {chapter_idx}")
+                    logger.info(f"Processing shot {shot_idx} in scene {scene_idx}, chapter {chapter_idx}")
                     
-                    # Generate opening image
-                    opening_image_path = f"chapter_{chapter_idx}/scene_{scene_idx}/shot_{shot_idx}_opening.png"
-                    seed = random.randint(0, 999999999)
-                    try:
-                        logger.info(f"Generating opening image for shot {shot_idx}")
-                        await self.generate_image(
-                            prompt=shot.detailed_opening_scene_description,
-                            image_path=opening_image_path,
-                            seed=seed,
-                            overwrite_image=False
+                    # Process opening scene
+                    if shot.detailed_opening_scene_description:
+                        image_path = f"chapter_{chapter_idx}/scene_{scene_idx}/shot_{shot_idx}_opening.png"
+                        success = await self._generate_single_image(
+                            shot.detailed_opening_scene_description,
+                            image_path,
+                            failed_images
                         )
-                        logger.info(f"Successfully generated opening image: {opening_image_path}")
-                    except Exception as e:
-                        logger.error(f"Failed to generate opening image for shot {shot_idx}: {str(e)}")
-                        failed_images.append((opening_image_path, str(e)))
-                        continue
+                        if not success:
+                            logger.warning(f"Failed to generate opening image for shot {shot_idx}")
                     
-                    # Generate closing image
-                    closing_image_path = f"chapter_{chapter_idx}/scene_{scene_idx}/shot_{shot_idx}_closing.png"
-                    try:
-                        logger.info(f"Generating closing image for shot {shot_idx}")
-                        await self.generate_image(
-                            prompt=shot.detailed_closing_scene_description,
-                            image_path=closing_image_path,
-                            seed=seed,
-                            overwrite_image=False
+                    # Process closing scene
+                    if shot.detailed_closing_scene_description:
+                        image_path = f"chapter_{chapter_idx}/scene_{scene_idx}/shot_{shot_idx}_closing.png"
+                        success = await self._generate_single_image(
+                            shot.detailed_closing_scene_description,
+                            image_path,
+                            failed_images
                         )
-                        logger.info(f"Successfully generated closing image: {closing_image_path}")
-                    except Exception as e:
-                        logger.error(f"Failed to generate closing image for shot {shot_idx}: {str(e)}")
-                        failed_images.append((closing_image_path, str(e)))
-                        continue
+                        if not success:
+                            logger.warning(f"Failed to generate closing image for shot {shot_idx}")
                     
                     # Add delay to avoid rate limiting
                     await asyncio.sleep(1)
-                
-                logger.info(f"Completed image generation for scene {scene_idx} in chapter {chapter_idx}")
-            
-            logger.info(f"Completed image generation for chapter {chapter_idx}")
         
         if failed_images:
-            logger.warning(f"Image generation completed with {len(failed_images)} failures:")
-            for path, error in failed_images:
-                logger.warning(f"- Failed to generate {path}: {error}")
+            logger.warning(f"Image generation completed with {len(failed_images)} failures")
         else:
             logger.info("Completed image generation for entire script successfully")
-
-    async def generate_image(self, prompt: str, image_path: str, seed: int | None = None, overwrite_image: bool = False) -> str:
-        """
-        Generate a single image based on the prompt and save it to the specified path.
-        If generation fails, uses a stock image instead.
-        Args:
-            prompt (str): The text prompt for image generation
-            image_path (str): Full S3 path to save the generated image
-            seed (int | None, optional): Seed for reproducible image generation. If None, a random seed will be used.
-        Returns:
-            str: Base64 encoded image data
-        """
-        # Check if image already exists locally or in S3
-        image_exists = await self.ensure_image_exists(image_path)
-        if image_exists and not overwrite_image:
-            logger.info(f"Image already exists for {image_path}, skipping generation")
-            # Return existing image as base64
-            local_path = self.temp_dir / image_path
-            with open(local_path, "rb") as image_file:
-                return base64.b64encode(image_file.read()).decode('utf-8')
-
-        try:
-            # If no seed is provided, generate a random one
-            if seed is None:
-                seed = random.randint(0, 999999999)
-
-            if self.black_and_white:
-                prompt = f'black and white, {prompt}'
-            prompt = f"The image should be very high quality, styled as a {self.genre} image, {prompt}"
-            
-            prompt = prompt.replace("Nazi", "German Soldier")
-            
-            request_payload = {
-                "prompt": f'{prompt}',
-                "mode": "text-to-image",
-                "aspect_ratio": "16:9",
-                "output_format": "jpeg",
-                "seed": seed
-            }
-
-            # Convert the payload to JSON bytes
-            body_bytes = json.dumps(request_payload).encode("utf-8")
-
-            # Invoke Bedrock for image generation
-            response = self.aws_service.bedrock_runtime.invoke_model(
-                modelId=self.model_id, 
-                body=body_bytes
-            )
-            response_data = json.loads(response["body"].read())
-            
-            # Extract base64 image from response
-            if "artifacts" in response_data and len(response_data["artifacts"]) > 0:
-                base64_image_data = response_data["artifacts"][0]["base64"]
-            elif "images" in response_data and len(response_data["images"]) > 0:
-                base64_image_data = response_data["images"][0]
-            else:
-                logger.error("No image data in response, using stock image")
-                stock_image_path = "stock_images/failed_generation.png"
-                with open(stock_image_path, "rb") as image_file:
-                    base64_image_data = base64.b64encode(image_file.read()).decode('utf-8')
-
-            # Upload to S3
-            await self.aws_service.upload_base64_file(
-                base64_image_data, 
-                image_path
-            )
-            logger.info(f"Generated and saved image to {image_path} with seed {seed}")
-            return base64_image_data
-
-        except Exception as e:
-            logger.error(f"Failed to generate image for {image_path}: {str(e)}")
-            # Use stock image instead
-            stock_image_path = "stock_images/failed_generation.png"
-            with open(stock_image_path, "rb") as image_file:
-                base64_image_data = base64.b64encode(image_file.read()).decode('utf-8')
-            await self.aws_service.upload_base64_file(
-                base64_image_data,
-                image_path
-            )
-            logger.info(f"Used stock image for failed generation at {image_path}")
-            return base64_image_data
+        
+        return failed_images
