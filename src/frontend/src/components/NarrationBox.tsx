@@ -6,50 +6,57 @@ interface NarrationBoxProps {
   projectName: string;
   chapter: number;
   scene: number;
+  audioData?: string; // base64 encoded audio data
 }
 
-const NarrationBox: React.FC<NarrationBoxProps> = ({ narrationText, projectName, chapter, scene }) => {
+const NarrationBox: React.FC<NarrationBoxProps> = ({ 
+  narrationText, 
+  projectName, 
+  chapter, 
+  scene,
+  audioData
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const toast = useToast();
 
   useEffect(() => {
-    const checkExistingNarration = async () => {
-      try {
-        const response = await fetch(
-          `/api/check-narration/${projectName}?chapter_number=${chapter}&scene_number=${scene}`
-        );
-
-        if (response.ok && response.status !== 404) {
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          setAudioUrl(url);
-        }
-      } catch (error) {
-        console.error('Error checking existing narration:', error);
+    // Convert base64 audio data to blob URL if available
+    if (audioData) {
+      // Convert base64 to binary
+      const binaryStr = atob(audioData);
+      // Create an array buffer from the binary string
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
       }
-    };
+      // Create blob from the array buffer
+      const blob = new Blob([bytes], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
+    }
 
-    checkExistingNarration();
-
-    // Cleanup function to revoke object URL
     return () => {
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
       }
     };
-  }, [projectName, chapter, scene]);
+  }, [audioData]);
 
   const handleGenerateAudio = async () => {
     setIsLoading(true);
     try {
-    const response = await fetch(`/api/generate-narration/${projectName}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ text: narrationText, chapter_number: chapter, scene_number: scene }),
-    });
+      const response = await fetch(`/api/generate-narration/${projectName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          text: narrationText, 
+          chapter_number: chapter, 
+          scene_number: scene 
+        }),
+      });
 
       if (!response.ok) {
         throw new Error('Failed to generate audio');
@@ -58,6 +65,14 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({ narrationText, projectName,
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
+
+      toast({
+        title: 'Success',
+        description: 'Audio narration generated successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
     } catch (error) {
       toast({
         title: 'Error',
@@ -83,7 +98,7 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({ narrationText, projectName,
           isLoading={isLoading}
           onClick={handleGenerateAudio}
         >
-          Generate Audio
+          {audioUrl ? 'Regenerate Audio' : 'Generate Audio'}
         </Button>
         
         {audioUrl && (

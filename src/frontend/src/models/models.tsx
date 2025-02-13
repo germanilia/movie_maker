@@ -36,3 +36,8 @@ export interface Chapter {
 export interface Script {
   chapters: Chapter[];
 }
+
+export interface NarrationResponse {
+  status: string;
+  narrations: Record<string, boolean>;
+}

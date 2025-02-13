@@ -319,8 +319,6 @@ class NarrationRequest(BaseModel):
     scene_number: int
     shot_number: int = None
 
-
-
 @app.post("/api/generate-narration/{project_name}")
 async def generate_narration(project_name: str, request: NarrationRequest):
     """Generate audio narration for given text"""
@@ -330,15 +328,9 @@ async def generate_narration(project_name: str, request: NarrationRequest):
             aws_service=aws_service,
             project_name=project_name
         )
-        director = Director(
-            aws_service=aws_service,
-            project_name=project_name
-        )
 
-        script = await director.get_script()
-        
         # Generate a unique filename for this narration
-        audio_path = f"{script.project_details.project}/chapter_{request.chapter_number}/scene_{request.scene_number}/narration.wav"
+        audio_path = f"chapter_{request.chapter_number}/scene_{request.scene_number}/narration.wav"
         
         # Generate the audio
         await sound_generator._generate_audio_from_text(request.text, audio_path)
@@ -357,13 +349,9 @@ async def generate_narration(project_name: str, request: NarrationRequest):
         logger.error(f"Error generating narration: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/check-narration/{project_name}")
-async def check_narration(
-    project_name: str,
-    chapter_number: int,
-    scene_number: int
-):
-    """Check if narration audio file exists for the given chapter and scene"""
+@app.get("/api/get-all-narrations/{project_name}")
+async def get_all_narrations(project_name: str):
+    """Get all existing narration audio files for a project"""
     try:
         aws_service = AWSService(project_name=project_name)
         sound_generator = SoundGenerator(
@@ -376,18 +364,29 @@ async def check_narration(
         )
 
         script = await director.get_script()
-        audio_path = f"{script.project_details.project}/chapter_{chapter_number}/scene_{scene_number}/narration.wav"
-        local_path = sound_generator.temp_dir / audio_path
+        project_dir = sound_generator.temp_dir
+        narration_files = {}
 
-        if local_path.exists():
-            return FileResponse(
-                path=str(local_path),
-                media_type="audio/wav",
-                filename="narration.wav"
-            )
-        else:
-            return {"status": "not_found"}
+        if project_dir.exists():
+            for chapter_dir in project_dir.glob("chapter_*"):
+                chapter_num = int(chapter_dir.name.split("_")[1])
+                for scene_dir in chapter_dir.glob("scene_*"):
+                    scene_num = int(scene_dir.name.split("_")[1])
+                    narration_path = scene_dir / "narration.wav"
+                    
+                    if narration_path.exists():
+                        key = f"{chapter_num}-{scene_num}"
+                        # Read the audio file and convert to base64
+                        with open(narration_path, "rb") as f:
+                            import base64
+                            audio_data = base64.b64encode(f.read()).decode('utf-8')
+                            narration_files[key] = audio_data
+
+        return {
+            "status": "success",
+            "narrations": narration_files
+        }
             
     except Exception as e:
-        logger.error(f"Error checking narration: {str(e)}")
+        logger.error(f"Error getting all narrations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

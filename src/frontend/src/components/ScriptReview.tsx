@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Script } from '../models/models';
+import { Script, NarrationResponse } from '../models/models';
 import {
   Box,
   Button,
@@ -14,9 +14,7 @@ import {
   AccordionIcon,
   UnorderedList,
   ListItem,
-  Spinner,
   useToast,
-  Image,
 } from '@chakra-ui/react';
 import ImageDisplay from './ImageDisplay';
 import NarrationBox from './NarrationBox';
@@ -34,6 +32,11 @@ interface ImageApiResponse {
   images: Record<string, string>;
 }
 
+interface NarrationApiResponse {
+  status: string;
+  narrations: Record<string, string>; // key is chapter-scene, value is base64 audio
+}
+
 const ScriptReview: React.FC<ScriptReviewProps> = ({
   script,
   setScript,
@@ -43,6 +46,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 }) => {
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [imageData, setImageData] = useState<Record<string, string>>({});
+  const [narrationData, setNarrationData] = useState<Record<string, string>>({});
+  const [existingNarrations, setExistingNarrations] = useState<Record<string, boolean>>({});
   const toast = useToast();
   const isMounted = React.useRef(false);
 
@@ -55,30 +60,43 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   React.useEffect(() => {
     isMounted.current = true;
 
-    if (!script) return;
-
-    const fetchAllImages = async () => {
+    const fetchAllData = async () => {
       try {
-        const response = await fetch(
+        // Fetch images
+        const imageResponse = await fetch(
           `http://localhost:8000/api/get-all-images/${projectName}`
         );
 
-        if (!response.ok || !isMounted.current) return;
+        if (!imageResponse.ok || !isMounted.current) return;
 
-        const data = await response.json() as ImageApiResponse;
+        const imageData = await imageResponse.json() as ImageApiResponse;
 
-        if (data.status === 'success' && data.images && isMounted.current) {
+        if (imageData.status === 'success' && imageData.images && isMounted.current) {
           const processedImages: Record<string, string> = {};
-          (Object.entries(data.images) as [string, string][]).forEach(([key, base64]) => {
+          (Object.entries(imageData.images) as [string, string][]).forEach(([key, base64]) => {
             processedImages[key] = `data:image/png;base64,${base64}`;
           });
           setImageData(processedImages);
         }
+
+        // Fetch narrations
+        const narrResponse = await fetch(
+          `http://localhost:8000/api/get-all-narrations/${projectName}`
+        );
+
+        if (!narrResponse.ok || !isMounted.current) return;
+
+        const narrData = await narrResponse.json() as NarrationApiResponse;
+        
+        if (narrData.status === 'success' && narrData.narrations && isMounted.current) {
+          setNarrationData(narrData.narrations);
+        }
+
       } catch (error) {
-        console.error('Error fetching images:', error);
+        console.error('Error fetching data:', error);
         toast({
           title: 'Error',
-          description: 'Failed to fetch images',
+          description: 'Failed to fetch data',
           status: 'error',
           duration: 5000,
           isClosable: true,
@@ -86,7 +104,9 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       }
     };
 
-    fetchAllImages();
+    if (script) {
+      fetchAllData();
+    }
 
     return () => {
       isMounted.current = false;
@@ -305,7 +325,13 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                               )}
 
                               {/* Narration */}
-                              <NarrationBox narrationText={scene.narration_text} projectName={projectName} chapter={chapter.chapter_number} scene={scene.scene_number} />
+                              <NarrationBox 
+                                narrationText={scene.narration_text} 
+                                projectName={projectName} 
+                                chapter={chapter.chapter_number} 
+                                scene={scene.scene_number}
+                                audioData={narrationData[`${chapter.chapter_number}-${scene.scene_number}`]}
+                              />
 
                               {/* Shots */}
                               {scene.shots?.map((shot, shotIndex) => (
