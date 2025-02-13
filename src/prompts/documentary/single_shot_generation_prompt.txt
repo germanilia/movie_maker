@@ -40,6 +40,8 @@ Output Format:
                   need to be sure the opening and closing scenes make sense together.
                   Pay attention to the place of the scene in the entire script, the information is provided
                   Need to consider this when creating the director instructions and the detailed descriptions
+                  Make sure when generating the opening for the script it needs to be the frist chapter and shot
+                  If there are previous chapters and scenes it means it's not the opening of the script
                 ",
   "director_instructions": "This string represents the driector instructions for the entire scene, it needs to consider the previous shots and what was already covered from the scene",
   "detailed_opening_scene_description": "{black_and_white} this is the description of the opening scene of the shot, it needs to be a very detailed explanation which will fit the diffusion models",

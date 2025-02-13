@@ -234,7 +234,7 @@ class Director:
                                 f"Unexpected error generating shot (attempt {max_retries - remaining_attempts}/{max_retries}): {str(e)}"
                             )
                             logger.info("Retrying shot generation...")
-            return script
+        return script
 
     async def _ensure_temp_dir(self, project_name: str) -> Path:
         """ Ensure the temporary directory exists for the project."""
