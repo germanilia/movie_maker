@@ -8,15 +8,18 @@ from src.services.aws_service import AWSService
 
 logger = logging.getLogger(__name__)
 
+
 class SoundGenerator:
     def __init__(self, aws_service: AWSService, project_name: str):
         """Initialize the SoundGenerator with Play.ht API credentials and AWS service."""
         user_id = os.getenv("PLAY_HT_USER_ID")
         api_key = os.getenv("PLAY_HT_API_KEY")
-        
+
         if not user_id or not api_key:
-            raise ValueError("PLAY_HT_USER_ID and PLAY_HT_API_KEY environment variables must be set")
-            
+            raise ValueError(
+                "PLAY_HT_USER_ID and PLAY_HT_API_KEY environment variables must be set"
+            )
+
         self.client = Client(
             user_id=user_id,
             api_key=api_key,
@@ -37,32 +40,11 @@ class SoundGenerator:
             bool: True if audio exists or was downloaded successfully, False if not found
         """
         try:
-            s3_uri = f"{self.aws_service.s3_base_uri}/{audio_path}"
-            # Check if audio exists in S3
-            if await self.aws_service.file_exists(s3_uri):
-                # Get local path
-                local_path = self.temp_dir / audio_path
-
-                # Create local directory if it doesn't exist
+            local_path = self.temp_dir / audio_path
+            if not local_path.exists():
                 local_path.parent.mkdir(parents=True, exist_ok=True)
-
-                # If not in temp directory, download it
-                if not local_path.exists():
-                    try:
-                        await self.aws_service.download_file(
-                            audio_path, str(local_path)
-                        )
-                        logger.info(f"Downloaded audio {audio_path} to {local_path}")
-                    except Exception as e:
-                        logger.error(f"Failed to download audio {audio_path}: {str(e)}")
-                        return False
-                else:
-                    logger.debug(f"Audio already exists locally at {local_path}")
-
-                return True
-            else:
-                logger.debug(f"Audio {audio_path} does not exist in S3")
                 return False
+            return True
 
         except Exception as e:
             logger.error(f"Error checking audio existence for {audio_path}: {str(e)}")
@@ -75,27 +57,27 @@ class SoundGenerator:
     ) -> str:
         """Generate audio from text using Play.ht API and save to S3."""
         # Check if audio already exists locally or in S3
+        s3_path = f"{self.aws_service.s3_base_uri}/{output_path}"
         audio_exists = await self.ensure_audio_exists(output_path)
+        local_path = self.temp_dir / output_path
         if audio_exists:
             logger.info(f"Audio already exists for {output_path}, skipping generation")
             return output_path
-
         try:
+            local_path.parent.mkdir(parents=True, exist_ok=True)
             # Configure TTS options
             options = TTSOptions(voice=self.voice_id)
-            
+
             # Get local path
-            local_path = self.temp_dir / output_path
             local_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Generate and save audio
             with open(local_path, "wb") as audio_file:
-                for chunk in self.client.tts(text, options, voice_engine='PlayDialog-http'):
+                for chunk in self.client.tts(
+                    text, options, voice_engine="PlayDialog-http"
+                ):
                     audio_file.write(chunk)
 
-            # Upload to S3
-            s3_path = f"{self.aws_service.s3_base_uri}/{output_path}"
-            await self.aws_service.upload_file(str(local_path), s3_path)
 
             logger.info(f"Generated and saved audio to {output_path}")
             return output_path

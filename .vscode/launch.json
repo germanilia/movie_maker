@@ -3,14 +3,22 @@
     "compounds": [
         {
             "name": "🚀 Full Stack",
-            "configurations": ["Python: FastAPI", "React: Dev Server", "React: Chrome"],
-            "preLaunchTask": "prepare-dev-env",
+            "configurations": [
+                "FastAPI Server",
+                "React Dev Server",
+                "React Browser"
+            ],
+            "presentation": {
+                "hidden": false,
+                "group": "All",
+                "order": 0
+            },
             "stopAll": true
         }
     ],
     "configurations": [
         {
-            "name": "Python: FastAPI",
+            "name": "FastAPI Server",
             "type": "python",
             "request": "launch",
             "module": "uvicorn",
@@ -20,52 +28,61 @@
                 "--host",
                 "0.0.0.0",
                 "--port",
-                "8000"
+                "8000",
+                "--log-level",
+                "debug"
             ],
-            "jinja": true,
-            "justMyCode": true,
+            "console": "integratedTerminal",
+            "justMyCode": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONUNBUFFERED": "1",
+                "PYDEVD_DISABLE_FILE_VALIDATION": "1"
+            },
+            "presentation": {
+                "hidden": false,
+                "group": "Backend",
+                "order": 1
             }
         },
         {
-            "name": "React: Chrome",
+            "name": "React Browser",
             "type": "chrome",
             "request": "launch",
             "url": "http://localhost:3000",
             "webRoot": "${workspaceFolder}/src/frontend",
+            "runtimeArgs": [
+                "--auto-open-devtools-for-tabs"
+            ],
             "sourceMapPathOverrides": {
                 "webpack:///src/*": "${webRoot}/*",
                 "webpack:///./*": "${webRoot}/*",
                 "webpack:////*": "*",
                 "webpack:///*": "${webRoot}/*"
             },
-            "skipFiles": [
-                "<node_internals>/**",
-                "${workspaceFolder}/node_modules/**"
-            ],
-            "smartStep": true,
-            "sourceMaps": true
-        },
-        {
-            "name": "Python: Current File",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+            "presentation": {
+                "hidden": false,
+                "group": "Frontend",
+                "order": 2
             }
         },
         {
-            "name": "React: Dev Server",
+            "name": "React Dev Server",
             "type": "node",
             "request": "launch",
             "cwd": "${workspaceFolder}/src/frontend",
             "runtimeExecutable": "npm",
             "runtimeArgs": ["start"],
-            "console": "integratedTerminal"
+            "console": "internalConsole",
+            "env": {
+                "BROWSER": "none",
+                "PORT": "3000"
+            },
+            "presentation": {
+                "hidden": false,
+                "group": "Frontend",
+                "order": 1
+            }
         }
     ],
     "workbench.externalBrowser": "chrome",

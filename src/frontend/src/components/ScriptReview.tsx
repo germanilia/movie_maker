@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Script } from '../models/models';
 import {
   Box,
@@ -14,7 +14,12 @@ import {
   AccordionIcon,
   UnorderedList,
   ListItem,
+  Spinner,
+  useToast,
+  Image,
 } from '@chakra-ui/react';
+import ImageDisplay from './ImageDisplay';
+import NarrationBox from './NarrationBox';
 
 interface ScriptReviewProps {
   script: Script | null;
@@ -24,6 +29,11 @@ interface ScriptReviewProps {
   projectName: string;
 }
 
+interface ImageApiResponse {
+  status: string;
+  images: Record<string, string>;
+}
+
 const ScriptReview: React.FC<ScriptReviewProps> = ({
   script,
   setScript,
@@ -31,6 +41,128 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   onBack,
   projectName
 }) => {
+  const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
+  const [imageData, setImageData] = useState<Record<string, string>>({});
+  const toast = useToast();
+  const isMounted = React.useRef(false);
+
+  const getImageKey = React.useCallback((chapterIndex: number, sceneIndex: number, shotIndex: number, type: string) =>
+    `${chapterIndex + 1}-${sceneIndex + 1}-${shotIndex + 1}-${type}`,
+    []
+  );
+
+  // Effect to fetch all images when script changes
+  React.useEffect(() => {
+    isMounted.current = true;
+
+    if (!script) return;
+
+    const fetchAllImages = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:8000/api/get-all-images/${projectName}`
+        );
+
+        if (!response.ok || !isMounted.current) return;
+
+        const data = await response.json() as ImageApiResponse;
+
+        if (data.status === 'success' && data.images && isMounted.current) {
+          const processedImages: Record<string, string> = {};
+          (Object.entries(data.images) as [string, string][]).forEach(([key, base64]) => {
+            processedImages[key] = `data:image/png;base64,${base64}`;
+          });
+          setImageData(processedImages);
+        }
+      } catch (error) {
+        console.error('Error fetching images:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch images',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    };
+
+    fetchAllImages();
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, [script, projectName, toast]);
+
+  const handleGenerateImage = async (
+    chapterIndex: number,
+    sceneIndex: number,
+    shotIndex: number,
+    type: string,
+    description: string
+  ) => {
+    const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
+    setGeneratingImages(prev => {
+      const newSet = new Set(Array.from(prev));
+      newSet.add(imageKey);
+      return newSet;
+    });
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/regenerate-image/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_index: chapterIndex + 1,
+            scene_index: sceneIndex + 1,
+            shot_index: shotIndex + 1,
+            type: type,
+            custom_prompt: description
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to generate image');
+      }
+
+      const data = await response.json();
+
+      // Store the base64 image data
+      setImageData(prev => ({
+        ...prev,
+        [imageKey]: `data:image/png;base64,${data.base64_image}`
+      }));
+
+      toast({
+        title: 'Success',
+        description: 'Image generation completed',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+    } catch (error) {
+      console.error('Error generating image:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate image',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setGeneratingImages(prev => {
+        const newSet = new Set(Array.from(prev));
+        newSet.delete(imageKey);
+        return newSet;
+      });
+    }
+  };
+
   if (!script) {
     return (
       <Box p={4}>
@@ -40,15 +172,47 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     );
   }
 
+  const renderSceneDescription = (
+    shot: any,
+    chapterIndex: number,
+    sceneIndex: number,
+    shotIndex: number,
+    type: 'opening' | 'closing'
+  ) => {
+    const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
+    const description = type === 'opening' ? shot.detailed_opening_scene_description : shot.detailed_closing_scene_description;
+
+    return (
+      <ImageDisplay
+        imageKey={imageKey}
+        imageData={imageData[imageKey]}
+        description={description}
+        type={type}
+        isGenerating={generatingImages.has(imageKey)}
+        onGenerateImage={() => {
+          if (description) {
+            handleGenerateImage(
+              chapterIndex,
+              sceneIndex,
+              shotIndex,
+              type,
+              description
+            );
+          }
+        }}
+      />
+    );
+  };
+
   return (
     <Box height="100vh" overflow="hidden" position="relative">
       {/* Top Navigation Bar */}
-      <Box 
-        p={4} 
-        borderBottomWidth={1} 
-        bg="white" 
-        position="sticky" 
-        top={0} 
+      <Box
+        p={4}
+        borderBottomWidth={1}
+        bg="white"
+        position="sticky"
+        top={0}
         zIndex={3}
         height="72px"
       >
@@ -64,10 +228,10 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       </Box>
 
       {/* Main Content */}
-      <Box 
+      <Box
         position="relative"
-        height="calc(100vh - 72px)" 
-        overflowY="auto" 
+        height="calc(100vh - 72px)"
+        overflowY="auto"
         css={{
           '&::-webkit-scrollbar': {
             width: '8px',
@@ -93,17 +257,17 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                     <AccordionIcon />
                   </HStack>
                 </AccordionButton>
-                
+
                 <AccordionPanel pb={6}>
                   <VStack spacing={6} align="stretch">
                     <Box bg="gray.50" p={4} borderRadius="md">
                       <Text color="gray.700">{chapter.chapter_description}</Text>
                     </Box>
-                    
+
                     <Accordion allowMultiple defaultIndex={[]}>
                       {chapter.scenes?.map((scene, sceneIndex) => (
-                        <AccordionItem 
-                          key={sceneIndex} 
+                        <AccordionItem
+                          key={sceneIndex}
                           border="1px solid"
                           borderColor="gray.200"
                           borderRadius="lg"
@@ -141,14 +305,11 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                               )}
 
                               {/* Narration */}
-                              <Box bg="purple.50" p={4} borderRadius="md">
-                                <Text fontWeight="bold" mb={2}>Narration:</Text>
-                                <Text color="purple.800">{scene.narration_text}</Text>
-                              </Box>
+                              <NarrationBox narrationText={scene.narration_text} projectName={projectName} chapter={chapter.chapter_number} scene={scene.scene_number} />
 
                               {/* Shots */}
                               {scene.shots?.map((shot, shotIndex) => (
-                                <Box 
+                                <Box
                                   key={shotIndex}
                                   borderWidth="1px"
                                   borderRadius="md"
@@ -157,7 +318,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                                 >
                                   <VStack spacing={4} align="stretch">
                                     <Heading size="xs">Shot {shot.shot_number}</Heading>
-                                    
+
                                     {/* Shot Reasoning */}
                                     {shot.reasoning && (
                                       <Box bg="yellow.50" p={3} borderRadius="md">
@@ -173,20 +334,12 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                                     </Box>
 
                                     {/* Opening Scene Description */}
-                                    {shot.detailed_opening_scene_description && (
-                                      <Box bg="teal.50" p={3} borderRadius="md">
-                                        <Text fontWeight="bold" mb={1}>Opening Scene Description:</Text>
-                                        <Text color="teal.800">{shot.detailed_opening_scene_description}</Text>
-                                      </Box>
-                                    )}
+                                    {shot.detailed_opening_scene_description &&
+                                      renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'opening')}
 
                                     {/* Closing Scene Description */}
-                                    {shot.detailed_closing_scene_description && (
-                                      <Box bg="pink.50" p={3} borderRadius="md">
-                                        <Text fontWeight="bold" mb={1}>Closing Scene Description:</Text>
-                                        <Text color="pink.800">{shot.detailed_closing_scene_description}</Text>
-                                      </Box>
-                                    )}
+                                    {shot.detailed_closing_scene_description &&
+                                      renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'closing')}
 
                                     {/* Sound Effects */}
                                     {shot.sound_effects && (

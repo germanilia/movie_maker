@@ -48,4 +48,5 @@ class RegenerateImageRequest(BaseModel):
     chapter_index: int
     scene_index: int
     shot_index: int
+    type: str
     custom_prompt: str | None = None

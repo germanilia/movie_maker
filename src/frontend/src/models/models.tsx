@@ -1,35 +1,38 @@
+export interface ProjectDetails {
+  project: string;
+  subject: string;
+  style: string;
+  genre: string;
+  duration: string;
+  age_rating: string;
+  specific_requirements: string;
+  black_and_white: boolean;
+}
+
 export interface Shot {
-  reasoning?: string;
   shot_number: number;
-  director_instructions: string;
+  reasoning?: string;
+  director_instructions?: string;
   detailed_opening_scene_description?: string;
   detailed_closing_scene_description?: string;
   sound_effects?: string[] | string;
 }
 
 export interface Scene {
-  reasoning?: string;
   scene_number: number;
-  main_story: string | string[];
+  main_story: string[] | string;
+  reasoning?: string;
   narration_text: string;
-  shots: Shot[] | null;
+  shots?: Shot[];
 }
 
 export interface Chapter {
-  reasoning: string;
   chapter_number: number;
   chapter_title: string;
   chapter_description: string;
-  scenes: Scene[] | null;
+  scenes?: Scene[];
 }
 
 export interface Script {
   chapters: Chapter[];
 }
-
-export interface Image {
-    url: string;
-    chapter_index: number;
-    scene_index: number;
-    shot_index: number;
-  }

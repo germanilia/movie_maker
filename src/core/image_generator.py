@@ -136,7 +136,7 @@ class ImageGenerator:
         else:
             logger.info("Completed image generation for entire script successfully")
 
-    async def generate_image(self, prompt: str, image_path: str, seed: int | None = None, overwrite_image: bool = False) -> None:
+    async def generate_image(self, prompt: str, image_path: str, seed: int | None = None, overwrite_image: bool = False) -> str:
         """
         Generate a single image based on the prompt and save it to the specified path.
         If generation fails, uses a stock image instead.
@@ -144,12 +144,17 @@ class ImageGenerator:
             prompt (str): The text prompt for image generation
             image_path (str): Full S3 path to save the generated image
             seed (int | None, optional): Seed for reproducible image generation. If None, a random seed will be used.
+        Returns:
+            str: Base64 encoded image data
         """
         # Check if image already exists locally or in S3
         image_exists = await self.ensure_image_exists(image_path)
         if image_exists and not overwrite_image:
             logger.info(f"Image already exists for {image_path}, skipping generation")
-            return
+            # Return existing image as base64
+            local_path = self.temp_dir / image_path
+            with open(local_path, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode('utf-8')
 
         try:
             # If no seed is provided, generate a random one
@@ -165,7 +170,7 @@ class ImageGenerator:
             request_payload = {
                 "prompt": f'{prompt}',
                 "mode": "text-to-image",
-                "aspect_ratio": "1:1",
+                "aspect_ratio": "16:9",
                 "output_format": "jpeg",
                 "seed": seed
             }
@@ -183,38 +188,31 @@ class ImageGenerator:
             # Extract base64 image from response
             if "artifacts" in response_data and len(response_data["artifacts"]) > 0:
                 base64_image_data = response_data["artifacts"][0]["base64"]
-                await self.aws_service.upload_base64_file(
-                    base64_image_data, 
-                    image_path
-                )
             elif "images" in response_data and len(response_data["images"]) > 0:
                 base64_image_data = response_data["images"][0]
-                await self.aws_service.upload_base64_file(
-                    base64_image_data, 
-                    image_path
-                )
             else:
                 logger.error("No image data in response, using stock image")
                 stock_image_path = "stock_images/failed_generation.png"
                 with open(stock_image_path, "rb") as image_file:
-                    stock_image_data = base64.b64encode(image_file.read()).decode('utf-8')
-                await self.aws_service.upload_base64_file(
-                    stock_image_data,
-                    image_path
-                )
-                logger.info(f"Used stock image for failed generation at {image_path}")
-                return
+                    base64_image_data = base64.b64encode(image_file.read()).decode('utf-8')
 
+            # Upload to S3
+            await self.aws_service.upload_base64_file(
+                base64_image_data, 
+                image_path
+            )
             logger.info(f"Generated and saved image to {image_path} with seed {seed}")
+            return base64_image_data
 
         except Exception as e:
             logger.error(f"Failed to generate image for {image_path}: {str(e)}")
             # Use stock image instead
             stock_image_path = "stock_images/failed_generation.png"
             with open(stock_image_path, "rb") as image_file:
-                stock_image_data = base64.b64encode(image_file.read()).decode('utf-8')
+                base64_image_data = base64.b64encode(image_file.read()).decode('utf-8')
             await self.aws_service.upload_base64_file(
-                stock_image_data,
+                base64_image_data,
                 image_path
             )
             logger.info(f"Used stock image for failed generation at {image_path}")
+            return base64_image_data

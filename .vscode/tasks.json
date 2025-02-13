@@ -6,7 +6,7 @@
             "type": "shell",
             "command": "echo Starting development environment...",
             "dependsOrder": "sequence",
-            "dependsOn": ["start-backend", "wait-for-services"],
+            "dependsOn": ["start-backend", "wait-for-backend", "start-frontend"],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
@@ -15,22 +15,37 @@
         {
             "label": "start-backend",
             "type": "shell",
-            "command": "echo Waiting for backend to start...",
+            "command": "python -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000",
+            "isBackground": true,
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
+            },
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^.*Error.*$",
+                    "file": 1,
+                    "location": 2,
+                    "message": 3
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^INFO:\\s*Started server process",
+                    "endsPattern": "^INFO:\\s*Application startup complete"
+                }
             }
         },
         {
-            "label": "wait-for-services",
+            "label": "wait-for-backend",
             "type": "shell",
-            "command": "sleep 3",
+            "command": "curl --retry 20 --retry-delay 1 --retry-connrefused http://localhost:8000/docs",
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
             }
         },
         {
+            "label": "start-frontend",
             "type": "npm",
             "script": "start",
             "path": "src/frontend",
@@ -49,9 +64,7 @@
                     "beginsPattern": "Starting the development server",
                     "endsPattern": "Compiled successfully|Failed to compile"
                 }
-            },
-            "label": "npm: start",
-            "detail": "Start React development server"
+            }
         }
     ]
 }

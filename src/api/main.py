@@ -1,6 +1,8 @@
 import logging
 import sys
 
+from src.core.sound_generator import SoundGenerator
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -9,6 +11,11 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+
+# Reduce boto3/botocore logging noise
+logging.getLogger('botocore').setLevel(logging.WARNING)
+logging.getLogger('boto3').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 # Get the logger for this module
 logger = logging.getLogger(__name__)
@@ -142,139 +149,6 @@ async def update_script(project_name: str, script: Script) -> Script:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/generate-images/{project_name}")
-async def generate_images(
-    project_name: str, script: Script, background_tasks: BackgroundTasks
-):
-    """Generate images for a script"""
-    try:
-        image_generator = ImageGenerator()
-        # Add the image generation task to background tasks
-        background_tasks.add_task(image_generator.generate_images_for_script, script)
-        return {
-            "status": "success",
-            "message": "Images generation started in background",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/regenerate-image/{project_name}")
-async def regenerate_image(
-    project_name: str,
-    request: RegenerateImageRequest,
-):
-    """Regenerate a specific image with optional custom prompt"""
-    try:
-        aws_service = AWSService(project_name=project_name)
-        image_generator = ImageGenerator(aws_service=aws_service)
-        
-        # Use the type from the request to determine which image to generate
-        image_type = getattr(request, 'type', 'opening')  # default to 'opening' if not specified
-        image_path = f"chapter_{request.chapter_index}/scene_{request.scene_index}/shot_{request.shot_index}_{image_type}.png"
-        
-        await image_generator.generate_image(
-            prompt=request.custom_prompt,
-            image_path=image_path,
-            overwrite_image=True
-        )
-        
-        return {
-            "status": "success",
-            "message": "Image regeneration completed",
-            "image_path": f"{aws_service.s3_object_uri}/{image_path}",
-            "chapter_index": request.chapter_index,
-            "scene_index": request.scene_index,
-            "shot_index": request.shot_index,
-            "type": image_type,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/images/{project_name}")
-async def get_images(project_name: str):
-    """Get all generated images for a project"""
-    try:
-        aws_service = AWSService(project_name=project_name)
-        script = await Director(
-            aws_service=aws_service, project_name=project_name
-        ).get_script()
-
-        images = []
-        for chapter_idx, chapter in enumerate(script.chapters):
-            for scene_idx, scene in enumerate(chapter.scenes or []):
-                for shot_idx, shot in enumerate(scene.shots or []):
-                    opening_image_path = f"chapter_{chapter_idx + 1}/scene_{scene_idx + 1}/shot_{shot_idx + 1}_opening.png"
-                    closing_image_path = f"chapter_{chapter_idx + 1}/scene_{scene_idx + 1}/shot_{shot_idx + 1}_closing.png"
-
-                    # Check if images exist in S3
-                    opening_exists = await aws_service.file_exists(
-                        f"images/{opening_image_path}"
-                    )
-                    closing_exists = await aws_service.file_exists(
-                        f"images/{closing_image_path}"
-                    )
-
-                    if opening_exists:
-                        images.append(
-                            {
-                                "url": f"{aws_service.s3_object_uri}/{opening_image_path}",
-                                "chapter_index": chapter_idx + 1,
-                                "scene_index": scene_idx + 1,
-                                "shot_index": shot_idx + 1,
-                                "type": "opening",
-                                "status": "completed",
-                                "description": shot.detailed_opening_scene_description,
-                            }
-                        )
-
-                    if closing_exists:
-                        images.append(
-                            {
-                                "url": f"{aws_service.s3_object_uri}/{closing_image_path}",
-                                "chapter_index": chapter_idx + 1,
-                                "scene_index": scene_idx + 1,
-                                "shot_index": shot_idx + 1,
-                                "type": "closing",
-                                "status": "completed",
-                                "description": shot.detailed_closing_scene_description,
-                            }
-                        )
-
-                    # If image doesn't exist, add placeholder
-                    if not opening_exists:
-                        images.append(
-                            {
-                                "url": "https://moviemaker-videos.s3.us-east-1.amazonaws.com/failed_generation.png",
-                                "chapter_index": chapter_idx + 1,
-                                "scene_index": scene_idx + 1,
-                                "shot_index": shot_idx + 1,
-                                "type": "opening",
-                                "status": "pending",
-                                "description": shot.detailed_opening_scene_description,
-                            }
-                        )
-
-                    if not closing_exists:
-                        images.append(
-                            {
-                                "url": "https://moviemaker-videos.s3.us-east-1.amazonaws.com/failed_generation.png",
-                                "chapter_index": chapter_idx + 1,
-                                "scene_index": scene_idx + 1,
-                                "shot_index": shot_idx + 1,
-                                "type": "closing",
-                                "status": "pending",
-                                "description": shot.detailed_closing_scene_description,
-                            }
-                        )
-
-        return images
-    except Exception as e:
-        print(f"Error in get_images: {str(e)}")  # Debug line
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/api/generate-video/{project_name}")
 async def generate_video(project_name: str, script: Script):
     """Generate the final video"""
@@ -301,46 +175,219 @@ async def get_script(project_name: str) -> Script:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def generate_unique_filename() -> str:
-    """Generate a unique filename using UUID"""
-    return f"{uuid.uuid4()}.png"
 
-@app.post("/api/generate-image", response_model=ImageResponse)
-async def generate_image(project_name: str, request: ImageRequest):
-    """Generate a single image from a prompt"""
+@app.get("/api/get-image/{project_name}")
+async def get_image(
+    project_name: str,
+    chapter_index: int,
+    scene_index: int,
+    shot_index: int,
+    type: str
+):
+    """Get a specific image if it exists and return it as base64"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        image_generator = ImageGenerator(
+            aws_service=aws_service,
+            black_and_white=False  # Can be made configurable if needed
+        )
+        
+        image_path = f"chapter_{chapter_index}/scene_{scene_index}/shot_{shot_index}_{type}.png"
+        
+        # Check if image exists and get its base64 data
+        image_exists = await image_generator.ensure_image_exists(image_path)
+        
+        if not image_exists:
+            # Instead of throwing a 404, return a response indicating the image doesn't exist
+            return {
+                "status": "not_found",
+                "message": "Image not found",
+                "chapter_index": chapter_index,
+                "scene_index": scene_index,
+                "shot_index": shot_index,
+                "type": type,
+                "path": image_path
+            }
+        
+        # Get the image as base64
+        local_path = image_generator.temp_dir / image_path
+        with open(local_path, "rb") as image_file:
+            import base64
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+        
+        return {
+            "status": "success",
+            "base64_image": base64_image,
+            "chapter_index": chapter_index,
+            "scene_index": scene_index,
+            "shot_index": shot_index,
+            "type": type,
+            "path": image_path
+        }
+    except FileNotFoundError:
+        return {
+            "status": "not_found",
+            "message": f"Image file not found at path {image_path}",
+            "chapter_index": chapter_index,
+            "scene_index": scene_index,
+            "shot_index": shot_index,
+            "type": type,
+            "path": image_path
+        }
+    except Exception as e:
+        logger.error(f"Error getting image: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/regenerate-image/{project_name}")
+async def regenerate_image(
+    project_name: str,
+    request: RegenerateImageRequest,
+):
+    """Regenerate a specific image with optional custom prompt"""
     try:
         aws_service = AWSService(project_name=project_name)
         image_generator = ImageGenerator(aws_service=aws_service)
         
-        image_path = f"single_images/{generate_unique_filename()}"
-        await image_generator.generate_image(
-            prompt=request.prompt,
+        image_path = f"chapter_{request.chapter_index}/scene_{request.scene_index}/shot_{request.shot_index}_{request.type}.png"
+        
+        # Generate image and get base64 data
+        base64_image = await image_generator.generate_image(
+            prompt=request.custom_prompt,
             image_path=image_path,
             overwrite_image=True
         )
         
-        return ImageResponse(image_path=f"{aws_service.s3_object_uri}/{image_path}")
+        return {
+            "status": "success",
+            "message": "Image regeneration completed",
+            "base64_image": base64_image,
+            "chapter_index": request.chapter_index,
+            "scene_index": request.scene_index,
+            "shot_index": request.shot_index,
+            "type": request.type,
+            "path": image_path
+        }
     except Exception as e:
-        logger.error(f"Failed to generate image: {str(e)}")
+        logger.error(f"Error regenerating image: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/get-all-images/{project_name}")
+async def get_all_images(project_name: str):
+    """Get all generated images for a project and return them as base64"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        image_generator = ImageGenerator(
+            aws_service=aws_service,
+            black_and_white=False
+        )
+        
+        # Get all image files in the project directory
+        project_dir = image_generator.temp_dir
+        image_data = {}
+        
+        if project_dir.exists():
+            for chapter_dir in project_dir.glob("chapter_*"):
+                chapter_num = int(chapter_dir.name.split("_")[1])
+                for scene_dir in chapter_dir.glob("scene_*"):
+                    scene_num = int(scene_dir.name.split("_")[1])
+                    for image_file in scene_dir.glob("shot_*.png"):
+                        # Parse shot number and type from filename
+                        # Format: shot_1_opening.png or shot_1_closing.png
+                        filename_parts = image_file.stem.split("_")
+                        shot_num = int(filename_parts[1])
+                        shot_type = filename_parts[2]  # 'opening' or 'closing'
+                        
+                        image_key = f"{chapter_num}-{scene_num}-{shot_num}-{shot_type}"
+                        
+                        # Read and encode image
+                        with open(image_file, "rb") as f:
+                            import base64
+                            base64_image = base64.b64encode(f.read()).decode('utf-8')
+                            image_data[image_key] = base64_image
+        
+        return {
+            "status": "success",
+            "images": image_data
+        }
+    except Exception as e:
+        logger.error(f"Error getting all images: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/")
-async def root():
-    """Serve the frontend index.html or API information if frontend is not built"""
-    index_path = os.path.join(frontend_dir, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {
-        "name": "Video Creator API",
-        "version": "1.0.0",
-        "description": "API for generating video content from scripts",
-        "endpoints": {
-            "generate_script": "/api/generate-script",
-            "update_script": "/api/update-script/{project_name}",
-            "generate_images": "/api/generate-images/{project_name}",
-            "regenerate_image": "/api/regenerate-image/{project_name}",
-            "get_images": "/api/images/{project_name}",
-            "generate_video": "/api/generate-video/{project_name}",
-        },
-    }
+class NarrationRequest(BaseModel):
+    text: str
+    chapter_number: int
+    scene_number: int
+    shot_number: int = None
+
+
+
+@app.post("/api/generate-narration/{project_name}")
+async def generate_narration(project_name: str, request: NarrationRequest):
+    """Generate audio narration for given text"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        sound_generator = SoundGenerator(
+            aws_service=aws_service,
+            project_name=project_name
+        )
+        director = Director(
+            aws_service=aws_service,
+            project_name=project_name
+        )
+
+        script = await director.get_script()
+        
+        # Generate a unique filename for this narration
+        audio_path = f"{script.project_details.project}/chapter_{request.chapter_number}/scene_{request.scene_number}/narration.wav"
+        
+        # Generate the audio
+        await sound_generator._generate_audio_from_text(request.text, audio_path)
+        
+        # Get the local path to the generated audio
+        local_path = sound_generator.temp_dir / audio_path
+        
+        # Return the audio file
+        return FileResponse(
+            path=str(local_path),
+            media_type="audio/wav",
+            filename="narration.wav"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating narration: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/check-narration/{project_name}")
+async def check_narration(
+    project_name: str,
+    chapter_number: int,
+    scene_number: int
+):
+    """Check if narration audio file exists for the given chapter and scene"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        sound_generator = SoundGenerator(
+            aws_service=aws_service,
+            project_name=project_name
+        )
+        director = Director(
+            aws_service=aws_service,
+            project_name=project_name
+        )
+
+        script = await director.get_script()
+        audio_path = f"{script.project_details.project}/chapter_{chapter_number}/scene_{scene_number}/narration.wav"
+        local_path = sound_generator.temp_dir / audio_path
+
+        if local_path.exists():
+            return FileResponse(
+                path=str(local_path),
+                media_type="audio/wav",
+                filename="narration.wav"
+            )
+        else:
+            return {"status": "not_found"}
+            
+    except Exception as e:
+        logger.error(f"Error checking narration: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
