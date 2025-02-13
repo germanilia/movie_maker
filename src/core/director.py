@@ -1,5 +1,19 @@
 import json
 import logging
+import sys
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# Get the logger for this module
+logger = logging.getLogger(__name__)
+
 from typing import List
 from pathlib import Path
 from src.models.models import (
@@ -10,8 +24,6 @@ from src.models.models import (
     Shot,
 )
 from src.services.aws_service import AWSService
-
-logger = logging.getLogger(__name__)
 
 
 class Director:
@@ -130,7 +142,7 @@ class Director:
         return response
         
 
-    def _get_previous_shots_instructions(self, scene: Scene, script:Script) -> str:
+    def _get_previous_shots_instructions(self, scene: Scene, chapter:Chapter, script:Script) -> str:
         """Get director instructions from previous shots or return 'N/A' if none exist."""
         if not scene.shots:
             return "N/A"
@@ -139,7 +151,7 @@ class Director:
         for shot in scene.shots:
             if shot.director_instructions:
                 previous_instructions.append(
-                    f"Shot {shot.shot_number}/{script.project_details.number_of_shots} in scene {scene.scene_number} director instructions : {shot.director_instructions}\nShot {shot.shot_number}/{script.project_details.number_of_shots} closing scene description : {shot.detailed_closing_scene_description}"
+                    f"Shot {shot.shot_number}/{script.project_details.number_of_shots} in scene {scene.scene_number}/{script.project_details.number_of_scenes} in chapter {chapter.chapter_number}/{script.project_details.number_of_chapters} director instructions : {shot.director_instructions}\nShot {shot.shot_number}/{script.project_details.number_of_shots} closing scene description : {shot.detailed_closing_scene_description}"
                 )
 
         return "\n".join(previous_instructions) if previous_instructions else "N/A"
@@ -191,7 +203,8 @@ class Director:
                                 chapter_high_level_description=chapter.chapter_description,
                                 previous_shots=self._get_previous_shots_instructions(
                                     scene=scene,
-                                    script=script
+                                    script=script,
+                                    chapter=chapter
                                 ),
                                 previous_scenes=self._get_previous_scenes_instructions(
                                     chapter=chapter,
@@ -258,7 +271,13 @@ class Director:
                     prompt, prev_errors=prev_error
                 )
                 chapter_data = json.loads(response)
-                return [Chapter(**chapter) for chapter in chapter_data["chapters"]]
+                chapters = [Chapter(**chapter) for chapter in chapter_data["chapters"]]
+                
+                # Set chapter numbers sequentially
+                for i, chapter in enumerate(chapters, 0):
+                    chapter.chapter_number = i+1
+                    
+                return chapters
             except json.JSONDecodeError as e:
                 prev_error = f"JSON Parse Error: {str(e)}"
                 if attempt == max_retries - 1:
@@ -306,6 +325,7 @@ class Director:
         script = await self._try_load_script(temp_dir)
         if script:
             logger.info(f"Loaded existing script for project '{request.project}'")
+            script = await self.generate_shots(script, request.number_of_shots)
             return script
 
         logger.info(
@@ -323,7 +343,6 @@ class Director:
                 f"\nGenerating scenes for chapter {chapter.chapter_number}: {chapter.chapter_title}"
             )
             scenes = await self.generate_scenes(request, chapter, request.number_of_scenes)
-
             chapter.scenes = scenes
             logger.info(
                 f"Generated {len(scenes)} scenes for chapter {chapter.chapter_number}"
@@ -339,6 +358,7 @@ class Director:
 
         # Save the script at the end
         await self._save_script(script)
+        script = await self.generate_shots(script, request.number_of_shots)
 
         return script
 
