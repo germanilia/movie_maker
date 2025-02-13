@@ -17,30 +17,24 @@ class ProjectDetails(BaseModel):
 class Shot(BaseModel):
     reasoning: str | None = None
     shot_number: int = -1
-    still_image: bool | str  = False
-    shot_director_instructions: str
+    director_instructions: str = ""  # Changed to have a default empty string
     detailed_opening_scene_description: str | None = None
     detailed_closing_scene_description: str | None = None
-
+    sound_effects: List[str] | str | None = None
 
 class Scene(BaseModel):
+    reasoning: str | None = None
     scene_number: int = -1
-    general_scene_description_and_motivations: str
-    key_events: List[str]
-    main_characters: List[str]
+    main_story: str | List[str]
     narration_text: str
     shots: List[Shot] | None = None
-    sound_effects: List[str] | str
-
-
+    
 class Chapter(BaseModel):
-    chapter_number: int
+    reasoning:str
+    chapter_number: int | None = None
     chapter_title: str
     chapter_description: str
-    key_events: List[str]
     scenes: List[Scene] | None = None
-
-
 class Script(BaseModel):
     chapters: List[Chapter]
     project_details: ProjectDetails

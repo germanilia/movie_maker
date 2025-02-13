@@ -3,13 +3,16 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from src.core.image_generator import ImageGenerator
 from src.models.models import ProjectDetails, Script, RegenerateImageRequest
 from src.core.director import Director
-from src.core.image_generator import ImageGenerator
 from src.core.video_genrator import VideoGenerator
 from src.services.aws_service import AWSService
+from src.models.image import ImageRequest, ImageResponse
+# from src.services.image_generator import ImageGenerator
 import os
 from pydantic import BaseModel
+import uuid
 
 app = FastAPI(title="Video Creator API")
 logger = logging.getLogger(__name__)
@@ -50,15 +53,14 @@ async def generate_script(project_details: ProjectDetails):
 
 
 @app.post("/api/generate_shots/{project_name}")
-async def generate_shots(project_name: str) -> Script:
+async def generate_shots(project_name: str, script: Script) -> Script:
     """Generate shots for a specific scene with retry mechanism."""
     try:
         director = Director(
             aws_service=AWSService(project_name=project_name),
             project_name=project_name,
         )
-        # video_request = ProjectDetails(**project_details.model_dump())
-        script = await director.generate_shots()
+        script = await director.generate_shots(script)
         return script
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -133,11 +135,7 @@ async def generate_images(
 ):
     """Generate images for a script"""
     try:
-        image_generator = ImageGenerator(
-            aws_service=AWSService(project_name=project_name),
-            black_and_white=True,  # This should come from the script/request
-            genre="documentary",  # This should come from the script/request
-        )
+        image_generator = ImageGenerator()
         # Add the image generation task to background tasks
         background_tasks.add_task(image_generator.generate_images_for_script, script)
         return {
@@ -154,48 +152,31 @@ async def regenerate_image(
     request: RegenerateImageRequest,
 ):
     """Regenerate a specific image with optional custom prompt"""
-    aws_service = AWSService(project_name=project_name)
-    image_generator = ImageGenerator(
-        aws_service=aws_service,
-        black_and_white=True,
-        genre="documentary",
-    )
-
-    script = await Director(
-        aws_service=aws_service, project_name=project_name
-    ).get_script()
-
-    chapter = script.chapters[request.chapter_index - 1]
-    if not chapter.scenes:
-        raise HTTPException(status_code=400, detail="No scenes in chapter")
-
-    scene = chapter.scenes[request.scene_index - 1]
-    if not scene.shots:
-        raise HTTPException(status_code=400, detail="No shots in scene")
-    shot = scene.shots[request.shot_index - 1]
-
-    opening_image_path = f"chapter_{request.chapter_index}/scene_{request.scene_index}/shot_{request.shot_index}_opening.png"
-
-    prompt = (
-        request.custom_prompt
-        if request.custom_prompt
-        else shot.detailed_opening_scene_description
-    )
-
-    await image_generator.generate_image(
-        prompt=str(prompt),
-        image_path=opening_image_path,
-        seed=None,
-        overwrite_image=True,
-    )
-
-    return {
-        "status": "success",
-        "message": "Image regeneration completed",
-        "chapter_index": request.chapter_index,
-        "scene_index": request.scene_index,
-        "shot_index": request.shot_index,
-    }
+    try:
+        aws_service = AWSService(project_name=project_name)
+        image_generator = ImageGenerator(aws_service=aws_service)
+        
+        # Use the type from the request to determine which image to generate
+        image_type = getattr(request, 'type', 'opening')  # default to 'opening' if not specified
+        image_path = f"chapter_{request.chapter_index}/scene_{request.scene_index}/shot_{request.shot_index}_{image_type}.png"
+        
+        await image_generator.generate_image(
+            prompt=request.custom_prompt,
+            image_path=image_path,
+            overwrite_image=True
+        )
+        
+        return {
+            "status": "success",
+            "message": "Image regeneration completed",
+            "image_path": f"{aws_service.s3_object_uri}/{image_path}",
+            "chapter_index": request.chapter_index,
+            "scene_index": request.scene_index,
+            "shot_index": request.shot_index,
+            "type": image_type,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/images/{project_name}")
@@ -252,7 +233,7 @@ async def get_images(project_name: str):
                     if not opening_exists:
                         images.append(
                             {
-                                "url": f"{aws_service.s3_object_uri}/{closing_image_path}",
+                                "url": "https://moviemaker-videos.s3.us-east-1.amazonaws.com/failed_generation.png",
                                 "chapter_index": chapter_idx + 1,
                                 "scene_index": scene_idx + 1,
                                 "shot_index": shot_idx + 1,
@@ -265,7 +246,7 @@ async def get_images(project_name: str):
                     if not closing_exists:
                         images.append(
                             {
-                                "url": f"{aws_service.s3_base_uri}/{closing_image_path}",
+                                "url": "https://moviemaker-videos.s3.us-east-1.amazonaws.com/failed_generation.png",
                                 "chapter_index": chapter_idx + 1,
                                 "scene_index": scene_idx + 1,
                                 "shot_index": shot_idx + 1,
@@ -305,6 +286,29 @@ async def get_script(project_name: str) -> Script:
         )
         return await director.get_script()
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def generate_unique_filename() -> str:
+    """Generate a unique filename using UUID"""
+    return f"{uuid.uuid4()}.png"
+
+@app.post("/api/generate-image", response_model=ImageResponse)
+async def generate_image(project_name: str, request: ImageRequest):
+    """Generate a single image from a prompt"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        image_generator = ImageGenerator(aws_service=aws_service)
+        
+        image_path = f"single_images/{generate_unique_filename()}"
+        await image_generator.generate_image(
+            prompt=request.prompt,
+            image_path=image_path,
+            overwrite_image=True
+        )
+        
+        return ImageResponse(image_path=f"{aws_service.s3_object_uri}/{image_path}")
+    except Exception as e:
+        logger.error(f"Failed to generate image: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

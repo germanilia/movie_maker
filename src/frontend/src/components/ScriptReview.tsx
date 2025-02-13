@@ -1,67 +1,20 @@
-import React, { useEffect } from 'react';
+import React from 'react';
+import { Script } from '../models/models';
 import {
   Box,
   Button,
+  VStack,
+  HStack,
+  Text,
+  Heading,
   Accordion,
   AccordionItem,
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
-  Heading,
-  VStack,
-  HStack,
-  Input,
-  Textarea,
-  FormControl,
-  FormLabel,
-  Spinner,
-  Center,
-  Text,
-  Select,
+  UnorderedList,
+  ListItem,
 } from '@chakra-ui/react';
-
-interface Shot {
-  shot_number: number;
-  still_image: boolean | string;
-  shot_director_instructions: string;
-  detailed_opening_scene_description: string;
-  detailed_closing_scene_description: string;
-}
-
-interface Scene {
-  scene_number: number;
-  general_scene_description_and_motivations: string;
-  key_events: string[];
-  main_characters: string[];
-  narration_text: string;
-  shots: Shot[] | null;
-  sound_effects: string[] | string;
-}
-
-interface Chapter {
-  chapter_number: number;
-  chapter_title: string;
-  chapter_description: string;
-  key_events: string[];
-  scenes: Scene[] | null;
-}
-
-interface Script {
-  chapters: Chapter[];
-}
-
-interface ProjectDetails {
-  project: string;
-  genre: string;
-  subject: string;
-  movie_general_instructions: string;
-  narration_instructions: string;
-  story_background: string;
-  number_of_chapters: number;
-  number_of_scenes: number;
-  number_of_shots: number;
-  black_and_white: boolean;
-}
 
 interface ScriptReviewProps {
   script: Script | null;
@@ -71,289 +24,188 @@ interface ScriptReviewProps {
   projectName: string;
 }
 
-const SCRIPT_STORAGE_KEY = 'current_script';
-
 const ScriptReview: React.FC<ScriptReviewProps> = ({
   script,
   setScript,
   onNext,
   onBack,
-  projectName,
+  projectName
 }) => {
-  const [isSaving, setIsSaving] = React.useState(false);
-  const [isGenerating, setIsGenerating] = React.useState(false);
-
-  // Load script from local storage on initial mount
-  useEffect(() => {
-    const storedScript = localStorage.getItem(SCRIPT_STORAGE_KEY);
-    if (storedScript && !script) {
-      setScript(JSON.parse(storedScript));
-    }
-  }, []);
-
-  // Update local storage whenever script changes
-  useEffect(() => {
-    if (script) {
-      localStorage.setItem(SCRIPT_STORAGE_KEY, JSON.stringify(script));
-    }
-  }, [script]);
-
-  const handleChapterChange = (chapterIndex: number, field: string, value: any) => {
-    if (!script) return;
-    const updatedScript = {
-      ...script,
-      chapters: script.chapters.map((chapter: any, index: number) =>
-        index === chapterIndex ? { ...chapter, [field]: value } : chapter
-      ),
-    };
-    setScript(updatedScript);
-  };
-
-  const handleSceneChange = (
-    chapterIndex: number,
-    sceneIndex: number,
-    field: string,
-    value: any
-  ) => {
-    if (!script) return;
-    const updatedScript = {
-      ...script,
-      chapters: script.chapters.map((chapter: any, cIndex: number) =>
-        cIndex === chapterIndex
-          ? {
-            ...chapter,
-            scenes: chapter.scenes.map((scene: any, sIndex: number) =>
-              sIndex === sceneIndex ? { ...scene, [field]: value } : scene
-            ),
-          }
-          : chapter
-      ),
-    };
-    setScript(updatedScript);
-  };
-
-  const handleSave = async () => {
-    if (!script) return;
-    setIsSaving(true);
-    try {
-      const response = await fetch(`http://localhost:8000/api/update-script/${projectName}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(script),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save script');
-      }
-
-      const updatedScript = await response.json();
-      setScript(updatedScript);
-      // Update local storage with the server response
-      localStorage.setItem(SCRIPT_STORAGE_KEY, JSON.stringify(updatedScript));
-    } catch (error) {
-      console.error('Error saving script:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleGenerateShots = async () => {
-    if (!script) return;
-    setIsGenerating(true);
-    try {
-      await handleSave(); // First save the script
-
-      // Generate shots
-      const generateShotsResponse = await fetch(
-        `http://localhost:8000/api/generate_shots/${projectName}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        }
-      );
-
-      if (!generateShotsResponse.ok) {
-        const errorData = await generateShotsResponse.json();
-        throw new Error(errorData.detail || 'Failed to generate shots');
-      }
-
-      const updatedScript = await generateShotsResponse.json();
-      setScript(updatedScript);
-      localStorage.setItem(SCRIPT_STORAGE_KEY, JSON.stringify(updatedScript));
-
-      // Start image generation
-      const response = await fetch(
-        `http://localhost:8000/api/generate-images/${projectName}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updatedScript),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to start image generation');
-      }
-
-      onNext(); // Proceed to image review page
-    } catch (error) {
-      console.error('Error generating shots and images:', error);
-      // You might want to show an error toast or message to the user here
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  if (!script || !script.chapters) {
+  if (!script) {
     return (
-      <Center h="100vh">
-        <VStack spacing={4}>
-          <Spinner
-            thickness="4px"
-            speed="0.65s"
-            emptyColor="gray.200"
-            color="blue.500"
-            size="xl"
-          />
-          <Text>Loading script...</Text>
-        </VStack>
-      </Center>
+      <Box p={4}>
+        <Text>No script available. Please go back and generate a script first.</Text>
+        <Button onClick={onBack}>Back</Button>
+      </Box>
     );
   }
 
   return (
-    <Box height="100vh" overflow="hidden">
-      <Box height="calc(100vh - 80px)" overflowY="auto" p={4} pb="100px">
-        <VStack spacing={4} align="stretch">
-          <Heading size="lg" mb={4}>Script Review</Heading>
+    <Box height="100vh" overflow="hidden" position="relative">
+      {/* Top Navigation Bar */}
+      <Box 
+        p={4} 
+        borderBottomWidth={1} 
+        bg="white" 
+        position="sticky" 
+        top={0} 
+        zIndex={3}
+        height="72px"
+      >
+        <HStack justify="space-between" align="center">
+          <Heading size="lg">Script Review</Heading>
+          <HStack spacing={4}>
+            <Button onClick={onBack}>Back</Button>
+            <Button colorScheme="blue" onClick={onNext}>
+              Next
+            </Button>
+          </HStack>
+        </HStack>
+      </Box>
 
-          <Accordion allowMultiple defaultIndex={[0]}>
-            {script.chapters.map((chapter: any, chapterIndex: number) => (
+      {/* Main Content */}
+      <Box 
+        position="relative"
+        height="calc(100vh - 72px)" 
+        overflowY="auto" 
+        css={{
+          '&::-webkit-scrollbar': {
+            width: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: '#f1f1f1',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: '#888',
+            borderRadius: '4px',
+          },
+        }}
+      >
+        <Box p={4} pb={32}>
+          <Accordion allowMultiple defaultIndex={[]}>
+            {script.chapters.map((chapter, chapterIndex) => (
               <AccordionItem key={chapterIndex}>
-                <AccordionButton>
-                  <Box flex="1" textAlign="left">
-                    <Heading size="md">Chapter {chapter.chapter_number}: {chapter.chapter_title}</Heading>
-                  </Box>
-                  <AccordionIcon />
+                <AccordionButton py={4}>
+                  <HStack flex="1" justify="space-between">
+                    <Heading size="md">
+                      Chapter {chapter.chapter_number}: {chapter.chapter_title}
+                    </Heading>
+                    <AccordionIcon />
+                  </HStack>
                 </AccordionButton>
-                <AccordionPanel>
-                  <VStack spacing={4} align="stretch">
-                    <FormControl>
-                      <FormLabel>Chapter Title</FormLabel>
-                      <Input
-                        value={chapter.chapter_title}
-                        onChange={(e) =>
-                          handleChapterChange(chapterIndex, 'chapter_title', e.target.value)
-                        }
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel>Chapter Description</FormLabel>
-                      <Textarea
-                        value={chapter.chapter_description}
-                        onChange={(e) =>
-                          handleChapterChange(chapterIndex, 'chapter_description', e.target.value)
-                        }
-                        rows={4}
-                      />
-                    </FormControl>
-
-                    <FormControl>
-                      <FormLabel>Key Events</FormLabel>
-                      <Textarea
-                        value={chapter.key_events.join('\n')}
-                        onChange={(e) =>
-                          handleChapterChange(chapterIndex, 'key_events', e.target.value.split('\n'))
-                        }
-                        rows={3}
-                        placeholder="One event per line"
-                      />
-                    </FormControl>
-
-                    <Accordion allowMultiple>
-                      {chapter.scenes.map((scene: any, sceneIndex: number) => (
-                        <AccordionItem key={sceneIndex}>
-                          <AccordionButton>
-                            <Box flex="1" textAlign="left">
+                
+                <AccordionPanel pb={6}>
+                  <VStack spacing={6} align="stretch">
+                    <Box bg="gray.50" p={4} borderRadius="md">
+                      <Text color="gray.700">{chapter.chapter_description}</Text>
+                    </Box>
+                    
+                    <Accordion allowMultiple defaultIndex={[]}>
+                      {chapter.scenes?.map((scene, sceneIndex) => (
+                        <AccordionItem 
+                          key={sceneIndex} 
+                          border="1px solid"
+                          borderColor="gray.200"
+                          borderRadius="lg"
+                          mb={4}
+                        >
+                          <AccordionButton py={3}>
+                            <HStack flex="1" justify="space-between">
                               <Heading size="sm">Scene {scene.scene_number}</Heading>
-                            </Box>
-                            <AccordionIcon />
+                              <AccordionIcon />
+                            </HStack>
                           </AccordionButton>
-                          <AccordionPanel>
-                            <VStack spacing={4} align="stretch">
-                              <FormControl>
-                                <FormLabel>Scene Description</FormLabel>
-                                <Textarea
-                                  value={scene.general_scene_description_and_motivations}
-                                  onChange={(e) =>
-                                    handleSceneChange(
-                                      chapterIndex,
-                                      sceneIndex,
-                                      'general_scene_description_and_motivations',
-                                      e.target.value
-                                    )
-                                  }
-                                  rows={4}
-                                />
-                              </FormControl>
 
-                              <FormControl>
-                                <FormLabel>Key Events</FormLabel>
-                                <Textarea
-                                  value={scene.key_events.join('\n')}
-                                  onChange={(e) =>
-                                    handleSceneChange(
-                                      chapterIndex,
-                                      sceneIndex,
-                                      'key_events',
-                                      e.target.value.split('\n')
-                                    )
-                                  }
-                                  rows={3}
-                                  placeholder="One event per line"
-                                />
-                              </FormControl>
+                          <AccordionPanel pb={4}>
+                            <VStack align="stretch" spacing={6}>
+                              {/* Scene Info */}
+                              <Box bg="blue.50" p={4} borderRadius="md">
+                                <Text fontWeight="bold" mb={2}>Main Story:</Text>
+                                {Array.isArray(scene.main_story) ? (
+                                  <UnorderedList>
+                                    {scene.main_story.map((story, idx) => (
+                                      <ListItem key={idx} color="blue.800">{story}</ListItem>
+                                    ))}
+                                  </UnorderedList>
+                                ) : (
+                                  <Text color="blue.800">{scene.main_story}</Text>
+                                )}
+                              </Box>
 
-                              <FormControl>
-                                <FormLabel>Main Characters</FormLabel>
-                                <Textarea
-                                  value={scene.main_characters.join('\n')}
-                                  onChange={(e) =>
-                                    handleSceneChange(
-                                      chapterIndex,
-                                      sceneIndex,
-                                      'main_characters',
-                                      e.target.value.split('\n')
-                                    )
-                                  }
-                                  rows={3}
-                                  placeholder="One character per line"
-                                />
-                              </FormControl>
+                              {/* Scene Reasoning */}
+                              {scene.reasoning && (
+                                <Box bg="green.50" p={4} borderRadius="md">
+                                  <Text fontWeight="bold" mb={2}>Scene Reasoning:</Text>
+                                  <Text color="green.800">{scene.reasoning}</Text>
+                                </Box>
+                              )}
 
-                              <FormControl>
-                                <FormLabel>Narration Text</FormLabel>
-                                <Textarea
-                                  value={scene.narration_text}
-                                  onChange={(e) =>
-                                    handleSceneChange(
-                                      chapterIndex,
-                                      sceneIndex,
-                                      'narration_text',
-                                      e.target.value
-                                    )
-                                  }
-                                  rows={4}
-                                />
-                              </FormControl>
+                              {/* Narration */}
+                              <Box bg="purple.50" p={4} borderRadius="md">
+                                <Text fontWeight="bold" mb={2}>Narration:</Text>
+                                <Text color="purple.800">{scene.narration_text}</Text>
+                              </Box>
+
+                              {/* Shots */}
+                              {scene.shots?.map((shot, shotIndex) => (
+                                <Box 
+                                  key={shotIndex}
+                                  borderWidth="1px"
+                                  borderRadius="md"
+                                  p={4}
+                                  bg="white"
+                                >
+                                  <VStack spacing={4} align="stretch">
+                                    <Heading size="xs">Shot {shot.shot_number}</Heading>
+                                    
+                                    {/* Shot Reasoning */}
+                                    {shot.reasoning && (
+                                      <Box bg="yellow.50" p={3} borderRadius="md">
+                                        <Text fontWeight="bold" mb={1}>Shot Reasoning:</Text>
+                                        <Text color="yellow.800">{shot.reasoning}</Text>
+                                      </Box>
+                                    )}
+
+                                    {/* Director Instructions */}
+                                    <Box bg="blue.50" p={3} borderRadius="md">
+                                      <Text fontWeight="bold" mb={1}>Director Instructions:</Text>
+                                      <Text color="blue.800">{shot.director_instructions || 'No director instructions available'}</Text>
+                                    </Box>
+
+                                    {/* Opening Scene Description */}
+                                    {shot.detailed_opening_scene_description && (
+                                      <Box bg="teal.50" p={3} borderRadius="md">
+                                        <Text fontWeight="bold" mb={1}>Opening Scene Description:</Text>
+                                        <Text color="teal.800">{shot.detailed_opening_scene_description}</Text>
+                                      </Box>
+                                    )}
+
+                                    {/* Closing Scene Description */}
+                                    {shot.detailed_closing_scene_description && (
+                                      <Box bg="pink.50" p={3} borderRadius="md">
+                                        <Text fontWeight="bold" mb={1}>Closing Scene Description:</Text>
+                                        <Text color="pink.800">{shot.detailed_closing_scene_description}</Text>
+                                      </Box>
+                                    )}
+
+                                    {/* Sound Effects */}
+                                    {shot.sound_effects && (
+                                      <Box bg="orange.50" p={3} borderRadius="md">
+                                        <Text fontWeight="bold" mb={1}>Sound Effects:</Text>
+                                        {Array.isArray(shot.sound_effects) ? (
+                                          <UnorderedList>
+                                            {shot.sound_effects.map((effect, idx) => (
+                                              <ListItem key={idx} color="orange.800">{effect}</ListItem>
+                                            ))}
+                                          </UnorderedList>
+                                        ) : (
+                                          <Text color="orange.800">{shot.sound_effects}</Text>
+                                        )}
+                                      </Box>
+                                    )}
+                                  </VStack>
+                                </Box>
+                              ))}
                             </VStack>
                           </AccordionPanel>
                         </AccordionItem>
@@ -364,29 +216,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               </AccordionItem>
             ))}
           </Accordion>
-        </VStack>
-      </Box>
-      <Box
-        position="fixed"
-        bottom={0}
-        left={0}
-        right={0}
-        p={4}
-        bg="white"
-        borderTopWidth={1}
-        shadow="lg"
-      >
-        <HStack spacing={4} justify="flex-end">
-          <Button onClick={onBack}>Back</Button>
-          <Button 
-            colorScheme="blue" 
-            onClick={handleGenerateShots}
-            isLoading={isGenerating}
-            loadingText="Generating shots..."
-          >
-            Next
-          </Button>
-        </HStack>
+        </Box>
       </Box>
     </Box>
   );

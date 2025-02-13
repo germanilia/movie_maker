@@ -2,8 +2,9 @@
     "version": "0.2.0",
     "compounds": [
         {
-            "name": "Full Stack: Frontend + Backend",
-            "configurations": ["Python: FastAPI", "React: Chrome"],
+            "name": "🚀 Full Stack",
+            "configurations": ["Python: FastAPI", "React: Dev Server", "React: Chrome"],
+            "preLaunchTask": "prepare-dev-env",
             "stopAll": true
         }
     ],
@@ -34,8 +35,17 @@
             "url": "http://localhost:3000",
             "webRoot": "${workspaceFolder}/src/frontend",
             "sourceMapPathOverrides": {
-                "webpack:///src/*": "${webRoot}/*"
-            }
+                "webpack:///src/*": "${webRoot}/*",
+                "webpack:///./*": "${webRoot}/*",
+                "webpack:////*": "*",
+                "webpack:///*": "${webRoot}/*"
+            },
+            "skipFiles": [
+                "<node_internals>/**",
+                "${workspaceFolder}/node_modules/**"
+            ],
+            "smartStep": true,
+            "sourceMaps": true
         },
         {
             "name": "Python: Current File",
@@ -47,7 +57,17 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
             }
+        },
+        {
+            "name": "React: Dev Server",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/src/frontend",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["start"],
+            "console": "integratedTerminal"
         }
     ],
-    "workbench.externalBrowser": "chrome"
+    "workbench.externalBrowser": "chrome",
+    "debug.javascript.unmapMissingSources": false
 }

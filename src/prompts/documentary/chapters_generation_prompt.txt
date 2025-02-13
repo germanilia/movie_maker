@@ -6,6 +6,10 @@ story background:
 {story_background}
 ####
 
+Total number of requested chapters: {number_of_chapters}
+Total number of requested scenes per chapter {number_of_scenes}
+
+
 Based on the story background, create a list of chapters for the screenplay.
 Each chapter should contain the high level description of the chapter, the key events and the main characters.
 The requested number of chapters is {number_of_chapters}. These chapters must cover the entire story and be in chronological order.
@@ -20,10 +24,10 @@ Output Structure:
 {{
   "chapters": [
     {{
-      "chapter_number": "[Chapter number; e.g., 1]",
-      "chapter_title": "[Chapter title; e.g., 'The Beginning']",
-      "chapter_description": "[Chapter description; e.g., 'The story of a Jewish boy in Nazi Germany']",
-      "key_events": "[Key events to be presented in this chapter, they should be logically make sense and follow a chronological order and story line ]"
+      "reasoning": "This string represents the logic for creating the chapter content, it needs to take under consideration the number of requested chapters, each chapter has scenes
+      the number of events needs to match this, describe in details the reasoning process lead to the decisions and considerations for creating the chapters."
+      "chapter_title": "This string will represent the title of the chapter",
+      "chapter_description": "A string describing the high level events which will take place in this chapter",
     }}
   ]
 }}

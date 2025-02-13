@@ -1,5 +1,7 @@
 Generate artistic instructions for a {genre} screenplay: "{subject}"
 
+Chapter {chapter_number}/{total_chapters}, Scene: {scene_number}/{total_scenes} Shot: {shot_number}/{total_shots}
+
 # Core Parameters
 - Video Genre: {genre}
 - Video Subject: {subject}
@@ -19,8 +21,8 @@ Story Background:
 Chapter Overview:
 {chapter_high_level_description}
 
-Scene Overview:
-{scene_overview}
+Previous Scenes:
+{previous_scenes}
 
 Previous Shots in Scene:
 {previous_shots}
@@ -28,80 +30,28 @@ Previous Shots in Scene:
 Previous Generation Issues:
 {previous_generation_error}
 
-# Shot Requirements
-## Technical Specifications
-1. Camera Details:
-   - Camera type and model
-   - Lens specifications
-   - Camera movement (if applicable)
-   - Shot type (wide, medium, close-up, etc.)
-   - Frame composition
 
-2. Lighting Requirements:
-   - Time of day
-   - Natural/Artificial lighting
-   - Key light positioning
-   - Fill light details
-   - Mood lighting elements
-
-3. Setting Details:
-   - Location description
-   - Time period markers
-   - Environmental elements
-   - Weather conditions
-   - Set dressing specifics
-
-4. Character Elements:
-   - Costume details
-   - Makeup specifications
-   - Character positioning
-   - Facial expressions
-   - Body language
-
-## Shot Type Requirements
-- If regenerating a static shot:
-  - No camera movement
-  - Main character presence preferred
-- If regenerating a dynamic shot:
-  - Include camera movement specifications
-  - Include transition requirements
-
-## Required Elements
-- Opening Shot:
-  - Must establish time period
-  - Main character presence (if applicable)
-  - Scene setting establishment
-- Closing Shot:
-  - Must provide scene resolution
-  - Main character presence (if applicable)
-  - Time period confirmation
-
-# Image Generation Requirements
-- Two images required (opening and closing)
-- Ultra-realistic style
-- Stable diffusion model compatibility
-- Detailed environmental elements
-- Period-accurate details
-- Lighting and atmosphere specifications
-- Must maintain visual continuity with adjacent shots
 
 Output Format:
 {{
-  "reasoning": "A deep explanation on how the output follows the given instructions, why each part was chosen and how is it the best possible selection, need to be sure the opening and closing scenes make sense together",
-  "still_image": "True/False",
-  "sound_effects": "[description of the sound effects required for the shot]",
-  "detailed_opening_scene_description": "[Detailed description of the opening shot, it should be described in a way it would be completely possible to vision the scene, it should describe the clothing of the characters if any appear, the objects in the scene, the positioning of the people and object.]"
-  "detailed_closing_scene_description": "[Detailed description of the opening shot, it should be described in a way it would be completely possible to vision the scene, it should describe the clothing of the characters if any appear, the objects in the scene, the positioning of the people and object.]"
-  "shot_director_instructions": "[Complete technical and artistic direction for crew implementation, also it must contain the progress of the shot, from the detailed_opening_scene_description to the detailed_opening_scene_description]",
+  "reasoning":  "
+                  A deep explanation on how the output follows the given instructions, 
+                  why each part was chosen and how is it the best possible selection, 
+                  need to be sure the opening and closing scenes make sense together.
+                  Pay attention to the place of the scene in the entire script, the information is provided
+                  Need to consider this when creating the director instructions and the detailed descriptions
+                ",
+  "director_instructions": "This string represents the driector instructions for the entire scene, it needs to consider the previous shots and what was already covered from the scene",
+  "detailed_opening_scene_description": "{black_and_white} this is the description of the opening scene of the shot, it needs to be a very detailed explanation which will fit the diffusion models",
+  "detailed_closing_scene_description": "{black_and_white} this is the description of the closing scene of the shot, it needs to be a very detailed explanation which will fit the diffusion models",
+  "sound_effects": A string which represents the sound effects which should be in the background during the scene
 }}
 
 Notes:
 - Shot must be feasible within 10-second duration
 - Events must be logically connected to adjacent shots
 - Time period must be clearly indicated
-- Main character presence must be noted in either opening or closing shot
-- Image prompts must be detailed enough for AI image generation
+- Image prompts must be detailed enough for AI image generation by diffusion model
 - Maintain visual and narrative continuity with adjacent shots
 
 Each output must contain only a json, therefore the first char in the response must be {{ and the last must be }}
-Do not use any single quotes in the response fields, I have issues parsing it so johon's is not a valid response.

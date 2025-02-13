@@ -2,11 +2,8 @@ project: "my_early_years"
 genre: "documentary"
 subject: "My Early Years: The Story of a Jewish Boy under Nazi Germany occupation"
 movie_general_instructions: >
-  This should be a realistic documentary, with a lot of details and explanations, 
-  this is told from the perspective of the narrator. So all the scenes should be 
-  told from the perspective of the narrator and the narration text should be in 
-  the first person perspective.
-narration_instructions: The story is told from the first person perspective.
+  This is a self-created documentary about a Jewish boy during WW2 hiding in a small village in Holland, This is told from the first person's perspective and this is a very personal story, It should follow documentary film general instructions
+narration_instructions: The story is told from the first-person perspective. it needs to be personal and reflect the thoughts and feelings of the person telling it.
 number_of_chapters: 4
 number_of_scenes: 3
 number_of_shots: 3

@@ -23,10 +23,9 @@ Based on the story background, chapter description, and maintaining continuity w
 
 Output Structure:
 {{
-  "scene": {{
-    "scene_description": "[Scene description that follows the story progression]",
-    "key_events": "[Key events that occur in this scene, must be the same number as the number of shots and also the scene must follow chronologically from the previous scenes and maintain the chapter's progression.]",
-    "main_characters": "[main_characters needs to include a detailed description of each character, the looks which should be very detailed and include hair style, hight, clothing, hight.]",
-    "narration_text": "[{narration_instructions}, limited to 70 words]",
-  }}
+    "reasoning": "A deep explanation on how the output follows the given instructions, why each part was chosen and how is it the best possible selection, need to be sure the opening and closing scenes make sense together",
+    "main_story": A string which represents the overview of the scene, which events should it cover 2-3 main events, it must be correlated to the previous scenes to create logical events flow and prevent repetition.
+    "narration_text": {narration_instructions}, limited to 100 words these will be played during the scene, This needs to consider the events which are displayed during the scene and the the previous events if any,
 }}
+
+The final output must be a valid json, the first character will be {{ and the last will be }}

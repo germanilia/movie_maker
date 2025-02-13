@@ -2,6 +2,35 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "prepare-dev-env",
+            "type": "shell",
+            "command": "echo Starting development environment...",
+            "dependsOrder": "sequence",
+            "dependsOn": ["start-backend", "wait-for-services"],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "start-backend",
+            "type": "shell",
+            "command": "echo Waiting for backend to start...",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "wait-for-services",
+            "type": "shell",
+            "command": "sleep 3",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
             "type": "npm",
             "script": "start",
             "path": "src/frontend",
@@ -23,7 +52,6 @@
             },
             "label": "npm: start",
             "detail": "Start React development server"
-        },
-        
+        }
     ]
-} 
+}

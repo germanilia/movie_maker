@@ -16,7 +16,8 @@ import {
 import ProjectDetailsForm from './components/ProjectDetailsForm';
 import VideoPreview from './components/VideoPreview';
 import ScriptReview from './components/ScriptReview';
-import ImageReview from './components/ImageReview';
+import ImageReview from './components/FinalReview';
+import { Script, Image } from './models/models';
 
 interface ProjectData {
   project: string;
@@ -31,29 +32,11 @@ interface ProjectData {
   black_and_white: boolean;
 }
 
-interface Script {
-  chapters: any[];
-  // Add other script properties as needed
-}
-
-interface Image {
-  url: string;
-  chapter_index: number;
-  scene_index: number;
-  shot_index: number;
-}
-
-interface ScriptReviewProps {
-  script: Script | null;
-  setScript: (script: Script | null) => void;
-  onNext: () => void;
-  onBack: () => void;
-}
 
 const steps = [
   { title: 'Project Details', description: 'Enter project information' },
   { title: 'Script Review', description: 'Review and edit the script' },
-  { title: 'Image Review', description: 'Review generated images' },
+  { title: 'Full Review', description: 'Final Script Review' },
   { title: 'Video Preview', description: 'Preview final video' },
 ];
 
@@ -167,4 +150,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

@@ -25,7 +25,7 @@ class AWSService:
         """
         # Load AWS profile and region from environment
         session = boto3.Session(
-            profile_name=os.getenv('AWS_PROFILE', 'default'),
+            profile_name=os.getenv('AWS_PROFILE', 'sela'),
             region_name=os.getenv('AWS_REGION', 'us-east-1')
         )
         
