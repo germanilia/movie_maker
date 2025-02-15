@@ -53,6 +53,9 @@ frontend_dir = os.path.join(
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 
+# Mount the temp directory for serving video files
+app.mount("/temp", StaticFiles(directory="temp"), name="temp")
+
 
 @app.post("/api/generate-script")
 async def generate_script(project_details: ProjectDetails):
@@ -88,48 +91,31 @@ async def generate_shots(project_name: str, script: Script) -> Script:
 @app.put("/api/update-shot-description/{project_name}")
 async def update_shot_description(project_name: str, update_data: dict):
     try:
-        # Load the current script
         director = DirectorService(
             aws_service=AWSService(project_name=project_name),
             project_name=project_name,
         )
-
         script = await director.get_script()
-        if update_data["action"] == "opening":
-            script.chapters[update_data["chapter_index"] - 1].scenes[
-                update_data["scene_index"] - 1
-            ].shots[
-                update_data["shot_index"] - 1
-            ].opening_frame = update_data[
-                "description"
-            ]
-        else:
-            script.chapters[update_data["chapter_index"] - 1].scenes[
-                update_data["scene_index"] - 1
-            ].shots[
-                update_data["shot_index"] - 1
-            ].closing_frame = update_data[
-                "description"
-            ]
-        temp = (
-            script.chapters[update_data["chapter_index"] - 1]
-            .scenes[update_data["scene_index"] - 1]
-            .shots[update_data["shot_index"] - 1]
-            .opening_frame
-        )
-        print(temp)
+        
+        # Get the indices
+        chapter_idx = update_data["chapter_index"] - 1
+        scene_idx = update_data["scene_index"] - 1
+        shot_idx = update_data["shot_index"] - 1
+        
+        # Update the appropriate field based on the action
+        if update_data["action"] == "director_instructions":
+            script.chapters[chapter_idx].scenes[scene_idx].shots[shot_idx].director_instructions = update_data["description"]
+        elif update_data["action"] == "opening":
+            script.chapters[chapter_idx].scenes[scene_idx].shots[shot_idx].opening_frame = update_data["description"]
+        elif update_data["action"] == "closing":
+            script.chapters[chapter_idx].scenes[scene_idx].shots[shot_idx].closing_frame = update_data["description"]
+        
+        # Save the updated script
         await director.save_script(script)
-        temp = (
-            script.chapters[update_data["chapter_index"] - 1]
-            .scenes[update_data["scene_index"] - 1]
-            .shots[update_data["shot_index"] - 1]
-            .opening_frame
-        )
-        return script  # Return the entire updated script instead of just status
+        return script
+
     except IndexError:
-        raise HTTPException(
-            status_code=400, detail="Invalid chapter, scene, or shot index"
-        )
+        raise HTTPException(status_code=400, detail="Invalid chapter, scene, or shot index")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

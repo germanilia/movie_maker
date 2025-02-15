@@ -92,10 +92,12 @@ class BaseVideoService(ABC):
                     scene_num = scene_dir.name.split("_")[1]
                     for shot_dir in scene_dir.glob("shot_*"):
                         shot_num = shot_dir.name.split("_")[1]
-                        video_path = shot_dir / "video.mp4"
+                        video_path = shot_dir.parent / f"shot_{shot_num}_video.mp4"
                         if video_path.exists():
                             key = f"{chapter_num}-{scene_num}-{shot_num}"
-                            videos[key] = str(video_path)
+                            # Convert to web-friendly path
+                            relative_path = str(video_path).replace('\\', '/')
+                            videos[key] = f"/{relative_path}"
         return videos
 
     @abstractmethod

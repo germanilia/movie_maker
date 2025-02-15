@@ -18,6 +18,7 @@ import ImageDisplay from './ImageDisplay';
 import NarrationBox from './NarrationBox';
 import BackgroundMusic from './BackgroundMusic';
 import ShotVideo from './ShotVideo';
+import DirectorInstructions from './DirectorInstructions';
 
 interface ScriptReviewProps {
   script: Script | null;
@@ -449,6 +450,40 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
+  const handleUpdateDirectorInstructions = async (
+    chapterIndex: number,
+    sceneIndex: number,
+    shotIndex: number,
+    newInstructions: string
+  ) => {
+    try {
+      // Create a deep copy of the script
+      const updatedScript = JSON.parse(JSON.stringify(script));
+      
+      // Update the instructions in the script
+      updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].director_instructions = newInstructions;
+
+      // Call the API to update the script
+      const response = await fetch(`http://localhost:8000/api/update-script/${projectName}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedScript),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update director instructions');
+      }
+
+      // Update the local script state
+      setScript(updatedScript);
+    } catch (error) {
+      console.error('Error updating director instructions:', error);
+      throw error;
+    }
+  };
+
   if (!script) {
     return (
       <Box p={4}>
@@ -617,10 +652,18 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                                   )}
 
                                   {/* Director Instructions */}
-                                  <Box bg="blue.50" p={3} borderRadius="md">
-                                    <Text fontWeight="bold" mb={1}>Director Instructions:</Text>
-                                    <Text color="blue.800">{shot.director_instructions || 'No director instructions available'}</Text>
-                                  </Box>
+                                  <DirectorInstructions 
+                                    instructions={shot.director_instructions} 
+                                    projectName={projectName}
+                                    chapterIndex={chapterIndex}
+                                    sceneIndex={sceneIndex}
+                                    shotIndex={shotIndex}
+                                    onInstructionsUpdated={(newInstructions) => {
+                                      const updatedScript = JSON.parse(JSON.stringify(script));
+                                      updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].director_instructions = newInstructions;
+                                      setScript(updatedScript);
+                                    }}
+                                  />
 
                                   {/* Opening Frame Description */}
                                   {shot.opening_frame &&
