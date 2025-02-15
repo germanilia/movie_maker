@@ -40,7 +40,7 @@ class ReplicateVideoService(BaseVideoService):
         shot: str,
         overwrite: bool = False,
         poll_interval: int = 10,
-        frame_mode: str = "both"
+        frame_mode: str = "opening"
     ) -> Tuple[bool, str | None]:
         """Generate video for a specific shot using Replicate"""
         video_path = self.get_shot_path(chapter, scene, shot)
@@ -60,23 +60,17 @@ class ReplicateVideoService(BaseVideoService):
                 logger.error(f"Opening frame not found at {frame_path}")
                 return False, None
 
-            # Prepare the frame as base64
-            image_uri = self._encode_image_to_base64(str(frame_path))
-
-            # If using both frames, enhance the prompt to guide towards closing frame
-            if frame_mode == "both":
-                closing_frame_path = self.get_shot_image_path(chapter, scene, shot, "closing")
-                if closing_frame_path.exists():
-                    prompt += " The scene should gradually transition towards the final look."
-
+            closing_frame_path = self.get_shot_image_path(chapter, scene, shot, "closing")
             logger.info("Calling Replicate API for video generation")
-
+            reference_image = self._encode_image_to_base64(str(frame_path))
+            if frame_mode == "closing":
+                reference_image = self._encode_image_to_base64(str(closing_frame_path))
             # Call Replicate API with proper type handling
             output = replicate.run(
                 self.video_model.model_name,
                 input={
                     "prompt": str(prompt),
-                    "start_image": str(image_uri),
+                    "start_image": reference_image,
                     "duration": float(self.video_model.parameters["duration"]),
                     "cfg_scale": float(self.video_model.parameters["cfg_scale"]),
                     "aspect_ratio": str(self.video_model.parameters["aspect_ratio"]),
