@@ -402,6 +402,53 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
+  const handleUpdateDescription = async (
+    chapterIndex: number,
+    sceneIndex: number,
+    shotIndex: number,
+    type: 'opening' | 'closing',
+    newDescription: string
+  ) => {
+    try {
+      // Create a deep copy of the script
+      const updatedScript = JSON.parse(JSON.stringify(script));
+      
+      // Update the description in the script
+      if (type === 'opening') {
+        updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].opening_frame = newDescription;
+      } else {
+        updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].closing_frame = newDescription;
+      }
+
+      // Call the API to update the script
+      const response = await fetch(`http://localhost:8000/api/update-shot-description/${projectName}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chapter_index: chapterIndex + 1,
+          scene_index: sceneIndex + 1,
+          shot_index: shotIndex + 1,
+          action: type,
+          description: newDescription,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update description');
+      }
+
+      // Update the local script state
+      setScript(updatedScript);
+
+      return;
+    } catch (error) {
+      console.error('Error updating description:', error);
+      throw error;
+    }
+  };
+
   if (!script) {
     return (
       <Box p={4}>
@@ -436,10 +483,16 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               shotIndex,
               type,
               description,
-              true  // Set overwrite_image to true for single image generation
+              true
             );
           }
         }}
+        onUpdateDescription={(newDescription) => 
+          handleUpdateDescription(chapterIndex, sceneIndex, shotIndex, type, newDescription)
+        }
+        chapterIndex={chapterIndex}
+        sceneIndex={sceneIndex}
+        shotIndex={shotIndex}
       />
     );
   };
