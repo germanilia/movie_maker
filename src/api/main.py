@@ -1,9 +1,7 @@
 import logging
 from pathlib import Path
 import sys
-from typing import List, Optional, Union
 
-from src.services.video_service import VideoService
 from src.services.director_service import DirectorService
 from src.services.image_service import ImageService
 from src.services.voice_service import VoiceService
@@ -14,6 +12,7 @@ from fastapi.responses import FileResponse
 from src.models.models import ProjectDetails, Script, RegenerateImageRequest
 from src.services.aws_service import AWSService
 from src.services.background_music_service import BackgroundMusicService
+from src.services.video_service_factory import VideoServiceFactory, VideoProvider
 
 import os
 from pydantic import BaseModel
@@ -456,47 +455,68 @@ class VideoGenerationRequest(BaseModel):
     scene_number: int
     shot_number: int
     overwrite: bool = False
+    provider: VideoProvider = VideoProvider.REPLICATE  # Default to Replicate
+    frame_mode: str = "both"  # Default to using both frames
 
 @app.post("/api/generate-shot-video/{project_name}")
 async def generate_shot_video(project_name: str, request: VideoGenerationRequest):
     """Generate video for a specific shot"""
     try:
         aws_service = AWSService(project_name=project_name)
-        video_service = VideoService(aws_service=aws_service)
+        video_service = VideoServiceFactory.create_video_service(request.provider, aws_service)
 
-        # Images will be loaded from disk based on chapter/scene/shot numbers
-        success, video_path = await video_service.generate_video(
-            prompt=request.prompt,
-            chapter=str(request.chapter_number),
-            scene=str(request.scene_number),
-            shot=str(request.shot_number),
-            overwrite=request.overwrite
-        )
+        try:
+            # Generate video
+            success, video_path = await video_service.generate_video(
+                prompt=request.prompt,
+                chapter=str(request.chapter_number),
+                scene=str(request.scene_number),
+                shot=str(request.shot_number),
+                overwrite=request.overwrite,
+                frame_mode=request.frame_mode
+            )
 
-        if not success or not video_path:
-            raise Exception("Failed to generate video")
+            if not success or not video_path:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to generate video - no video path returned"
+                )
 
-        return FileResponse(
-            path=video_path,
-            media_type="video/mp4",
-            filename=f"video_{request.chapter_number}_{request.scene_number}_{request.shot_number}.mp4"
-        )
+            return FileResponse(
+                path=video_path,
+                media_type="video/mp4",
+                filename=f"video_{request.chapter_number}_{request.scene_number}_{request.shot_number}.mp4"
+            )
 
+        except Exception as service_error:
+            # Log the detailed error and raise a user-friendly message
+            logger.error(f"Video service error: {str(service_error)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Video generation failed: {str(service_error)}"
+            )
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except Exception as e:
-        logger.error(f"Error generating video: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error generating video: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred during video generation"
+        )
 
 @app.get("/api/get-video/{project_name}")
 async def get_video(
     project_name: str,
     chapter_number: int,
     scene_number: int,
-    shot_number: int
+    shot_number: int,
+    provider: VideoProvider = VideoProvider.REPLICATE
 ):
     """Get a specific video if it exists"""
     try:
         aws_service = AWSService(project_name=project_name)
-        video_service = VideoService(aws_service=aws_service)
+        video_service = VideoServiceFactory.create_video_service(provider, aws_service)
 
         video_exists = video_service.video_exists(
             chapter=str(chapter_number),
@@ -531,11 +551,11 @@ async def get_video(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/get-all-videos/{project_name}")
-async def get_all_videos(project_name: str):
+async def get_all_videos(project_name: str, provider: VideoProvider = VideoProvider.REPLICATE):
     """Get all generated videos for a project"""
     try:
         aws_service = AWSService(project_name=project_name)
-        video_service = VideoService(aws_service=aws_service)
+        video_service = VideoServiceFactory.create_video_service(provider, aws_service)
 
         videos = video_service.get_all_videos()
         return {

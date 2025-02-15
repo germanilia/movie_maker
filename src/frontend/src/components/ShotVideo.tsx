@@ -5,6 +5,7 @@ import {
   Text,
   VStack,
   useToast,
+  Select,
 } from '@chakra-ui/react';
 
 interface ShotVideoProps {
@@ -28,6 +29,8 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [provider, setProvider] = useState<string>("runwayml");
+  const [frameMode, setFrameMode] = useState<string>("both");
   const toast = useToast();
 
   useEffect(() => {
@@ -73,6 +76,8 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
             scene_number: sceneNumber,
             shot_number: shotNumber,
             overwrite: true,
+            provider: provider,
+            frame_mode: frameMode,
           }),
         }
       );
@@ -114,6 +119,23 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
   return (
     <VStack spacing={4} align="stretch" w="100%">
       <Box>
+        <Select
+          value={provider}
+          onChange={(e) => setProvider(e.target.value)}
+          mb={2}
+        >
+          <option value="runwayml">RunwayML (Gen3)</option>
+          <option value="replicate">Replicate (Kling)</option>
+        </Select>
+        <Select
+          value={frameMode}
+          onChange={(e) => setFrameMode(e.target.value)}
+          mb={2}
+        >
+          <option value="both">Use Both Frames (not supported by kling)</option>
+          <option value="opening">Use Opening Frame Only</option>
+          <option value="closing">Use Closing Frame Only</option>
+        </Select>
         <Button
           colorScheme="teal"
           onClick={handleGenerateVideo}
