@@ -195,7 +195,7 @@ class VideoGenerator:
         video = await self._generate_video_from_image(
             opening_image,
             closing_image,
-            shot.detailed_opening_scene_description,
+            shot.opening_frame,
             video_path,
         )
         return {

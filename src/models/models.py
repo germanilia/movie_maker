@@ -18,9 +18,8 @@ class Shot(BaseModel):
     reasoning: str | None = None
     shot_number: int = -1
     director_instructions: str = ""  # Changed to have a default empty string
-    detailed_opening_scene_description: str | None = None
-    detailed_closing_scene_description: str | None = None
-    background_music: List[str] | str | None = None
+    opening_frame: str | None = None
+    closing_frame: str | None = None
 
 class Scene(BaseModel):
     reasoning: str | None = None
@@ -28,6 +27,7 @@ class Scene(BaseModel):
     main_story: str | List[str]
     narration_text: str
     shots: List[Shot] | None = None
+    background_music: List[str] | str | None = None
     
 class Chapter(BaseModel):
     reasoning:str
@@ -50,3 +50,5 @@ class RegenerateImageRequest(BaseModel):
     shot_index: int
     type: str
     custom_prompt: str | None = None
+    overwrite_image: bool = False
+    

@@ -11,26 +11,25 @@ from src.models.models import ProjectDetails, Script, RegenerateImageRequest
 from src.core.director import Director
 from src.core.video_genrator import VideoGenerator
 from src.services.aws_service import AWSService
+
 # from src.services.image_generator import ImageGenerator
 import os
 from pydantic import BaseModel
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 
 # Reduce boto3/botocore logging noise
-logging.getLogger('botocore').setLevel(logging.WARNING)
-logging.getLogger('boto3').setLevel(logging.WARNING)
-logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger("botocore").setLevel(logging.WARNING)
+logging.getLogger("boto3").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # Get the logger for this module
 logger = logging.getLogger(__name__)
-
 
 
 app = FastAPI(title="Video Creator API")
@@ -52,6 +51,7 @@ frontend_dir = os.path.join(
 )
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+
 
 @app.post("/api/generate-script")
 async def generate_script(project_details: ProjectDetails):
@@ -99,7 +99,7 @@ async def update_shot_description(project_name: str, update_data: dict):
                 update_data["scene_index"] - 1
             ].shots[
                 update_data["shot_index"] - 1
-            ].detailed_opening_scene_description = update_data[
+            ].opening_frame = update_data[
                 "description"
             ]
         else:
@@ -107,14 +107,14 @@ async def update_shot_description(project_name: str, update_data: dict):
                 update_data["scene_index"] - 1
             ].shots[
                 update_data["shot_index"] - 1
-            ].detailed_closing_scene_description = update_data[
+            ].closing_frame = update_data[
                 "description"
             ]
         temp = (
             script.chapters[update_data["chapter_index"] - 1]
             .scenes[update_data["scene_index"] - 1]
             .shots[update_data["shot_index"] - 1]
-            .detailed_opening_scene_description
+            .opening_frame
         )
         print(temp)
         await director.save_script(script)
@@ -122,7 +122,7 @@ async def update_shot_description(project_name: str, update_data: dict):
             script.chapters[update_data["chapter_index"] - 1]
             .scenes[update_data["scene_index"] - 1]
             .shots[update_data["shot_index"] - 1]
-            .detailed_opening_scene_description
+            .opening_frame
         )
         return script  # Return the entire updated script instead of just status
     except IndexError:
@@ -176,25 +176,23 @@ async def get_script(project_name: str) -> Script:
 
 @app.get("/api/get-image/{project_name}")
 async def get_image(
-    project_name: str,
-    chapter_index: int,
-    scene_index: int,
-    shot_index: int,
-    type: str
+    project_name: str, chapter_index: int, scene_index: int, shot_index: int, type: str
 ):
     """Get a specific image if it exists and return it as base64"""
     try:
         aws_service = AWSService(project_name=project_name)
         image_generator = ImageGenerator(
             aws_service=aws_service,
-            black_and_white=False  # Can be made configurable if needed
+            black_and_white=False,  # Can be made configurable if needed
         )
-        
-        image_path = f"chapter_{chapter_index}/scene_{scene_index}/shot_{shot_index}_{type}.png"
-        
+
+        image_path = (
+            f"chapter_{chapter_index}/scene_{scene_index}/shot_{shot_index}_{type}.png"
+        )
+
         # Check if image exists and get its base64 data
         image_exists = await image_generator.ensure_image_exists(image_path)
-        
+
         if not image_exists:
             # Instead of throwing a 404, return a response indicating the image doesn't exist
             return {
@@ -204,15 +202,16 @@ async def get_image(
                 "scene_index": scene_index,
                 "shot_index": shot_index,
                 "type": type,
-                "path": image_path
+                "path": image_path,
             }
-        
+
         # Get the image as base64
         local_path = image_generator.temp_dir / image_path
         with open(local_path, "rb") as image_file:
             import base64
-            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-        
+
+            base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+
         return {
             "status": "success",
             "base64_image": f"data:image/png;base64,{base64_image}",
@@ -220,7 +219,7 @@ async def get_image(
             "scene_index": scene_index,
             "shot_index": shot_index,
             "type": type,
-            "path": image_path
+            "path": image_path,
         }
     except FileNotFoundError:
         return {
@@ -230,11 +229,12 @@ async def get_image(
             "scene_index": scene_index,
             "shot_index": shot_index,
             "type": type,
-            "path": image_path
+            "path": image_path,
         }
     except Exception as e:
         logger.error(f"Error getting image: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/api/regenerate-image/{project_name}")
 async def regenerate_image(
@@ -244,23 +244,26 @@ async def regenerate_image(
     """Regenerate a specific image with optional custom prompt"""
     try:
         aws_service = AWSService(project_name=project_name)
-        image_generator = ImageGenerator(aws_service=aws_service)
-        
+        director = Director(aws_service=aws_service, project_name=project_name)
+        script = await director.get_script()
+        image_generator = ImageGenerator(
+            aws_service=aws_service,
+            black_and_white=script.project_details.black_and_white,
+        )
+
         image_path = f"chapter_{request.chapter_index}/scene_{request.scene_index}/shot_{request.shot_index}_{request.type}.png"
-        
+        seed = image_path
         # Generate image and get base64 data
         base64_image = await image_generator.generate_image(
             prompt=request.custom_prompt,
             image_path=image_path,
-            overwrite_image=True
+            overwrite_image=request.overwrite_image,
+
         )
-        
+
         if not base64_image:
-            return {
-                "status": "error",
-                "message": "Failed to generate image"
-            }
-            
+            return {"status": "error", "message": "Failed to generate image"}
+
         return {
             "status": "success",
             "message": "Image regeneration completed",
@@ -269,26 +272,29 @@ async def regenerate_image(
             "scene_index": request.scene_index,
             "shot_index": request.shot_index,
             "type": request.type,
-            "path": image_path
+            "path": image_path,
         }
     except Exception as e:
         logger.error(f"Error regenerating image: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/get-all-images/{project_name}")
 async def get_all_images(project_name: str):
-    """Get all generated images for a project and return them as base64"""
+    "Get all generated images for a project and return them them as base64" ""
     try:
         aws_service = AWSService(project_name=project_name)
+        director = Director(aws_service=aws_service, project_name=project_name)
+        script = await director.get_script()
         image_generator = ImageGenerator(
             aws_service=aws_service,
-            black_and_white=False
+            black_and_white=script.project_details.black_and_white,
         )
-        
+
         # Get all image files in the project directory
         project_dir = image_generator.temp_dir
         image_data = {}
-        
+
         if project_dir.exists():
             for chapter_dir in project_dir.glob("chapter_*"):
                 chapter_num = int(chapter_dir.name.split("_")[1])
@@ -300,22 +306,23 @@ async def get_all_images(project_name: str):
                         filename_parts = image_file.stem.split("_")
                         shot_num = int(filename_parts[1])
                         shot_type = filename_parts[2]  # 'opening' or 'closing'
-                        
+
                         image_key = f"{chapter_num}-{scene_num}-{shot_num}-{shot_type}"
-                        
+
                         # Read and encode image
                         with open(image_file, "rb") as f:
                             import base64
-                            base64_image = base64.b64encode(f.read()).decode('utf-8')
-                            image_data[image_key] = f"data:image/png;base64,{base64_image}"
-        
-        return {
-            "status": "success",
-            "images": image_data
-        }
+
+                            base64_image = base64.b64encode(f.read()).decode("utf-8")
+                            image_data[image_key] = (
+                                f"data:image/png;base64,{base64_image}"
+                            )
+
+        return {"status": "success", "images": image_data}
     except Exception as e:
         logger.error(f"Error getting all images: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 class NarrationRequest(BaseModel):
     text: str
@@ -323,37 +330,38 @@ class NarrationRequest(BaseModel):
     scene_number: int
     shot_number: int = None
 
+
 @app.post("/api/generate-narration/{project_name}")
 async def generate_narration(project_name: str, request: NarrationRequest):
     """Generate audio narration for given text"""
     try:
         aws_service = AWSService(project_name=project_name)
         sound_generator = SoundGenerator(
-            aws_service=aws_service,
-            project_name=project_name
+            aws_service=aws_service, project_name=project_name
         )
         await sound_generator.initialize_voice(
             project_name=project_name,
         )
         # Generate a unique filename for this narration
         audio_path = f"chapter_{request.chapter_number}/scene_{request.scene_number}/narration.wav"
-        
+
         # Generate the audio
-        local_path = await sound_generator._generate_audio_from_text(request.text, audio_path)
-        
+        local_path = await sound_generator._generate_audio_from_text(
+            request.text, audio_path
+        )
+
         # Get the local path to the generated audio
         # local_path = sound_generator.temp_dir / audio_path
-        
+
         # Return the audio file
         return FileResponse(
-            path=str(local_path),
-            media_type="audio/wav",
-            filename="narration.wav"
+            path=str(local_path), media_type="audio/wav", filename="narration.wav"
         )
-        
+
     except Exception as e:
         logger.error(f"Error generating narration: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/get-all-narrations/{project_name}")
 async def get_all_narrations(project_name: str):
@@ -361,8 +369,7 @@ async def get_all_narrations(project_name: str):
     try:
         aws_service = AWSService(project_name=project_name)
         sound_generator = SoundGenerator(
-            aws_service=aws_service,
-            project_name=project_name
+            aws_service=aws_service, project_name=project_name
         )
         project_dir = sound_generator.temp_dir
         narration_files = {}
@@ -373,20 +380,18 @@ async def get_all_narrations(project_name: str):
                 for scene_dir in chapter_dir.glob("scene_*"):
                     scene_num = int(scene_dir.name.split("_")[1])
                     narration_path = scene_dir / "narration.wav"
-                    
+
                     if narration_path.exists():
                         key = f"{chapter_num}-{scene_num}"
                         # Read the audio file and convert to base64
                         with open(narration_path, "rb") as f:
                             import base64
-                            audio_data = base64.b64encode(f.read()).decode('utf-8')
+
+                            audio_data = base64.b64encode(f.read()).decode("utf-8")
                             narration_files[key] = audio_data
 
-        return {
-            "status": "success",
-            "narrations": narration_files
-        }
-            
+        return {"status": "success", "narrations": narration_files}
+
     except Exception as e:
         logger.error(f"Error getting all narrations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

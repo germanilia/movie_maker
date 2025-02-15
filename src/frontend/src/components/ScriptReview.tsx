@@ -120,7 +120,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     sceneIndex: number,
     shotIndex: number,
     type: string,
-    description: string
+    description: string,
+    overwriteImage: boolean = true  // Add default parameter
   ) => {
     const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
     setGeneratingImages(prev => {
@@ -142,7 +143,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             scene_index: sceneIndex + 1,
             shot_index: shotIndex + 1,
             type: type,
-            custom_prompt: description
+            custom_prompt: description,
+            overwrite_image: overwriteImage  // Add the new parameter
           }),
         }
       );
@@ -203,22 +205,22 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     script.chapters.forEach((chapter, chapterIndex) => {
       chapter.scenes?.forEach((scene, sceneIndex) => {
         scene.shots?.forEach((shot, shotIndex) => {
-          if (shot.detailed_opening_scene_description) {
+          if (shot.opening_frame) {
             pendingImages.push({
               chapterIndex,
               sceneIndex,
               shotIndex,
               type: 'opening',
-              description: shot.detailed_opening_scene_description
+              description: shot.opening_frame
             });
           }
-          if (shot.detailed_closing_scene_description) {
+          if (shot.closing_frame) {
             pendingImages.push({
               chapterIndex,
               sceneIndex,
               shotIndex,
               type: 'closing',
-              description: shot.detailed_closing_scene_description
+              description: shot.closing_frame
             });
           }
         });
@@ -241,7 +243,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           img.sceneIndex,
           img.shotIndex,
           img.type,
-          img.description
+          img.description,
+          false  // Set overwrite_image to false for batch generation
         );
       }
 
@@ -283,7 +286,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     type: 'opening' | 'closing'
   ) => {
     const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
-    const description = type === 'opening' ? shot.detailed_opening_scene_description : shot.detailed_closing_scene_description;
+    const description = type === 'opening' ? shot.opening_frame : shot.closing_frame;
 
     return (
       <ImageDisplay
@@ -299,7 +302,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               sceneIndex,
               shotIndex,
               type,
-              description
+              description,
+              true  // Set overwrite_image to true for single image generation
             );
           }
         }}
@@ -416,6 +420,22 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                                 </Box>
                               )}
 
+                              {/* Background Music */}
+                              {scene.background_music && (
+                                <Box bg="orange.50" p={3} borderRadius="md">
+                                  <Text fontWeight="bold" mb={1}>Background Music:</Text>
+                                  {Array.isArray(scene.background_music) ? (
+                                    <UnorderedList>
+                                      {scene.background_music.map((music, idx) => (
+                                        <ListItem key={idx} color="orange.800">{music}</ListItem>
+                                      ))}
+                                    </UnorderedList>
+                                  ) : (
+                                    <Text color="orange.800">{scene.background_music}</Text>
+                                  )}
+                                </Box>
+                              )}
+
                               {/* Narration */}
                               <NarrationBox 
                                 narrationText={scene.narration_text} 
@@ -451,29 +471,13 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                                       <Text color="blue.800">{shot.director_instructions || 'No director instructions available'}</Text>
                                     </Box>
 
-                                    {/* Opening Scene Description */}
-                                    {shot.detailed_opening_scene_description &&
+                                    {/* Opening Frame Description */}
+                                    {shot.opening_frame &&
                                       renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'opening')}
 
-                                    {/* Closing Scene Description */}
-                                    {shot.detailed_closing_scene_description &&
+                                    {/* Closing Frame Description */}
+                                    {shot.closing_frame &&
                                       renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'closing')}
-
-                                    {/* Sound Effects */}
-                                    {shot.background_music && (
-                                      <Box bg="orange.50" p={3} borderRadius="md">
-                                        <Text fontWeight="bold" mb={1}>Sound Effects:</Text>
-                                        {Array.isArray(shot.background_music) ? (
-                                          <UnorderedList>
-                                            {shot.background_music.map((effect, idx) => (
-                                              <ListItem key={idx} color="orange.800">{effect}</ListItem>
-                                            ))}
-                                          </UnorderedList>
-                                        ) : (
-                                          <Text color="orange.800">{shot.background_music}</Text>
-                                        )}
-                                      </Box>
-                                    )}
                                   </VStack>
                                 </Box>
                               ))}

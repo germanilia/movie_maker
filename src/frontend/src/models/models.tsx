@@ -11,19 +11,19 @@ export interface ProjectDetails {
 
 export interface Shot {
   shot_number: number;
-  reasoning?: string;
+  reasoning: string;
   director_instructions?: string;
-  detailed_opening_scene_description?: string;
-  detailed_closing_scene_description?: string;
-  background_music?: string[] | string;
+  opening_frame: string;
+  closing_frame: string;
 }
 
 export interface Scene {
   scene_number: number;
   main_story: string[] | string;
-  reasoning?: string;
+  reasoning: string;
   narration_text: string;
   shots?: Shot[];
+  background_music: string[] | string;
 }
 
 export interface Chapter {

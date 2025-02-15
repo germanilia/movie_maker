@@ -30,27 +30,36 @@ Previous Shots in Scene:
 Previous Generation Issues:
 {previous_generation_error}
 
+The opening and closing images, are still photos which are the first and last frames for the shot, it needs to keep
+consistency, in clothing, characters, age, time frame etc.
+These descriptions are stand alone, so all the details must be provided for each one, you are not allowed to reference
+different images in the description. 
+Describe the cloths poses and everything else.
 
+in the frame / image description Same evening, same location. are not allowed, need to describe everything from scratch
 
-Output Format:
-{{
-  "reasoning":  "
-                  A deep explanation on how the output follows the given instructions, 
-                  why each part was chosen and how is it the best possible selection, 
-                  need to be sure the opening and closing scenes make sense together.
-                  Pay attention to the place of the scene in the entire script, the information is provided
-                  Need to consider this when creating the director instructions and the detailed descriptions
-                  Make sure when generating the opening for the script it needs to be the first chapter and shot
-                  If there are previous chapters and scenes it means it's not the opening of the script
-                  Need to provide time period for the scene descriptions, also need to provide exactly 
-                  who is in the scene, how are they posed, also need to provided their description based on the character description
-                  the opening closing scene descrip
-                ",
-  "director_instructions": "This string represents the director instructions for the entire scene, it needs to consider the previous shots and what was already covered from the scene",
-  "detailed_opening_scene_description": "{black_and_white} this is the description of the opening scene of the shot, it needs to be a very detailed explanation which will fit the diffusion models",
-  "detailed_closing_scene_description": "{black_and_white} this is the description of the closing scene of the shot, it needs to be a very detailed explanation which will fit the diffusion models",
-  "background_music": String which describes the background music which needs to be played in the background of this shot
-}}
+The director's instructions must be clear, they need to provide the camera movement from the opening frame to the closing one.
+It also needs to describe the flow of events, it must not exceed 10s, which is the time limit for the shot.
+No need to address the music or speech.
+
+The reasoning will explain the logic behind the other required filed for the shot,
+It will help understanding the reasons for the selections.
+
+The director instructions needs to be very clear, it should include the camera instructions,
+the type of shot, and the flow of the shot.
+
+The opening / closing descriptions are used as still images, the description
+of each one must include the details and without referring to other images.
+This images will be the opening and closing images of a short video, so they must 
+be valid as such, the video would be 10s long.
+It needs to be consistent with previous shots and descriptions so it will preserve 
+the styling, it is part of the same movie. each description should also include 
+the period of the image, like the year, season and daytime.
+Keep the description of the characters consistent across the shots.
+If there are previous chapters and scenes it means it's not the opening of the script
+
+Need to pay special attention to clothing, they need to match between shots.
+Ths 
 
 Notes:
 - Shot must be feasible within 10-second duration
@@ -58,5 +67,23 @@ Notes:
 - Time period must be clearly indicated
 - Image prompts must be detailed enough for AI image generation by diffusion model
 - Maintain visual and narrative continuity with adjacent shots
+- When specifying the age use number and years old; like 31 years old
+- Without missing important details keep the frame descriptions as short as possible
+- Image description must be very clear, A black leather Nazi boot is a bad description because it's unclear its a boot a soldier's get_parameter_from_prompt
+  The correct phrase would have been A Nazi soldier with a black leather boot
+- Avoid "...Same garden, minutes later..." descriptions, during the image generation there is no access to the previous descriptions 
+- No need to add addresses to the descriptions it doesn't really help
+-  inside the same living room is a bad description, need to describe provide the full description and not a reference 
+
+avoid repeating the closing  
+
+Output Format:
+{{
+  "reasoning":  "This is the reasoning, based on the instructions above",
+  "opening_frame": "The first frame of the shot",
+  "closing_frame": "The last frame of the shot",
+  "director_instructions": "The director instructions for this shot based on previous shots and the frames description",
+}}
+
 
 Each output must contain only a json, therefore the first char in the response must be {{ and the last must be }}
