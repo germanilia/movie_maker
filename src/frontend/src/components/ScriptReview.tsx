@@ -149,7 +149,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       if (!videoResponse.ok || !isMounted.current) return;
 
       const videoData = await videoResponse.json() as VideoApiResponse;
-      
+
       if (videoData.status === 'success' && videoData.videos && isMounted.current) {
         setVideoData(videoData.videos);
       }
@@ -168,7 +168,10 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     shotIndex: number,
     type: string,
     description: string,
-    overwriteImage: boolean = true  // Add default parameter
+    overwriteImage: boolean = true,
+    referenceImage?: string,
+    modelType: string = 'flux_dev_realism',
+    seed: number = 333
   ) => {
     const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
     setGeneratingImages(prev => {
@@ -191,7 +194,10 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             shot_index: shotIndex + 1,
             type: type,
             custom_prompt: description,
-            overwrite_image: overwriteImage  // Add the new parameter
+            overwrite_image: overwriteImage,
+            model_type: modelType,
+            reference_image: referenceImage,
+            seed: seed
           }),
         }
       );
@@ -297,7 +303,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     try {
       for (const chapter of script.chapters || []) {
         if (!isMounted.current) break;
-        
+
         for (const scene of chapter.scenes || []) {
           if (!isMounted.current) break;
           await handleGenerateBackgroundMusic(chapter.chapter_number, scene.scene_number);
@@ -327,13 +333,13 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
   const getAllPendingImages = () => {
     if (!script) return [];
-    
-    const pendingImages: { 
-      chapterIndex: number; 
-      sceneIndex: number; 
-      shotIndex: number; 
-      type: string; 
-      description: string; 
+
+    const pendingImages: {
+      chapterIndex: number;
+      sceneIndex: number;
+      shotIndex: number;
+      type: string;
+      description: string;
     }[] = [];
 
     script.chapters.forEach((chapter, chapterIndex) => {
@@ -371,7 +377,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     try {
       for (const img of pendingImages) {
         if (!isMounted.current) break;
-        
+
         await handleGenerateImage(
           img.chapterIndex,
           img.sceneIndex,
@@ -413,7 +419,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     try {
       // Create a deep copy of the script
       const updatedScript = JSON.parse(JSON.stringify(script));
-      
+
       // Update the description in the script
       if (type === 'opening') {
         updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].opening_frame = newDescription;
@@ -459,7 +465,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     try {
       // Create a deep copy of the script
       const updatedScript = JSON.parse(JSON.stringify(script));
-      
+
       // Update the instructions in the script
       updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].director_instructions = newInstructions;
 
@@ -493,6 +499,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     );
   }
 
+  // First, update the renderSceneDescription function to accept the seed parameter
   const renderSceneDescription = (
     shot: Shot,
     chapterIndex: number,
@@ -502,7 +509,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   ) => {
     const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
     const description = type === 'opening' ? shot.opening_frame : shot.closing_frame;
-
+  
     return (
       <ImageDisplay
         imageKey={imageKey}
@@ -510,7 +517,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         description={description || ''}
         type={type}
         isGenerating={generatingImages.has(imageKey)}
-        onGenerateImage={() => {
+        onGenerateImage={(referenceImage?: string, modelType?: string, seed?: number) => {
           if (description) {
             handleGenerateImage(
               chapterIndex,
@@ -518,11 +525,14 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               shotIndex,
               type,
               description,
-              true
+              true,
+              referenceImage,
+              modelType || 'flux_dev_realism',
+              seed
             );
           }
         }}
-        onUpdateDescription={(newDescription) => 
+        onUpdateDescription={(newDescription) =>
           handleUpdateDescription(chapterIndex, sceneIndex, shotIndex, type, newDescription)
         }
         chapterIndex={chapterIndex}
@@ -547,7 +557,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         <HStack justify="space-between" align="center">
           <Heading size="lg">Script Review</Heading>
           <HStack spacing={4}>
-            <Button 
+            <Button
               colorScheme="teal"
               onClick={handleGenerateAll}
               isLoading={isGeneratingAll}
@@ -556,7 +566,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             >
               Generate All Images
             </Button>
-            <Button 
+            <Button
               colorScheme="orange"
               onClick={handleGenerateAllMusic}
               isLoading={isGeneratingAllMusic}
@@ -612,8 +622,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                             </Box>
 
                             {/* Background Music */}
-                            <BackgroundMusic 
-                              backgroundMusic={scene.background_music || []} 
+                            <BackgroundMusic
+                              backgroundMusic={scene.background_music || []}
                               projectName={projectName}
                               chapterNumber={chapter.chapter_number}
                               sceneNumber={scene.scene_number}
@@ -623,7 +633,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                             />
 
                             {/* Narration */}
-                            <NarrationBox 
+                            <NarrationBox
                               narrationText={scene.narration_text}
                               projectName={projectName}
                               chapterNumber={chapter.chapter_number}
@@ -652,8 +662,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                                   )}
 
                                   {/* Director Instructions */}
-                                  <DirectorInstructions 
-                                    instructions={shot.director_instructions} 
+                                  <DirectorInstructions
+                                    instructions={shot.director_instructions}
                                     projectName={projectName}
                                     chapterIndex={chapterIndex}
                                     sceneIndex={sceneIndex}

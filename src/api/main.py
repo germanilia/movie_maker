@@ -229,7 +229,9 @@ async def regenerate_image(
             prompt=request.custom_prompt,
             image_path=image_path,
             overwrite_image=request.overwrite_image,
-            model_type=request.model_type
+            model_type=request.model_type,
+            reference_image=request.reference_image,
+            seed=request.seed
         )
 
         if not success or not local_path:

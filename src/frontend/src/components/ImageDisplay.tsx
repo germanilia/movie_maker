@@ -1,16 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Button,
   HStack,
+  VStack,
   Text,
   Image,
   Textarea,
   IconButton,
   useToast,
   Select,
+  NumberInput,
+  NumberInputField,
 } from '@chakra-ui/react';
-import { RepeatIcon, EditIcon, CheckIcon, CloseIcon } from '@chakra-ui/icons';
+import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon } from '@chakra-ui/icons';
+
+const dragDropStyles = {
+  border: '2px dashed',
+  borderRadius: 'md',
+  p: 4,
+  textAlign: 'center' as const,
+  cursor: 'pointer',
+  transition: 'all 0.2s',
+  _hover: {
+    bg: 'gray.50',
+  },
+};
 
 interface ImageDisplayProps {
   imageKey: string;
@@ -18,15 +33,15 @@ interface ImageDisplayProps {
   description: string;
   type: 'opening' | 'closing';
   isGenerating: boolean;
-  onGenerateImage: () => void;
+  onGenerateImage: (referenceImage?: string, modelType?: string, seed?: number) => void;
   onUpdateDescription?: (newDescription: string) => Promise<void>;
-  chapterIndex?: number;
-  sceneIndex?: number;
-  shotIndex?: number;
   modelType?: string;
-  onModelChange?: (model: string) => void;
+  chapterIndex: number;
+  sceneIndex: number;
+  shotIndex: number;
 }
 
+// Update the component to manage its own modelType state
 const ImageDisplay: React.FC<ImageDisplayProps> = ({
   imageKey,
   imageData,
@@ -35,13 +50,22 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   isGenerating,
   onGenerateImage,
   onUpdateDescription,
-  modelType,
-  onModelChange,
+  modelType: initialModelType = 'flux_dev_realism',  // Rename to initialModelType
+  chapterIndex,
+  sceneIndex,
+  shotIndex,
 }) => {
+  // Add local modelType state
+  const [localModelType, setLocalModelType] = useState(initialModelType);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedDescription, setEditedDescription] = useState(description);
   const [isSaving, setIsSaving] = useState(false);
   const toast = useToast();
+  const [isDragging, setIsDragging] = useState(false);
+  const [seed, setSeed] = useState(333);
 
   const bgColor = type === 'opening' ? 'teal.50' : 'pink.50';
   const textColor = type === 'opening' ? 'teal.800' : 'pink.800';
@@ -81,8 +105,67 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   };
 
   const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    if (onModelChange) {
-      onModelChange(event.target.value);
+    const newModelType = event.target.value;
+    setLocalModelType(newModelType);
+    // Clear reference image when switching away from flux_ultra_model
+    if (newModelType !== 'flux_ultra_model') {
+      setReferenceImage(null);
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setReferenceImage(base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleGenerateWithReference = () => {
+    onGenerateImage(referenceImage || undefined, localModelType, seed);
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setReferenceImage(base64);
+        toast({
+          title: "Reference image added",
+          status: "success",
+          duration: 2000,
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSeedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(event.target.value);
+    if (!isNaN(value)) {
+      setSeed(value);
     }
   };
 
@@ -100,10 +183,50 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
               onClick={() => setIsEditing(true)}
             />
           )}
+          {localModelType === 'flux_ultra_model' && (
+            <Box
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              {...dragDropStyles}
+              borderColor={isDragging ? 'teal.500' : 'gray.300'}
+              bg={isDragging ? 'teal.50' : 'transparent'}
+              w="200px"
+            >
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                style={{ display: 'none' }}
+              />
+              <VStack spacing={2}>
+                <IconButton
+                  aria-label="Add reference image"
+                  icon={<AttachmentIcon />}
+                  size="sm"
+                  colorScheme={referenceImage ? 'green' : buttonColor}
+                  onClick={() => fileInputRef.current?.click()}
+                />
+                <Text fontSize="sm">
+                  {referenceImage ? 'Image loaded' : 'Drop image here or click to upload'}
+                </Text>
+                {referenceImage && (
+                  <Image
+                    src={referenceImage}
+                    alt="Reference"
+                    maxH="100px"
+                    objectFit="contain"
+                  />
+                )}
+              </VStack>
+            </Box>
+          )}
           <Select
             size="sm"
             width="200px"
-            value={modelType || 'flux_dev_realism'}
+            value={localModelType}
             onChange={handleModelChange}
           >
             {modelOptions.map(option => (
@@ -112,10 +235,21 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
               </option>
             ))}
           </Select>
+          <NumberInput
+            size="sm"
+            width="80px"
+            value={seed}
+            min={0}
+            max={999999}
+            defaultValue={333}
+            onChange={(valueString) => setSeed(parseInt(valueString))}
+          >
+            <NumberInputField />
+          </NumberInput>
           <Button
             size="sm"
             colorScheme={buttonColor}
-            onClick={onGenerateImage}
+            onClick={handleGenerateWithReference}
             isLoading={isGenerating}
             loadingText="Generating"
             leftIcon={<RepeatIcon />}

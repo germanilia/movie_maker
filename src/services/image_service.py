@@ -57,7 +57,7 @@ class ImageService:
         self.flux_dev_realism = ImageModels(
             model_name="xlabs-ai/flux-dev-realism:39b3434f194f87a900d1bc2b6d4b983e90f0dde1d5022c27b52c143d670758fa",
             parameters={
-                "seed": 111,
+                "seed": 333,
                 "guidance": 3.5,
                 "num_outputs": 1,
                 "aspect_ratio": "16:9",
@@ -114,6 +114,8 @@ class ImageService:
         image_path: str,
         overwrite_image: bool = False,
         model_type: str = "flux_dev_realism",  # Add model_type parameter
+        reference_image: str | None = None,
+        seed: int = 333,
     ) -> Tuple[bool, str | None]:
         """Generate image using Replicate and save locally"""
         start_time = time.time()
@@ -136,10 +138,12 @@ class ImageService:
             prompt = f"The image should be very high quality, realistic, styled as a {self.genre} image, {prompt}"
             logger.debug(f"Enhanced prompt: {prompt}")
             # Extract numeric values from image_path to use as seed
-            seed = int("".join(filter(str.isdigit, image_path)))
 
             logger.info("Calling Replicate API for image generation")
             self.image_model.parameters["prompt"] = prompt
+            self.image_model.parameters["seed"] = seed
+            if reference_image:
+                self.image_model.parameters["image_prompt"] = reference_image
             output = replicate.run(
                 self.image_model.model_name,
                 input=self.image_model.parameters,
