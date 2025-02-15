@@ -39,3 +39,19 @@ export interface NarrationResponse {
   status: string;
   narrations: Record<string, string>;
 }
+
+export interface VideoGenerationResponse {
+  status: string;
+  message: string;
+  video_path?: string;
+  chapter?: number;
+  scene?: number;
+  shot?: number;
+}
+
+export interface VideosListResponse {
+  status: string;
+  videos: {
+    [key: string]: string;  // key format: "chapter-scene-shot", value: video file path
+  };
+}

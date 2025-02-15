@@ -10,7 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from src.models.models import ProjectDetails, Script, RegenerateImageRequest
-from src.core.video_generator import VideoGenerator
 from src.services.aws_service import AWSService
 from src.services.background_music_service import BackgroundMusicService
 
@@ -461,4 +460,108 @@ async def get_all_background_music(project_name: str):
         return {"status": "success", "background_music": music_files}
     except Exception as e:
         logger.error(f"Error getting all background music: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class VideoGenerationRequest(BaseModel):
+    prompt: str
+    chapter_number: int
+    scene_number: int
+    shot_number: int
+    opening_frame: Union[str, List[str]]
+    closing_frame: Optional[Union[str, List[str]]] = None
+    overwrite: bool = False
+
+@app.post("/api/generate-shot-video/{project_name}")
+async def generate_shot_video(project_name: str, request: VideoGenerationRequest):
+    """Generate video for a specific shot"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        video_service = VideoService(aws_service=aws_service)
+
+        success, video_path = await video_service.generate_video(
+            prompt=request.prompt,
+            chapter=str(request.chapter_number),
+            scene=str(request.scene_number),
+            shot=str(request.shot_number),
+            opening_frame=request.opening_frame,
+            closing_frame=request.closing_frame,
+            overwrite=request.overwrite
+        )
+
+        if not success or not video_path:
+            raise Exception("Failed to generate video")
+
+        return {
+            "status": "success",
+            "message": "Video generation completed",
+            "video_path": video_path,
+            "chapter": request.chapter_number,
+            "scene": request.scene_number,
+            "shot": request.shot_number
+        }
+
+    except Exception as e:
+        logger.error(f"Error generating video: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-video/{project_name}")
+async def get_video(
+    project_name: str,
+    chapter_number: int,
+    scene_number: int,
+    shot_number: int
+):
+    """Get a specific video if it exists"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        video_service = VideoService(aws_service=aws_service)
+
+        video_exists = video_service.video_exists(
+            chapter=str(chapter_number),
+            scene=str(scene_number),
+            shot=str(shot_number)
+        )
+
+        if not video_exists:
+            return {
+                "status": "not_found",
+                "message": "Video not found",
+                "chapter": chapter_number,
+                "scene": scene_number,
+                "shot": shot_number
+            }
+
+        video_path = video_service.get_shot_path(
+            chapter=str(chapter_number),
+            scene=str(scene_number),
+            shot=str(shot_number)
+        )
+        local_path = video_service.get_local_path(video_path)
+
+        return FileResponse(
+            path=str(local_path),
+            media_type="video/mp4",
+            filename=f"video_{chapter_number}_{scene_number}_{shot_number}.mp4"
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting video: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-all-videos/{project_name}")
+async def get_all_videos(project_name: str):
+    """Get all generated videos for a project"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        video_service = VideoService(aws_service=aws_service)
+
+        videos = video_service.get_all_videos()
+        return {
+            "status": "success",
+            "videos": videos
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting all videos: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

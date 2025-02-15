@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ChakraProvider } from '@chakra-ui/react';
 import ProjectDetailsForm from './components/ProjectDetailsForm';
-import VideoPreview from './components/VideoPreview';
 import ScriptReview from './components/ScriptReview';
 import { Script } from './models/models';
 
@@ -36,14 +35,6 @@ const App: React.FC = () => {
             onNext={handleNext}
             onBack={handleBack}
             projectName={projectName}
-          />
-        );
-      case 3:
-        return (
-          <VideoPreview
-            script={script}
-            projectName={projectName}
-            onBack={handleBack}
           />
         );
       default:
