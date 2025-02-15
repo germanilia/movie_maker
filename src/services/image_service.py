@@ -176,3 +176,22 @@ class ImageService:
                 f"Image generation failed after {time.time() - start_time:.2f} seconds: {str(e)}"
             )
             return False, None
+
+    def encode_image_to_base64(self, image_path: Path | str) -> str:
+        """Convert image to base64 with data URL prefix"""
+        logger.debug(f"Encoding image to base64: {image_path}")
+        try:
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+                logger.debug(f"Successfully encoded image {image_path}")
+                return f"data:image/png;base64,{base64_image}"
+        except Exception as e:
+            logger.error(
+                f"Failed to encode image to base64: {image_path}. Error: {str(e)}"
+            )
+            return self.get_fallback_image()
+
+    def ensure_image_exists(self, image_path: str) -> bool:
+        """Check if image exists in the temp directory"""
+        full_path = self.temp_dir / image_path
+        return full_path.exists()

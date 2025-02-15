@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text, Button, HStack, useToast } from '@chakra-ui/react';
+import { Box, Text, Button, VStack, useToast } from '@chakra-ui/react';
 
-interface NarrationBoxProps {
+export interface NarrationBoxProps {
   narrationText: string;
   projectName: string;
-  chapter: number;
-  scene: number;
+  chapterNumber: number;
+  sceneNumber: number;
+  existingNarration?: string;
   audioData?: string; // base64 encoded audio data
 }
 
 const NarrationBox: React.FC<NarrationBoxProps> = ({ 
   narrationText, 
   projectName, 
-  chapter, 
-  scene,
+  chapterNumber, 
+  sceneNumber,
+  existingNarration,
   audioData
 }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -53,8 +55,8 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
         },
         body: JSON.stringify({ 
           text: narrationText, 
-          chapter_number: chapter, 
-          scene_number: scene 
+          chapter_number: chapterNumber, 
+          scene_number: sceneNumber 
         }),
       });
 
@@ -89,25 +91,32 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
 
   return (
     <Box bg="purple.50" p={4} borderRadius="md">
-      <Text fontWeight="bold" mb={2}>Narration:</Text>
-      <Text color="purple.800" mb={4}>{narrationText}</Text>
-      
-      <HStack spacing={4}>
-        <Button
-          colorScheme="purple"
-          isLoading={isLoading}
-          onClick={handleGenerateAudio}
-        >
-          {audioUrl ? 'Regenerate Audio' : 'Generate Audio'}
-        </Button>
+      <VStack align="stretch" spacing={4}>
+        <Box>
+          <Text fontWeight="bold" mb={2}>Narration:</Text>
+          <Text color="purple.800">{narrationText}</Text>
+        </Box>
         
-        {audioUrl && (
-          <audio controls>
-            <source src={audioUrl} type="audio/wav" />
-            Your browser does not support the audio element.
-          </audio>
-        )}
-      </HStack>
+        <Box>
+          <Button
+            colorScheme="purple"
+            isLoading={isLoading}
+            onClick={handleGenerateAudio}
+            mb={audioUrl ? 3 : 0}
+          >
+            {audioUrl ? 'Regenerate Audio' : 'Generate Audio'}
+          </Button>
+          
+          {audioUrl && (
+            <Box mt={2}>
+              <audio controls style={{ width: '100%' }}>
+                <source src={audioUrl} type="audio/wav" />
+                Your browser does not support the audio element.
+              </audio>
+            </Box>
+          )}
+        </Box>
+      </VStack>
     </Box>
   );
 };

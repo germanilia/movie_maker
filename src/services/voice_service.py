@@ -10,7 +10,6 @@ from pathlib import Path
 from urllib3.exceptions import InsecureRequestWarning
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from contextlib import closing
 
 # Suppress only the single warning from urllib3 needed.
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)

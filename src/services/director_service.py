@@ -1,19 +1,6 @@
 import json
 import logging
 import sys
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
-# Get the logger for this module
-logger = logging.getLogger(__name__)
-
 from typing import List
 from pathlib import Path
 from src.models.models import (
@@ -25,8 +12,19 @@ from src.models.models import (
 )
 from src.services.aws_service import AWSService
 
+# Configure logging
 
-class Director:
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+
+# Get the logger for this module
+logger = logging.getLogger(__name__)
+
+
+class DirectorService:
     def __init__(self, aws_service: AWSService, project_name: str):
         self.aws_service = aws_service
         self.prompts_base_path = Path("src/prompts")
@@ -68,7 +66,9 @@ class Director:
 
             while remaining_attempts > 0 and not scene_generated:
                 try:
-                    logger.info(f"Generating scene {scene_number + 1}/{request.number_of_scenes} (attempt {max_retries - remaining_attempts + 1}/{max_retries})")
+                    logger.info(
+                        f"Generating scene {scene_number + 1}/{request.number_of_scenes} (attempt {max_retries - remaining_attempts + 1}/{max_retries})"
+                    )
                     prompt = await self._format_prompt(
                         prompt_template,
                         genre=request.genre,
@@ -86,7 +86,7 @@ class Director:
                     response = await self.aws_service.invoke_llm(
                         prompt, prev_errors=prev_error
                     )
-                    scene= Scene(**json.loads(response))
+                    scene = Scene(**json.loads(response))
                     scene.scene_number = scene_number + 1
                     scenes.append(scene)
                     scene_generated = True
@@ -97,21 +97,31 @@ class Director:
                     #     raise ValueError("Invalid scene response format: missing 'scene' key")
 
                 except json.JSONDecodeError as e:
-                    prev_error = f"JSON parsing error for scene {scene_number + 1}: {str(e)}"
+                    prev_error = (
+                        f"JSON parsing error for scene {scene_number + 1}: {str(e)}"
+                    )
                     remaining_attempts -= 1
                 except Exception as e:
                     prev_error = f"Error generating scene {scene_number + 1}: {str(e)}"
                     remaining_attempts -= 1
-                    
+
                 if remaining_attempts == 0 and not scene_generated:
-                    logger.error(f"Failed to generate scene {scene_number + 1} after {max_retries} attempts: {prev_error}")
-                    raise Exception(f"Failed to generate scene {scene_number + 1} after {max_retries} attempts")
+                    logger.error(
+                        f"Failed to generate scene {scene_number + 1} after {max_retries} attempts: {prev_error}"
+                    )
+                    raise Exception(
+                        f"Failed to generate scene {scene_number + 1} after {max_retries} attempts"
+                    )
                 elif not scene_generated:
-                    logger.warning(f"Retrying scene generation... ({remaining_attempts} attempts left)")
+                    logger.warning(
+                        f"Retrying scene generation... ({remaining_attempts} attempts left)"
+                    )
 
         return scenes
 
-    def _get_previous_scenes_instructions(self, chapter: Chapter, total_scenes:int) -> str:
+    def _get_previous_scenes_instructions(
+        self, chapter: Chapter, total_scenes: int
+    ) -> str:
         """Get director instructions from previous shots or return 'N/A' if none exist."""
         if not chapter.scenes:
             return "N/A"
@@ -124,25 +134,26 @@ class Director:
                 previous_main_story.append(
                     f"Scene {scene.scene_number}: {scene.main_story}"
                 )
-                
+
             if scene.narration_text:
                 previous_narration_text.append(
                     f"Scene {scene.scene_number}: {scene.narration_text}"
                 )
-                
+
             if scene.reasoning:
                 previous_reasoning.append(
                     f"Scene {scene.scene_number}: {scene.reasoning}"
                 )
 
         response = f"Scene number:{scene.scene_number}/{total_scenes} In chapter number: {chapter.chapter_number}\n"
-        response += "\n".join(previous_main_story) 
-        response += "\n".join(previous_reasoning) 
-        response += "\n".join(previous_narration_text) 
+        response += "\n".join(previous_main_story)
+        response += "\n".join(previous_reasoning)
+        response += "\n".join(previous_narration_text)
         return response
-        
 
-    def _get_previous_shots_instructions(self, scene: Scene, chapter:Chapter, script:Script) -> str:
+    def _get_previous_shots_instructions(
+        self, scene: Scene, chapter: Chapter, script: Script
+    ) -> str:
         """Get director instructions from previous shots or return 'N/A' if none exist."""
         if not scene.shots:
             return "N/A"
@@ -171,17 +182,21 @@ class Director:
                 for scene in chapter.scenes:
                     if scene.shots is None:
                         scene.shots = []
-                    
+
                     # Calculate how many shots we need to generate
                     existing_shots = len(scene.shots)
-                    
+
                     if existing_shots >= script.project_details.number_of_shots:
-                        logger.info(f"Scene {scene.scene_number} already has all required shots")
+                        logger.info(
+                            f"Scene {scene.scene_number} already has all required shots"
+                        )
                         continue
 
                     remaining_attempts = max_retries
                     prev_error = "N/A"
-                    for i in range(existing_shots, script.project_details.number_of_shots):
+                    for i in range(
+                        existing_shots, script.project_details.number_of_shots
+                    ):
                         try:
                             logger.info(
                                 f"Shot generation attempt {max_retries - remaining_attempts + 1}/{max_retries}"
@@ -189,9 +204,13 @@ class Director:
                             prompt = await self._format_prompt(
                                 prompt_template,
                                 genre=script.project_details.genre,
-                                black_and_white="Black and white image" if script.project_details.black_and_white else "Color image",
+                                black_and_white=(
+                                    "Black and white image"
+                                    if script.project_details.black_and_white
+                                    else "Color image"
+                                ),
                                 subject=script.project_details.subject,
-                                shot_number=i+1,
+                                shot_number=i + 1,
                                 total_shots=script.project_details.number_of_shots,
                                 scene_number=scene.scene_number,
                                 total_scenes=script.project_details.number_of_scenes,
@@ -202,13 +221,11 @@ class Director:
                                 story_background=script.project_details.story_background,
                                 chapter_high_level_description=chapter.chapter_description,
                                 previous_shots=self._get_previous_shots_instructions(
-                                    scene=scene,
-                                    script=script,
-                                    chapter=chapter
+                                    scene=scene, script=script, chapter=chapter
                                 ),
                                 previous_scenes=self._get_previous_scenes_instructions(
                                     chapter=chapter,
-                                    total_scenes=script.project_details.number_of_scenes
+                                    total_scenes=script.project_details.number_of_scenes,
                                 ),
                                 previous_generation_error=prev_error,
                             )
@@ -237,7 +254,7 @@ class Director:
         return script
 
     async def _ensure_temp_dir(self, project_name: str) -> Path:
-        """ Ensure the temporary directory exists for the project."""
+        """Ensure the temporary directory exists for the project."""
         temp_dir = self.temp_base_path / project_name
         temp_dir.mkdir(parents=True, exist_ok=True)
         return temp_dir
@@ -272,11 +289,11 @@ class Director:
                 )
                 chapter_data = json.loads(response)
                 chapters = [Chapter(**chapter) for chapter in chapter_data["chapters"]]
-                
+
                 # Set chapter numbers sequentially
                 for i, chapter in enumerate(chapters, 0):
-                    chapter.chapter_number = i+1
-                    
+                    chapter.chapter_number = i + 1
+
                 return chapters
             except json.JSONDecodeError as e:
                 prev_error = f"JSON Parse Error: {str(e)}"
@@ -342,7 +359,9 @@ class Director:
             logger.info(
                 f"\nGenerating scenes for chapter {chapter.chapter_number}: {chapter.chapter_title}"
             )
-            scenes = await self.generate_scenes(request, chapter, request.number_of_scenes)
+            scenes = await self.generate_scenes(
+                request, chapter, request.number_of_scenes
+            )
             chapter.scenes = scenes
             logger.info(
                 f"Generated {len(scenes)} scenes for chapter {chapter.chapter_number}"
@@ -394,7 +413,9 @@ class Director:
     async def get_script(self) -> Script:
         """Get the current script for the project."""
         try:
-            script = await self._try_load_script(self.temp_base_path / self.project_name)
+            script = await self._try_load_script(
+                self.temp_base_path / self.project_name
+            )
             if not script:
                 raise FileNotFoundError("Script not found")
             return script
@@ -411,19 +432,21 @@ class Director:
             logger.error(f"Failed to save script: {str(e)}")
             raise
 
+
 def parse_shot_response(response: str) -> Shot:
     try:
         # Clean the response string
         cleaned_response = (
-            response.strip()                    # Remove leading/trailing whitespace
-            .replace("\'", "")               # Replace single quotes with double quotes
+            response.strip().replace(  # Remove leading/trailing whitespace
+                "'", ""
+            )  # Replace single quotes with double quotes
         )
-        
+
         # Parse JSON
         data = json.loads(cleaned_response)
-        
+
         return Shot(**data)
-        
+
     except json.JSONDecodeError as e:
         logger.error(f"JSON parsing error: {str(e)}")
         logger.error(f"Response content: {response}")

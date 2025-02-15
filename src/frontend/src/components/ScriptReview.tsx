@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Script, NarrationResponse } from '../models/models';
+import React, { useState, useRef } from 'react';
+import { Script, NarrationResponse, Chapter, Scene, Shot } from '../models/models';
 import {
   Box,
   Button,
@@ -18,6 +18,7 @@ import {
 } from '@chakra-ui/react';
 import ImageDisplay from './ImageDisplay';
 import NarrationBox from './NarrationBox';
+import BackgroundMusic from './BackgroundMusic';
 
 interface ScriptReviewProps {
   script: Script | null;
@@ -49,8 +50,16 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [narrationData, setNarrationData] = useState<Record<string, string>>({});
   const [existingNarrations, setExistingNarrations] = useState<Record<string, boolean>>({});
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [generatingMusic, setGeneratingMusic] = useState<Set<string>>(new Set());
+  const [isGeneratingAllMusic, setIsGeneratingAllMusic] = useState(false);
   const toast = useToast();
-  const isMounted = React.useRef(false);
+  const isMounted = useRef(true);
+
+  React.useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const getImageKey = React.useCallback((chapterIndex: number, sceneIndex: number, shotIndex: number, type: string) =>
     `${chapterIndex + 1}-${sceneIndex + 1}-${shotIndex + 1}-${type}`,
@@ -191,6 +200,93 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
+  const handleGenerateBackgroundMusic = async (chapterNumber: number, sceneNumber: number) => {
+    const musicKey = `${chapterNumber}-${sceneNumber}`;
+    setGeneratingMusic(prev => {
+      const newSet = new Set(Array.from(prev));
+      newSet.add(musicKey);
+      return newSet;
+    });
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/generate-background-music/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_number: chapterNumber,
+            scene_number: sceneNumber,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to generate background music');
+      }
+
+      toast({
+        title: 'Success',
+        description: `Generated background music for Chapter ${chapterNumber}, Scene ${sceneNumber}`,
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error generating background music:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate background music',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setGeneratingMusic(prev => {
+        const newSet = new Set(Array.from(prev));
+        newSet.delete(musicKey);
+        return newSet;
+      });
+    }
+  };
+
+  const handleGenerateAllMusic = async () => {
+    if (!script) return;
+    setIsGeneratingAllMusic(true);
+
+    try {
+      for (const chapter of script.chapters || []) {
+        if (!isMounted.current) break;
+        
+        for (const scene of chapter.scenes || []) {
+          if (!isMounted.current) break;
+          await handleGenerateBackgroundMusic(chapter.chapter_number, scene.scene_number);
+        }
+      }
+
+      toast({
+        title: 'Success',
+        description: 'All background music has been generated',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error generating all background music:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate all background music',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsGeneratingAllMusic(false);
+    }
+  };
+
   const getAllPendingImages = () => {
     if (!script) return [];
     
@@ -279,7 +375,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   }
 
   const renderSceneDescription = (
-    shot: any,
+    shot: Shot,
     chapterIndex: number,
     sceneIndex: number,
     shotIndex: number,
@@ -292,7 +388,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       <ImageDisplay
         imageKey={imageKey}
         imageData={imageData[imageKey]}
-        description={description}
+        description={description || ''}
         type={type}
         isGenerating={generatingImages.has(imageKey)}
         onGenerateImage={() => {
@@ -335,6 +431,15 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             >
               Generate All Images
             </Button>
+            <Button 
+              colorScheme="orange"
+              onClick={handleGenerateAllMusic}
+              isLoading={isGeneratingAllMusic}
+              loadingText="Generating All Music"
+              isDisabled={generatingMusic.size > 0}
+            >
+              Generate All Music
+            </Button>
             <Button onClick={onBack}>Back</Button>
             <Button colorScheme="blue" onClick={onNext}>
               Next
@@ -344,154 +449,108 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       </Box>
 
       {/* Main Content */}
-      <Box
-        position="relative"
-        height="calc(100vh - 72px)"
-        overflowY="auto"
-        css={{
-          '&::-webkit-scrollbar': {
-            width: '8px',
-          },
-          '&::-webkit-scrollbar-track': {
-            background: '#f1f1f1',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: '#888',
-            borderRadius: '4px',
-          },
-        }}
-      >
-        <Box p={4} pb={32}>
-          <Accordion allowMultiple defaultIndex={[]}>
-            {script.chapters.map((chapter, chapterIndex) => (
-              <AccordionItem key={chapterIndex}>
-                <AccordionButton py={4}>
-                  <HStack flex="1" justify="space-between">
-                    <Heading size="md">
-                      Chapter {chapter.chapter_number}: {chapter.chapter_title}
-                    </Heading>
-                    <AccordionIcon />
-                  </HStack>
-                </AccordionButton>
+      <Box height="calc(100vh - 72px)" overflow="auto" p={4}>
+        <Accordion defaultIndex={[0]} allowMultiple>
+          {(script?.chapters || []).map((chapter, chapterIndex) => (
+            <AccordionItem key={chapterIndex}>
+              <AccordionButton>
+                <Box flex="1" textAlign="left">
+                  <Text fontWeight="bold">
+                    Chapter {chapter.chapter_number}: {chapter.title}
+                  </Text>
+                </Box>
+                <AccordionIcon />
+              </AccordionButton>
+              <AccordionPanel pb={4}>
+                <VStack spacing={4} align="stretch">
+                  {/* Chapter Description */}
+                  <Box bg="gray.50" p={3} borderRadius="md">
+                    <Text>{chapter.description}</Text>
+                  </Box>
 
-                <AccordionPanel pb={6}>
-                  <VStack spacing={6} align="stretch">
-                    <Box bg="gray.50" p={4} borderRadius="md">
-                      <Text color="gray.700">{chapter.chapter_description}</Text>
-                    </Box>
+                  <Accordion defaultIndex={[]} allowMultiple>
+                    {(chapter.scenes || []).map((scene, sceneIndex) => (
+                      <AccordionItem key={sceneIndex}>
+                        <AccordionButton>
+                          <Box flex="1" textAlign="left">
+                            <Text fontWeight="bold">
+                              Scene {scene.scene_number}
+                            </Text>
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                        <AccordionPanel pb={4}>
+                          <VStack spacing={4} align="stretch">
+                            {/* Scene Description */}
+                            <Box bg="gray.50" p={3} borderRadius="md">
+                              <Text>{scene.description}</Text>
+                            </Box>
 
-                    <Accordion allowMultiple defaultIndex={[]}>
-                      {chapter.scenes?.map((scene, sceneIndex) => (
-                        <AccordionItem
-                          key={sceneIndex}
-                          border="1px solid"
-                          borderColor="gray.200"
-                          borderRadius="lg"
-                          mb={4}
-                        >
-                          <AccordionButton py={3}>
-                            <HStack flex="1" justify="space-between">
-                              <Heading size="sm">Scene {scene.scene_number}</Heading>
-                              <AccordionIcon />
-                            </HStack>
-                          </AccordionButton>
+                            {/* Background Music */}
+                            <BackgroundMusic 
+                              backgroundMusic={scene.background_music || []} 
+                              projectName={projectName}
+                              chapterNumber={chapter.chapter_number}
+                              sceneNumber={scene.scene_number}
+                              isGenerating={generatingMusic.has(`${chapter.chapter_number}-${scene.scene_number}`)}
+                              onGenerate={() => handleGenerateBackgroundMusic(chapter.chapter_number, scene.scene_number)}
+                            />
 
-                          <AccordionPanel pb={4}>
-                            <VStack align="stretch" spacing={6}>
-                              {/* Scene Info */}
-                              <Box bg="blue.50" p={4} borderRadius="md">
-                                <Text fontWeight="bold" mb={2}>Main Story:</Text>
-                                {Array.isArray(scene.main_story) ? (
-                                  <UnorderedList>
-                                    {scene.main_story.map((story, idx) => (
-                                      <ListItem key={idx} color="blue.800">{story}</ListItem>
-                                    ))}
-                                  </UnorderedList>
-                                ) : (
-                                  <Text color="blue.800">{scene.main_story}</Text>
-                                )}
-                              </Box>
+                            {/* Narration */}
+                            <NarrationBox 
+                              narrationText={scene.narration}
+                              projectName={projectName}
+                              chapterNumber={chapter.chapter_number}
+                              sceneNumber={scene.scene_number}
+                              existingNarration={narrationData[`${chapter.chapter_number}-${scene.scene_number}`]}
+                            />
 
-                              {/* Scene Reasoning */}
-                              {scene.reasoning && (
-                                <Box bg="green.50" p={4} borderRadius="md">
-                                  <Text fontWeight="bold" mb={2}>Scene Reasoning:</Text>
-                                  <Text color="green.800">{scene.reasoning}</Text>
-                                </Box>
-                              )}
+                            {/* Shots */}
+                            {scene.shots?.map((shot, shotIndex) => (
+                              <Box
+                                key={shotIndex}
+                                borderWidth="1px"
+                                borderRadius="md"
+                                p={4}
+                                bg="white"
+                              >
+                                <VStack spacing={4} align="stretch">
+                                  <Heading size="xs">Shot {shot.shot_number}</Heading>
 
-                              {/* Background Music */}
-                              {scene.background_music && (
-                                <Box bg="orange.50" p={3} borderRadius="md">
-                                  <Text fontWeight="bold" mb={1}>Background Music:</Text>
-                                  {Array.isArray(scene.background_music) ? (
-                                    <UnorderedList>
-                                      {scene.background_music.map((music, idx) => (
-                                        <ListItem key={idx} color="orange.800">{music}</ListItem>
-                                      ))}
-                                    </UnorderedList>
-                                  ) : (
-                                    <Text color="orange.800">{scene.background_music}</Text>
-                                  )}
-                                </Box>
-                              )}
-
-                              {/* Narration */}
-                              <NarrationBox 
-                                narrationText={scene.narration_text} 
-                                projectName={projectName} 
-                                chapter={chapter.chapter_number} 
-                                scene={scene.scene_number}
-                                audioData={narrationData[`${chapter.chapter_number}-${scene.scene_number}`]}
-                              />
-
-                              {/* Shots */}
-                              {scene.shots?.map((shot, shotIndex) => (
-                                <Box
-                                  key={shotIndex}
-                                  borderWidth="1px"
-                                  borderRadius="md"
-                                  p={4}
-                                  bg="white"
-                                >
-                                  <VStack spacing={4} align="stretch">
-                                    <Heading size="xs">Shot {shot.shot_number}</Heading>
-
-                                    {/* Shot Reasoning */}
-                                    {shot.reasoning && (
-                                      <Box bg="yellow.50" p={3} borderRadius="md">
-                                        <Text fontWeight="bold" mb={1}>Shot Reasoning:</Text>
-                                        <Text color="yellow.800">{shot.reasoning}</Text>
-                                      </Box>
-                                    )}
-
-                                    {/* Director Instructions */}
-                                    <Box bg="blue.50" p={3} borderRadius="md">
-                                      <Text fontWeight="bold" mb={1}>Director Instructions:</Text>
-                                      <Text color="blue.800">{shot.director_instructions || 'No director instructions available'}</Text>
+                                  {/* Shot Reasoning */}
+                                  {shot.reasoning && (
+                                    <Box bg="yellow.50" p={3} borderRadius="md">
+                                      <Text fontWeight="bold" mb={1}>Shot Reasoning:</Text>
+                                      <Text color="yellow.800">{shot.reasoning}</Text>
                                     </Box>
+                                  )}
 
-                                    {/* Opening Frame Description */}
-                                    {shot.opening_frame &&
-                                      renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'opening')}
+                                  {/* Director Instructions */}
+                                  <Box bg="blue.50" p={3} borderRadius="md">
+                                    <Text fontWeight="bold" mb={1}>Director Instructions:</Text>
+                                    <Text color="blue.800">{shot.director_instructions || 'No director instructions available'}</Text>
+                                  </Box>
 
-                                    {/* Closing Frame Description */}
-                                    {shot.closing_frame &&
-                                      renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'closing')}
-                                  </VStack>
-                                </Box>
-                              ))}
-                            </VStack>
-                          </AccordionPanel>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  </VStack>
-                </AccordionPanel>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </Box>
+                                  {/* Opening Frame Description */}
+                                  {shot.opening_frame &&
+                                    renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'opening')}
+
+                                  {/* Closing Frame Description */}
+                                  {shot.closing_frame &&
+                                    renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'closing')}
+                                </VStack>
+                              </Box>
+                            ))}
+                          </VStack>
+                        </AccordionPanel>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </VStack>
+              </AccordionPanel>
+            </AccordionItem>
+          ))}
+        </Accordion>
       </Box>
     </Box>
   );

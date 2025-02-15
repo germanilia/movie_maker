@@ -1,3 +1,28 @@
+
+TODO: 
+Need to keep summary for each chapter, for each scene so it can be used when generating the content
+Also maybe it makes scense to generate each chapter at a time??
+
+Need to provide the description of each character so it will be possible to make it consistent
+
+Need to enable face swap
+Need to provide an option to attach reference images when generating the shots
+
+add button to generate all narratives
+
+
+add button to generate all sounds
+need to enable sound generation
+
+movie
+need to enable shot,scene chapter and all generation, 
+need to enable movie generation
+
+
+
+
+
+
 Generate artistic instructions for a {genre} screenplay about "{subject}". 
 special instructions:
 {movie_general_instructions}
@@ -11,15 +36,20 @@ chapter_high_level_description:
 previously generated scenes:
 {previous_scenes}
 ####
-current Scene Number: {scene_number}
-####
-Total number of scenes in this chapter: {number_of_scenes}
+current Scene Number: {scene_number}/{number_of_scenes}
 ####
 Previous Generation Error:
 {previous_generation_error}
 ####
 
 Based on the story background, chapter description, and maintaining continuity with the previously generated scenes, create the next scene for this chapter.
+
+If there are previous scenes make sure you continue the story line, don't  repeat yourself, continue to make progress to cover all the required main events.
+If this is the opening or closing scene of the chapter, give it attention, and make sure it continues the logic and story line from previous scenes
+If this is the firs scene of the first chapter, there are none to continue, and just make sure you are on topic and follow instructions.
+
+Follow the chapter's narrative, and the storyline, do not deviate and make sure the things you are covering have not been already.
+
 
 You are required to provide solid reasoning on the selections in the scene, it needs to avoid repeating and progress the plot
 It should stick to the narrative of the chapter, and make sure to progress from the previous scene / shots.

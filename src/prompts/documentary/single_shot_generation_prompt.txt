@@ -73,7 +73,7 @@ Notes:
   The correct phrase would have been A Nazi soldier with a black leather boot
 - Avoid "...Same garden, minutes later..." descriptions, during the image generation there is no access to the previous descriptions 
 - No need to add addresses to the descriptions it doesn't really help
--  inside the same living room is a bad description, need to describe provide the full description and not a reference 
+- Inside the same living room is a bad description, need to describe provide the full description and not a reference 
 
 avoid repeating the closing  
 
