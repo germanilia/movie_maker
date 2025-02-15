@@ -8,6 +8,7 @@ import {
   Textarea,
   IconButton,
   useToast,
+  Select,
 } from '@chakra-ui/react';
 import { RepeatIcon, EditIcon, CheckIcon, CloseIcon } from '@chakra-ui/icons';
 
@@ -22,6 +23,8 @@ interface ImageDisplayProps {
   chapterIndex?: number;
   sceneIndex?: number;
   shotIndex?: number;
+  modelType?: string;
+  onModelChange?: (model: string) => void;
 }
 
 const ImageDisplay: React.FC<ImageDisplayProps> = ({
@@ -32,6 +35,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   isGenerating,
   onGenerateImage,
   onUpdateDescription,
+  modelType,
+  onModelChange,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedDescription, setEditedDescription] = useState(description);
@@ -41,6 +46,11 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const bgColor = type === 'opening' ? 'teal.50' : 'pink.50';
   const textColor = type === 'opening' ? 'teal.800' : 'pink.800';
   const buttonColor = type === 'opening' ? 'teal' : 'pink';
+
+  const modelOptions = [
+    { value: 'flux_dev_realism', label: 'Flux Dev Realism' },
+    { value: 'flux_ultra_model', label: 'Flux Ultra Model' },
+  ];
 
   const handleSave = async () => {
     if (!onUpdateDescription) return;
@@ -70,6 +80,12 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     setIsEditing(false);
   };
 
+  const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    if (onModelChange) {
+      onModelChange(event.target.value);
+    }
+  };
+
   return (
     <Box bg={bgColor} p={3} borderRadius="md">
       <HStack justify="space-between" mb={2}>
@@ -84,6 +100,18 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
               onClick={() => setIsEditing(true)}
             />
           )}
+          <Select
+            size="sm"
+            width="200px"
+            value={modelType || 'flux_dev_realism'}
+            onChange={handleModelChange}
+          >
+            {modelOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
           <Button
             size="sm"
             colorScheme={buttonColor}

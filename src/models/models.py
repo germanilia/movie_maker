@@ -51,4 +51,5 @@ class RegenerateImageRequest(BaseModel):
     type: str
     custom_prompt: str | None = None
     overwrite_image: bool = False
-    
+    model_type: str = "flux_dev_realism"  # Add this new field
+

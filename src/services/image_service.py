@@ -113,15 +113,16 @@ class ImageService:
         prompt: str,
         image_path: str,
         overwrite_image: bool = False,
+        model_type: str = "flux_dev_realism",  # Add model_type parameter
     ) -> Tuple[bool, str | None]:
         """Generate image using Replicate and save locally"""
         start_time = time.time()
-        logger.info(f"Starting image generation for path: {image_path}")
-        logger.debug(
-            f"Generation parameters - Prompt: {prompt}, Overwrite: {overwrite_image}"
-        )
-
+        logger.info(f"Starting image generation for path: {image_path} with model: {model_type}")
+        
         try:
+            # Set the model before generation
+            self.set_model(model_type)
+            
             local_path = self.get_local_path(image_path)
 
             if not overwrite_image and local_path.exists():
@@ -195,3 +196,12 @@ class ImageService:
         """Check if image exists in the temp directory"""
         full_path = self.temp_dir / image_path
         return full_path.exists()
+
+    def set_model(self, model_type: str):
+        """Set the image generation model"""
+        if model_type == "flux_ultra_model":
+            self.image_model = self.flux_ultra_model
+        elif model_type == "flux_dev_realism":
+            self.image_model = self.flux_dev_realism
+        else:
+            raise ValueError(f"Unknown model type: {model_type}")
