@@ -5,9 +5,6 @@ import {
   HStack,
   Text,
   Image,
-  VStack,
-  IconButton,
-  Tooltip,
 } from '@chakra-ui/react';
 import { RepeatIcon } from '@chakra-ui/icons';
 

@@ -1,7 +1,9 @@
 import logging
 from pathlib import Path
 import sys
+from typing import List, Optional, Union
 
+from src.services.video_service import VideoService
 from src.services.director_service import DirectorService
 from src.services.image_service import ImageService
 from src.services.voice_service import VoiceService
@@ -145,21 +147,6 @@ async def update_script(project_name: str, script: Script) -> Script:
         return script
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/generate-video/{project_name}")
-async def generate_video(project_name: str, script: Script):
-    """Generate the final video"""
-    try:
-        video_generator = VideoGenerator(
-            aws_service=AWSService(project_name=project_name),
-            project_name=project_name,
-        )
-        await video_generator.generate_videos_for_script(script)
-        return {"status": "success", "message": "Video generation started"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/api/script/{project_name}")
 async def get_script(project_name: str) -> Script:
@@ -468,8 +455,6 @@ class VideoGenerationRequest(BaseModel):
     chapter_number: int
     scene_number: int
     shot_number: int
-    opening_frame: Union[str, List[str]]
-    closing_frame: Optional[Union[str, List[str]]] = None
     overwrite: bool = False
 
 @app.post("/api/generate-shot-video/{project_name}")
@@ -479,27 +464,23 @@ async def generate_shot_video(project_name: str, request: VideoGenerationRequest
         aws_service = AWSService(project_name=project_name)
         video_service = VideoService(aws_service=aws_service)
 
+        # Images will be loaded from disk based on chapter/scene/shot numbers
         success, video_path = await video_service.generate_video(
             prompt=request.prompt,
             chapter=str(request.chapter_number),
             scene=str(request.scene_number),
             shot=str(request.shot_number),
-            opening_frame=request.opening_frame,
-            closing_frame=request.closing_frame,
             overwrite=request.overwrite
         )
 
         if not success or not video_path:
             raise Exception("Failed to generate video")
 
-        return {
-            "status": "success",
-            "message": "Video generation completed",
-            "video_path": video_path,
-            "chapter": request.chapter_number,
-            "scene": request.scene_number,
-            "shot": request.shot_number
-        }
+        return FileResponse(
+            path=video_path,
+            media_type="video/mp4",
+            filename=f"video_{request.chapter_number}_{request.scene_number}_{request.shot_number}.mp4"
+        )
 
     except Exception as e:
         logger.error(f"Error generating video: {str(e)}")

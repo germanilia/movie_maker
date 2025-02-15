@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Script, NarrationResponse, Chapter, Scene, Shot } from '../models/models';
+import { Script, Shot } from '../models/models';
 import {
   Box,
   Button,
@@ -12,13 +12,12 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
-  UnorderedList,
-  ListItem,
   useToast,
 } from '@chakra-ui/react';
 import ImageDisplay from './ImageDisplay';
 import NarrationBox from './NarrationBox';
 import BackgroundMusic from './BackgroundMusic';
+import ShotVideo from './ShotVideo';
 
 interface ScriptReviewProps {
   script: Script | null;
@@ -38,6 +37,11 @@ interface NarrationApiResponse {
   narrations: Record<string, string>; // key is chapter-scene, value is base64 audio
 }
 
+interface VideoApiResponse {
+  status: string;
+  videos: Record<string, string>;
+}
+
 const ScriptReview: React.FC<ScriptReviewProps> = ({
   script,
   setScript,
@@ -49,6 +53,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [imageData, setImageData] = useState<Record<string, string>>({});
   const [narrationData, setNarrationData] = useState<Record<string, string>>({});
   const [backgroundMusicData, setBackgroundMusicData] = useState<Record<string, string>>({});
+  const [videoData, setVideoData] = useState<Record<string, string>>({});
   const [existingNarrations, setExistingNarrations] = useState<Record<string, boolean>>({});
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingMusic, setGeneratingMusic] = useState<Set<string>>(new Set());
@@ -73,37 +78,46 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
     const fetchAllData = async () => {
       try {
-        // Fetch images
-        const imageResponse = await fetch(
-          `http://localhost:8000/api/get-all-images/${projectName}`
-        );
+        const [imageResponse, narrResponse, videoResponse, musicResponse] = await Promise.all([
+          fetch(`http://localhost:8000/api/get-all-images/${projectName}`),
+          fetch(`http://localhost:8000/api/get-all-narrations/${projectName}`),
+          fetch(`http://localhost:8000/api/get-all-videos/${projectName}`),
+          fetch(`http://localhost:8000/api/get-all-background-music/${projectName}`)
+        ]);
 
-        if (!imageResponse.ok || !isMounted.current) return;
+        if (isMounted.current) {
+          // Handle images
+          if (imageResponse.ok) {
+            const imageData = await imageResponse.json() as ImageApiResponse;
+            if (imageData.status === 'success' && imageData.images) {
+              setImageData(imageData.images);
+            }
+          }
 
-        const imageData = await imageResponse.json() as ImageApiResponse;
+          // Handle narrations
+          if (narrResponse.ok) {
+            const narrData = await narrResponse.json() as NarrationApiResponse;
+            if (narrData.status === 'success' && narrData.narrations) {
+              setNarrationData(narrData.narrations);
+            }
+          }
 
-        if (imageData.status === 'success' && imageData.images && isMounted.current) {
-          const processedImages: Record<string, string> = {};
-          Object.entries(imageData.images).forEach(([key, base64]) => {
-            // Backend now returns full data URL, so we don't need to add the prefix
-            processedImages[key] = base64;
-          });
-          setImageData(processedImages);
+          // Handle videos
+          if (videoResponse.ok) {
+            const videoData = await videoResponse.json() as VideoApiResponse;
+            if (videoData.status === 'success' && videoData.videos) {
+              setVideoData(videoData.videos);
+            }
+          }
+
+          // Handle background music
+          if (musicResponse.ok) {
+            const musicData = await musicResponse.json();
+            if (musicData.status === 'success' && musicData.background_music) {
+              setBackgroundMusicData(musicData.background_music);
+            }
+          }
         }
-
-        // Fetch narrations
-        const narrResponse = await fetch(
-          `http://localhost:8000/api/get-all-narrations/${projectName}`
-        );
-
-        if (!narrResponse.ok || !isMounted.current) return;
-
-        const narrData = await narrResponse.json() as NarrationApiResponse;
-        
-        if (narrData.status === 'success' && narrData.narrations && isMounted.current) {
-          setNarrationData(narrData.narrations);
-        }
-
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
@@ -125,29 +139,27 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     };
   }, [script, projectName, toast]);
 
-  // Add new effect to fetch all background music
-  React.useEffect(() => {
-    const fetchAllBackgroundMusic = async () => {
-      try {
-        const response = await fetch(
-          `http://localhost:8000/api/get-all-background-music/${projectName}`
-        );
+  const fetchAllVideos = async () => {
+    try {
+      const videoResponse = await fetch(
+        `http://localhost:8000/api/get-all-videos/${projectName}`
+      );
 
-        if (!response.ok || !isMounted.current) return;
+      if (!videoResponse.ok || !isMounted.current) return;
 
-        const data = await response.json();
-        if (data.status === 'success' && data.background_music) {
-          setBackgroundMusicData(data.background_music);
-        }
-      } catch (error) {
-        console.error('Error fetching background music:', error);
+      const videoData = await videoResponse.json() as VideoApiResponse;
+      
+      if (videoData.status === 'success' && videoData.videos && isMounted.current) {
+        setVideoData(videoData.videos);
       }
-    };
-
-    if (script) {
-      fetchAllBackgroundMusic();
+    } catch (error) {
+      console.error('Error fetching videos:', error);
     }
-  }, [script, projectName]);
+  };
+
+  const onVideoGenerated = async () => {
+    await fetchAllVideos();
+  };
 
   const handleGenerateImage = async (
     chapterIndex: number,
@@ -564,6 +576,17 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                                   {/* Closing Frame Description */}
                                   {shot.closing_frame &&
                                     renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'closing')}
+
+                                  {/* Add ShotVideo component with existingVideo prop */}
+                                  <ShotVideo
+                                    projectName={projectName}
+                                    chapterNumber={chapter.chapter_number}
+                                    sceneNumber={scene.scene_number}
+                                    shotNumber={shot.shot_number}
+                                    shotDescription={shot.director_instructions || ''}
+                                    existingVideo={videoData[`${chapter.chapter_number}-${scene.scene_number}-${shot.shot_number}`]}
+                                    onVideoGenerated={onVideoGenerated}
+                                  />
                                 </VStack>
                               </Box>
                             ))}

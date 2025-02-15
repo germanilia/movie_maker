@@ -1,9 +1,11 @@
+import asyncio
 import os
 import logging
 import base64
 from pathlib import Path
 import time
 from typing import Any, Tuple, Optional, Union, List
+import aiohttp
 from pydantic import BaseModel
 
 from runwayml import RunwayML
@@ -13,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class VideoModel(BaseModel):
     model_name: str
-    parameters: Any
+    parameters: Any | None = None
 
 class VideoService:
     def __init__(self, aws_service: AWSService):
@@ -29,12 +31,7 @@ class VideoService:
 
         self.video_model = VideoModel(
             model_name="gen3a_turbo",
-            parameters={
-                "number_of_frames": 48,  # This will generate about 2 seconds of video
-                "fps": 24,
-                "motion_scale": 1.0,
-                "noise": 0.1
-            }
+            parameters={}
         )
 
     def get_local_path(self, video_path: str) -> Path:
@@ -45,7 +42,7 @@ class VideoService:
 
     def get_shot_path(self, chapter: str, scene: str, shot: str) -> str:
         """Construct the path for a specific shot"""
-        return f"chapter_{chapter}/scene_{scene}/shot_{shot}/video.mp4"
+        return f"chapter_{chapter}/scene_{scene}/shot_{shot}_video.mp4"
 
     def get_download_path(self, video_path: str) -> Path:
         """Get the download path for video files"""
@@ -60,22 +57,46 @@ class VideoService:
         return self.get_local_path(video_path).exists()
 
     def _encode_image_to_base64(self, image_path: str) -> str:
-        """Convert image to base64 data URI"""
-        with open(image_path, 'rb') as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-            extension = Path(image_path).suffix[1:]  # Remove the dot
-            return f"data:image/{extension};base64,{encoded_string}"
+        """Convert image to base64 string with data URI prefix"""
+        try:
+            with open(image_path, 'rb') as image_file:
+                # Get file extension from path
+                extension = Path(image_path).suffix.lower().replace('.', '')
+                # Convert extension if needed
+                if extension == 'jpg':
+                    extension = 'jpeg'
+                # Read and encode file
+                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                # Return with required data URI prefix
+                return f"data:image/{extension};base64,{encoded_string}"
+        except Exception as e:
+            logger.error(f"Failed to encode image to base64: {str(e)}")
+            raise
 
-    def _prepare_images(self, images: Union[str, List[str]]) -> Union[str, List[str]]:
-        """Prepare images for API request - convert local paths to base64 if needed"""
-        if isinstance(images, list):
-            return [
-                self._encode_image_to_base64(img) if os.path.exists(img) else img
-                for img in images
-            ]
-        elif os.path.exists(images):
-            return self._encode_image_to_base64(images)
-        return images
+    def get_shot_image_path(self, chapter: str, scene: str, shot: str, type_str: str) -> Path:
+        """Get the path for a shot's image file (opening or closing)"""
+        return self.temp_dir / f"chapter_{chapter}/scene_{scene}/shot_{shot}_{type_str}.png"  # Changed to .png extension
+
+    def _prepare_images(self, chapter: str, scene: str, shot: str, images: Union[str, List[str]], type_str: str) -> Union[str, List[str]]:
+        """Prepare images for API request - convert local paths to base64"""
+        try:
+            if isinstance(images, list):
+                prepared_images = []
+                for idx, img in enumerate(images):
+                    image_path = self.get_shot_image_path(chapter, scene, shot, f"{type_str}_{idx}")
+                    if image_path.exists():
+                        prepared_images.append(self._encode_image_to_base64(str(image_path)))
+                    else:
+                        prepared_images.append(img)  # Use as is if not a local path
+                return prepared_images
+            else:
+                image_path = self.get_shot_image_path(chapter, scene, shot, type_str)
+                if image_path.exists():
+                    return self._encode_image_to_base64(str(image_path))
+                return images  # Use as is if not a local path
+        except Exception as e:
+            logger.error(f"Failed to prepare images: {str(e)}")
+            raise
 
     async def generate_video(
         self,
@@ -83,8 +104,6 @@ class VideoService:
         chapter: str,
         scene: str,
         shot: str,
-        opening_frame: Union[str, List[str]],
-        closing_frame: Optional[Union[str, List[str]]] = None,
         overwrite: bool = False,
         poll_interval: int = 10
     ) -> Tuple[bool, str | None]:
@@ -95,16 +114,12 @@ class VideoService:
             chapter: Chapter number/id
             scene: Scene number/id
             shot: Shot number/id
-            opening_frame: Single image URL/path or list of image URLs/paths
-            closing_frame: Optional final frame image URL/path or list
             overwrite: Whether to overwrite existing video
             poll_interval: Seconds to wait between polling for task completion
         """
         video_path = self.get_shot_path(chapter, scene, shot)
         start_time = time.time()
         logger.info(f"Starting video generation for shot {chapter}/{scene}/{shot}")
-        logger.debug(f"Generation parameters - Prompt: {prompt}, Opening frame(s): {opening_frame}, "
-                    f"Closing frame(s): {closing_frame}, Overwrite: {overwrite}")
 
         try:
             local_path = self.get_local_path(video_path)
@@ -113,19 +128,25 @@ class VideoService:
                 logger.info(f"Video file already exists at {video_path}, skipping generation")
                 return True, str(local_path)
 
-            # Prepare images
-            prompt_images = self._prepare_images(opening_frame)
-            if closing_frame:
-                closing_images = self._prepare_images(closing_frame)
-                if isinstance(prompt_images, list):
-                    prompt_images.extend(closing_images if isinstance(closing_images, list) else [closing_images])
+            # Prepare both opening and closing frames
+            frames = [("opening", "first"), ("closing", "last")]
+            prompt_images = []
+
+            for frame_type, position in frames:
+                frame_path = self.get_shot_image_path(chapter, scene, shot, frame_type)
+                if frame_path.exists():
+                    prompt_images.append({
+                        "position": position,
+                        "uri": self._encode_image_to_base64(str(frame_path))
+                    })
                 else:
-                    prompt_images = [prompt_images, closing_images]
-            
+                    logger.error(f"{frame_type.capitalize()} frame not found at {frame_path}")
+                    return False, None
+
             logger.info("Calling RunwayML API for video generation")
-            image_to_video = await self.client.image_to_video.create(
+            image_to_video = self.client.image_to_video.create(
                 model=self.video_model.model_name,
-                prompt_image=prompt_images,
+                prompt_image=prompt_images[0]['uri'],  # Now passing properly structured images
                 prompt_text=prompt,
                 **self.video_model.parameters
             )
@@ -139,26 +160,27 @@ class VideoService:
 
             # Poll until task completion
             while True:
-                task = await self.client.tasks.retrieve(task_id)
+                task = self.client.tasks.retrieve(task_id)
                 if task.status == 'SUCCEEDED':
                     break
                 elif task.status == 'FAILED':
                     raise Exception(f"Video generation task failed: {task.error}")
                 
                 logger.debug(f"Task status: {task.status}, waiting {poll_interval} seconds...")
-                time.sleep(poll_interval)
+                await asyncio.sleep(poll_interval)  # Use asyncio.sleep instead of time.sleep
 
             # Download the completed video
             save_path = self.get_download_path(video_path)
             downloaded_path = save_path / f"{Path(video_path).stem}.mp4"
 
             # Download video from task output URL
-            video_url = task.output.video_url  # Adjust based on actual API response structure
-            async with self.client.http_client.stream('GET', video_url) as response:
-                response.raise_for_status()
-                with open(downloaded_path, 'wb') as f:
-                    async for chunk in response.aiter_bytes():
-                        f.write(chunk)
+            video_url = task.output[0]
+            async with aiohttp.ClientSession() as session:
+                async with session.get(video_url) as response:
+                    response.raise_for_status()
+                    with open(downloaded_path, 'wb') as f:
+                        async for chunk in response.content.iter_chunked(8192):
+                            f.write(chunk)
 
             generation_time = time.time() - start_time
             logger.info(f"Successfully generated and saved video to {downloaded_path} in {generation_time:.2f} seconds")
