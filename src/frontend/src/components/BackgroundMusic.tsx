@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text, UnorderedList, ListItem, Button, HStack, useToast } from '@chakra-ui/react';
 
 interface BackgroundMusicProps {
@@ -8,6 +8,7 @@ interface BackgroundMusicProps {
   sceneNumber: number;
   isGenerating?: boolean;
   onGenerate?: () => void;
+  existingMusic?: string;
 }
 
 const BackgroundMusic: React.FC<BackgroundMusicProps> = ({ 
@@ -16,10 +17,23 @@ const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
   chapterNumber, 
   sceneNumber,
   isGenerating,
-  onGenerate 
+  onGenerate,
+  existingMusic 
 }) => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
+
+  useEffect(() => {
+    if (existingMusic) {
+      const audioBlob = new Blob(
+        [Uint8Array.from(atob(existingMusic), c => c.charCodeAt(0))],
+        { type: 'audio/mp3' }
+      );
+      const url = URL.createObjectURL(audioBlob);
+      setAudioUrl(url);
+    }
+  }, [existingMusic]);
 
   const handleGenerateMusic = async () => {
     if (onGenerate) {
@@ -27,6 +41,7 @@ const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
       return;
     }
 
+    setIsLoading(true);
     try {
       const response = await fetch(
         `http://localhost:8000/api/generate-background-music/${projectName}`,
@@ -66,6 +81,8 @@ const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
         duration: 5000,
         isClosable: true,
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -79,7 +96,7 @@ const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
           size="sm"
           colorScheme="orange"
           onClick={handleGenerateMusic}
-          isLoading={isGenerating}
+          isLoading={isGenerating || isLoading}
           loadingText="Generating"
         >
           Generate Music

@@ -23,6 +23,23 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
   const toast = useToast();
 
   useEffect(() => {
+    if (existingNarration) {
+      const audioBlob = new Blob(
+        [Uint8Array.from(atob(existingNarration), c => c.charCodeAt(0))],
+        { type: 'audio/wav' }
+      );
+      const url = URL.createObjectURL(audioBlob);
+      setAudioUrl(url);
+
+      return () => {
+        if (url) {
+          URL.revokeObjectURL(url);
+        }
+      };
+    }
+  }, [existingNarration]);
+
+  useEffect(() => {
     // Convert base64 audio data to blob URL if available
     if (audioData) {
       // Convert base64 to binary
@@ -92,30 +109,31 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
   return (
     <Box bg="purple.50" p={4} borderRadius="md">
       <VStack align="stretch" spacing={4}>
-        <Box>
-          <Text fontWeight="bold" mb={2}>Narration:</Text>
-          <Text color="purple.800">{narrationText}</Text>
-        </Box>
-        
-        <Box>
+        <Box position="relative">
           <Button
             colorScheme="purple"
             isLoading={isLoading}
             onClick={handleGenerateAudio}
-            mb={audioUrl ? 3 : 0}
+            position="absolute"
+            right={0}
+            top={-2}
+            zIndex={1}
           >
             {audioUrl ? 'Regenerate Audio' : 'Generate Audio'}
           </Button>
           
-          {audioUrl && (
-            <Box mt={2}>
-              <audio controls style={{ width: '100%' }}>
-                <source src={audioUrl} type="audio/wav" />
-                Your browser does not support the audio element.
-              </audio>
-            </Box>
-          )}
+          <Text fontWeight="bold" mb={2}>Narration:</Text>
+          <Text color="purple.800">{narrationText}</Text>
         </Box>
+        
+        {audioUrl && (
+          <Box mt={2}>
+            <audio controls style={{ width: '100%' }}>
+              <source src={audioUrl} type="audio/wav" />
+              Your browser does not support the audio element.
+            </audio>
+          </Box>
+        )}
       </VStack>
     </Box>
   );

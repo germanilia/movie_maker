@@ -48,6 +48,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [imageData, setImageData] = useState<Record<string, string>>({});
   const [narrationData, setNarrationData] = useState<Record<string, string>>({});
+  const [backgroundMusicData, setBackgroundMusicData] = useState<Record<string, string>>({});
   const [existingNarrations, setExistingNarrations] = useState<Record<string, boolean>>({});
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingMusic, setGeneratingMusic] = useState<Set<string>>(new Set());
@@ -123,6 +124,30 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       isMounted.current = false;
     };
   }, [script, projectName, toast]);
+
+  // Add new effect to fetch all background music
+  React.useEffect(() => {
+    const fetchAllBackgroundMusic = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:8000/api/get-all-background-music/${projectName}`
+        );
+
+        if (!response.ok || !isMounted.current) return;
+
+        const data = await response.json();
+        if (data.status === 'success' && data.background_music) {
+          setBackgroundMusicData(data.background_music);
+        }
+      } catch (error) {
+        console.error('Error fetching background music:', error);
+      }
+    };
+
+    if (script) {
+      fetchAllBackgroundMusic();
+    }
+  }, [script, projectName]);
 
   const handleGenerateImage = async (
     chapterIndex: number,
@@ -494,11 +519,12 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                               sceneNumber={scene.scene_number}
                               isGenerating={generatingMusic.has(`${chapter.chapter_number}-${scene.scene_number}`)}
                               onGenerate={() => handleGenerateBackgroundMusic(chapter.chapter_number, scene.scene_number)}
+                              existingMusic={backgroundMusicData[`${chapter.chapter_number}-${scene.scene_number}`]}
                             />
 
                             {/* Narration */}
                             <NarrationBox 
-                              narrationText={scene.narration}
+                              narrationText={scene.narration_text}
                               projectName={projectName}
                               chapterNumber={chapter.chapter_number}
                               sceneNumber={scene.scene_number}

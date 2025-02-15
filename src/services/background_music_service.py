@@ -6,6 +6,8 @@ from pathlib import Path
 import time
 from typing import Any, Tuple
 
+from src.services.aws_service import AWSService
+
 logger = logging.getLogger(__name__)
 
 class MusicModel(BaseModel):
@@ -13,14 +15,14 @@ class MusicModel(BaseModel):
     parameters: Any
 
 class BackgroundMusicService:
-    def __init__(self, temp_dir: str):
+    def __init__(self, aws_service: AWSService):
         logger.info("Initializing BackgroundMusicService")
         self.replicate_token = os.getenv("REPLICATE_API_TOKEN")
         if not self.replicate_token:
             logger.error("Missing Replicate API token. Required: REPLICATE_API_TOKEN")
             raise ValueError("Missing required Replicate API token in environment variables")
 
-        self.temp_dir = Path(temp_dir)
+        self.temp_dir = Path(aws_service.temp_dir)
         logger.info(f"BackgroundMusicService initialized. Using temp directory: {self.temp_dir}")
 
         self.music_model = MusicModel(
@@ -67,7 +69,7 @@ class BackgroundMusicService:
         logger.debug(f"Generation parameters - Prompt: {prompt}, Duration: {duration}, Overwrite: {overwrite}")
 
         try:
-            local_path = self.get_local_path(music_path)
+            local_path = self.get_local_path(self.temp_dir / music_path)
 
             if not overwrite and local_path.exists():
                 logger.info(f"Music file already exists at {music_path}, skipping generation")

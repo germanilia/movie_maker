@@ -18,7 +18,7 @@ export interface Shot {
 export interface Scene {
   scene_number: number;
   description: string;
-  narration: string;
+  narration_text: string;
   background_music?: string | string[];
   shots?: Shot[];
 }

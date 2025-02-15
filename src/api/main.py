@@ -401,7 +401,7 @@ async def generate_background_music(project_name: str, request: BackgroundMusicR
     """Generate background music for a specific scene"""
     try:
         aws_service = AWSService(project_name=project_name)
-        music_service = BackgroundMusicService(temp_dir=aws_service.temp_dir)
+        music_service = BackgroundMusicService(aws_service=aws_service)
 
         # Generate a unique filename for this background music
         music_path = f"chapter_{request.chapter_number}/scene_{request.scene_number}/background_music.mp3"
@@ -411,7 +411,7 @@ async def generate_background_music(project_name: str, request: BackgroundMusicR
             director = DirectorService(aws_service=aws_service, project_name=project_name)
             script = await director.get_script()
             scene = script.chapters[request.chapter_number - 1].scenes[request.scene_number - 1]
-            request.prompt = f"Create background music that matches the mood of: {scene.description}"
+            request.prompt = f"Create background music that matches the mood of: {scene.background_music}"
 
         # Generate the music
         success, local_path = await music_service.generate_music(
@@ -439,7 +439,7 @@ async def get_all_background_music(project_name: str):
     """Get all existing background music files for a project"""
     try:
         aws_service = AWSService(project_name=project_name)
-        music_service = BackgroundMusicService(temp_dir=aws_service.temp_dir)
+        music_service = BackgroundMusicService(aws_service=aws_service)
         project_dir = Path(music_service.temp_dir)
         music_files = {}
 
