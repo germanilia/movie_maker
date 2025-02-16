@@ -21,6 +21,7 @@ import NarrationBox from './NarrationBox';
 import BackgroundMusic from './BackgroundMusic';
 import ShotVideo from './ShotVideo';
 import DirectorInstructions from './DirectorInstructions';
+import Scene from './Scene';
 
 interface ScriptReviewProps {
   script: Script | null;
@@ -623,100 +624,27 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
                   <Accordion defaultIndex={[]} allowMultiple>
                     {(chapter.scenes || []).map((scene, sceneIndex) => (
-                      <AccordionItem key={sceneIndex}>
-                        <AccordionButton>
-                          <Box flex="1" textAlign="left">
-                            <Text fontWeight="bold">
-                              Scene {scene.scene_number}
-                            </Text>
-                          </Box>
-                          <AccordionIcon />
-                        </AccordionButton>
-                        <AccordionPanel pb={4}>
-                          <VStack spacing={4} align="stretch">
-                            {/* Scene Description */}
-                            <Box bg="gray.50" p={3} borderRadius="md">
-                              <Text>{scene.description}</Text>
-                            </Box>
-
-                            {/* Background Music */}
-                            <BackgroundMusic
-                              backgroundMusic={scene.background_music || []}
-                              projectName={projectName}
-                              chapterNumber={chapter.chapter_number}
-                              sceneNumber={scene.scene_number}
-                              isGenerating={generatingMusic.has(`${chapter.chapter_number}-${scene.scene_number}`)}
-                              onGenerate={() => handleGenerateBackgroundMusic(chapter.chapter_number, scene.scene_number)}
-                              existingMusic={backgroundMusicData[`${chapter.chapter_number}-${scene.scene_number}`]}
-                            />
-
-                            {/* Narration */}
-                            <NarrationBox
-                              narrationText={scene.narration_text}
-                              projectName={projectName}
-                              chapterNumber={chapter.chapter_number}
-                              sceneNumber={scene.scene_number}
-                              existingNarration={narrationData[`${chapter.chapter_number}-${scene.scene_number}`]}
-                            />
-
-                            {/* Shots */}
-                            {scene.shots?.map((shot, shotIndex) => (
-                              <Box
-                                key={shotIndex}
-                                borderWidth="1px"
-                                borderRadius="md"
-                                p={4}
-                                bg="white"
-                              >
-                                <VStack spacing={4} align="stretch">
-                                  <Heading size="xs">Shot {shot.shot_number}</Heading>
-
-                                  {/* Shot Reasoning */}
-                                  {shot.reasoning && (
-                                    <Box bg="yellow.50" p={3} borderRadius="md">
-                                      <Text fontWeight="bold" mb={1}>Shot Reasoning:</Text>
-                                      <Text color="yellow.800">{shot.reasoning}</Text>
-                                    </Box>
-                                  )}
-
-                                  {/* Director Instructions */}
-                                  <DirectorInstructions
-                                    instructions={shot.director_instructions}
-                                    projectName={projectName}
-                                    chapterIndex={chapterIndex}
-                                    sceneIndex={sceneIndex}
-                                    shotIndex={shotIndex}
-                                    onInstructionsUpdated={(newInstructions) => {
-                                      const updatedScript = JSON.parse(JSON.stringify(script));
-                                      updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].director_instructions = newInstructions;
-                                      setScript(updatedScript);
-                                    }}
-                                  />
-
-                                  {/* Opening Frame Description */}
-                                  {shot.opening_frame &&
-                                    renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'opening')}
-
-                                  {/* Closing Frame Description */}
-                                  {shot.closing_frame &&
-                                    renderSceneDescription(shot, chapterIndex, sceneIndex, shotIndex, 'closing')}
-
-                                  {/* Add ShotVideo component with existingVideo prop */}
-                                  <ShotVideo
-                                    projectName={projectName}
-                                    chapterNumber={chapter.chapter_number}
-                                    sceneNumber={scene.scene_number}
-                                    shotNumber={shot.shot_number}
-                                    shotDescription={shot.director_instructions || ''}
-                                    existingVideo={videoData[`${chapter.chapter_number}-${scene.scene_number}-${shot.shot_number}`]}
-                                    onVideoGenerated={onVideoGenerated}
-                                  />
-                                </VStack>
-                              </Box>
-                            ))}
-                          </VStack>
-                        </AccordionPanel>
-                      </AccordionItem>
+                      <Scene
+                        key={sceneIndex}
+                        scene={scene}
+                        chapterIndex={chapterIndex}
+                        sceneIndex={sceneIndex}
+                        chapterNumber={chapter.chapter_number}
+                        projectName={projectName}
+                        script={script}
+                        setScript={setScript}
+                        imageData={imageData}
+                        narrationData={narrationData}
+                        backgroundMusicData={backgroundMusicData}
+                        videoData={videoData}
+                        generatingImages={generatingImages}
+                        generatingMusic={generatingMusic}
+                        handleGenerateImage={handleGenerateImage}
+                        handleGenerateBackgroundMusic={handleGenerateBackgroundMusic}
+                        handleUpdateDescription={handleUpdateDescription}
+                        getImageKey={getImageKey}
+                        onVideoGenerated={onVideoGenerated}
+                      />
                     ))}
                   </Accordion>
                 </VStack>
