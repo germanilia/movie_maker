@@ -127,67 +127,103 @@ class BaseVideoService(ABC):
             bg_music_path = scene_path / "background_music.mp3"
             output_path = scene_path / "final_scene.mp4"
             temp_concat_video = scene_path / "temp_concat.mp4"
-            
+
+            # Validate input files
             if not narration_path.exists():
                 raise ValueError("Missing narration.wav file")
             if not bg_music_path.exists():
                 raise ValueError("Missing background_music.mp3 file")
 
-            # Get all video files in correct order
-            video_files = sorted(scene_path.glob("shot_*_video.mp4"))
+            # Get all video files matching the pattern
+            video_files = list(scene_path.glob("shot_*_video.mp4"))
             if not video_files:
                 raise ValueError("No video files found for this scene")
-
-            # First, standardize and concatenate all videos
-            filter_complex = []
-            input_args = []
-            for i, video in enumerate(video_files):
-                input_args.extend(["-i", str(video)])
-                filter_complex.append(f"[{i}:v]scale=1280:768:force_original_aspect_ratio=decrease,pad=1280:768:(ow-iw)/2:(oh-ih)/2[v{i}]")
             
-            # Create the concat part of the filter
-            concat_inputs = ''.join(f'[v{i}]' for i in range(len(video_files)))
-            filter_complex.append(f"{concat_inputs}concat=n={len(video_files)}:v=1[outv]")
-            
-            # Join all filter complex parts
-            filter_complex_str = ';'.join(filter_complex)
+            # Sort videos numerically based on the shot number extracted from the filename
+            def extract_shot_number(path: Path) -> int:
+                # Expected filename: shot_<number>_video.mp4
+                try:
+                    return int(path.stem.split("_")[1])
+                except (IndexError, ValueError):
+                    return 0
 
+            video_files = sorted(video_files, key=extract_shot_number)
+
+            # Check for missing expected shots (1, 2, 3) and log them
+            expected = {f"shot_{i}_video.mp4" for i in [1, 2, 3]}
+            found = {v.name for v in video_files}
+            missing = expected - found
+            if missing:
+                logger.error("Missing expected video files: %s", missing)
+                raise ValueError("Missing expected shot video(s): " + ", ".join(missing))
+            if len(video_files) != 3:
+                logger.warning("Expected 3 videos, but found %d", len(video_files))
+            logger.debug("Found video files in order: %s", [v.name for v in video_files])
+            
             try:
-                # First step: Concatenate videos
-                concat_cmd = [
-                    "ffmpeg", "-y"
-                ] + input_args + [
-                    "-filter_complex", filter_complex_str,
-                    "-map", "[outv]",
-                    "-c:v", "libx264",
-                    "-preset", "medium",
-                    "-crf", "23",
-                    str(temp_concat_video)
-                ]
-                
-                logger.info("Concatenating videos...")
-                subprocess.run(concat_cmd, check=True)
+                filter_complex = []
+                input_args = []
 
-                # Second step: Add audio
+                # Process each video ensuring a constant frame rate
+                for i, video in enumerate(video_files):
+                    input_args.extend(["-i", str(video)])
+                    filter_complex.append(
+                        f"[{i}:v]scale=1280:768:force_original_aspect_ratio=decrease,"
+                        f"pad=1280:768:(ow-iw)/2:(oh-ih)/2,"
+                        f"format=yuv420p,setpts=PTS-STARTPTS,fps=30[scaled{i}]"
+                    )
+
+                # Chain crossfade transitions with dynamic offsets.
+                # Here we assume each clip has a duration of ~10 seconds and a transition duration of 1 second.
+                transition_duration = 1
+                clip_duration = 10  # adjust if necessary
+                last_output = "scaled0"
+                for i in range(1, len(video_files)):
+                    offset = clip_duration * i - transition_duration
+                    filter_complex.append(
+                        f"[{last_output}][scaled{i}]xfade=transition=fade:duration={transition_duration}:offset={offset},format=yuv420p[faded{i}]"
+                    )
+                    last_output = f"faded{i}"
+
+                concat_cmd = (
+                    ["ffmpeg", "-y"]
+                    + input_args
+                    + [
+                        "-filter_complex", ";".join(filter_complex),
+                        "-map", f"[{last_output}]",
+                        "-c:v", "libx264",
+                        "-preset", "medium",
+                        "-crf", "23",
+                        "-r", "30",
+                        str(temp_concat_video)
+                    ]
+                )
+
+                logger.info("Concatenating videos with transitions...")
+                subprocess.run(concat_cmd, check=True, capture_output=True, text=True)
+
+                # Add audio with adjusted volume levels
                 audio_cmd = [
                     "ffmpeg", "-y",
                     "-i", str(temp_concat_video),
                     "-i", str(narration_path),
                     "-i", str(bg_music_path),
                     "-filter_complex",
-                    "[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];" +
-                    "[2:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,volume=0.3[music];" +
-                    "[narr][music]amix=inputs=2:duration=longest[a]",
+                    (
+                        "[1:a]aformat=sample_fmts=fltp:sample_rates=44100[narr];"
+                        "[2:a]aformat=sample_fmts=fltp:sample_rates=44100,volume=0.08[music];"
+                        "[narr][music]amix=inputs=2:duration=first:weights=10 1[aout]"
+                    ),
                     "-map", "0:v",
-                    "-map", "[a]",
+                    "-map", "[aout]",
                     "-c:v", "copy",
                     "-c:a", "aac",
-                    "-b:a", "384k",
+                    "-b:a", "192k",
                     str(output_path)
                 ]
-                
-                logger.info("Adding audio to video...")
-                subprocess.run(audio_cmd, check=True)
+
+                logger.info("Adding audio...")
+                subprocess.run(audio_cmd, check=True, capture_output=True, text=True)
 
                 # Clean up temporary file
                 if temp_concat_video.exists():
@@ -200,11 +236,11 @@ class BaseVideoService(ABC):
                     raise ValueError("Output file was not created")
 
             except subprocess.CalledProcessError as e:
-                logger.error(f"FFmpeg error: {str(e)}")
-                if hasattr(e, 'stderr'):
-                    logger.error(f"FFmpeg stderr: {e.stderr}")
+                logger.error("FFmpeg error: %s", str(e))
+                if hasattr(e, "stderr"):
+                    logger.error("FFmpeg stderr: %s", e.stderr)
                 raise ValueError("Error combining videos and audio")
 
         except Exception as e:
-            logger.error(f"Error generating scene video: {str(e)}")
+            logger.error("Error generating scene video: %s", str(e))
             return False, None
