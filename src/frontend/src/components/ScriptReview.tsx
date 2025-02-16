@@ -279,6 +279,19 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         throw new Error('Failed to generate background music');
       }
 
+      // After successful generation, fetch all background music data
+      const allMusicResponse = await fetch(
+        `http://localhost:8000/api/get-all-background-music/${projectName}`,
+        { cache: 'no-store' }
+      );
+
+      if (allMusicResponse.ok) {
+        const musicData = await allMusicResponse.json();
+        if (musicData.status === 'success' && musicData.background_music) {
+          setBackgroundMusicData(musicData.background_music);
+        }
+      }
+
       toast({
         title: 'Success',
         description: `Generated background music for Chapter ${chapterNumber}, Scene ${sceneNumber}`,
