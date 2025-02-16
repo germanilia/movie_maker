@@ -142,13 +142,12 @@ class BaseVideoService(ABC):
             video_files = sorted(video_files, key=lambda p: int(p.stem.split("_")[1]))
 
             try:
-                # First normalize all videos to same resolution and frame rate
+                # First normalize all videos
                 normalized_videos = []
                 for i, video in enumerate(video_files):
                     normalized_path = scene_path / f"normalized_{i}.mp4"
                     normalized_videos.append(normalized_path)
                     
-                    # Normalize video
                     subprocess.run([
                         "ffmpeg", "-y",
                         "-i", str(video),
@@ -161,13 +160,23 @@ class BaseVideoService(ABC):
                         str(normalized_path)
                     ], check=True, capture_output=True)
 
-                # Process each normalized video with fades
+                # Process each normalized video with extended duration and fades
                 processed_videos = []
                 for i, video in enumerate(normalized_videos):
                     processed_path = scene_path / f"processed_shot_{i}.mp4"
                     processed_videos.append(processed_path)
                     
-                    # Get video duration
+                    # Create black video segments for fade transitions
+                    black_video = scene_path / f"black_{i}.mp4"
+                    subprocess.run([
+                        "ffmpeg", "-y",
+                        "-f", "lavfi",
+                        "-i", "color=c=black:s=1280x768:d=1",
+                        "-r", "30",
+                        str(black_video)
+                    ], check=True, capture_output=True)
+
+                    # Get original video duration
                     duration_cmd = [
                         "ffprobe", "-v", "error",
                         "-show_entries", "format=duration",
@@ -177,25 +186,38 @@ class BaseVideoService(ABC):
                     result = subprocess.run(duration_cmd, capture_output=True, text=True, check=True)
                     duration = float(result.stdout.strip())
 
-                    # Add fade effects
+                    # Create filter complex for extending video with fades
+                    filter_complex = (
+                        "[0:v]fade=t=out:st=0:d=1[black_fade_in];"                    # Fade from black
+                        f"[1:v]fade=t=in:st=0:d=1,fade=t=out:st={duration-1}:d=1[main];"  # Fade in/out main video
+                        "[2:v]fade=t=in:st=0:d=1[black_fade_out];"                    # Fade to black
+                        "[black_fade_in][main][black_fade_out]concat=n=3:v=1:a=0[v]"  # Concatenate all
+                    )
+
+                    # Combine everything
                     subprocess.run([
                         "ffmpeg", "-y",
-                        "-i", str(video),
-                        "-vf", f"fade=t=in:st=0:d=1,fade=t=out:st={duration-1}:d=1",
+                        "-i", str(black_video),      # Input 0: black video for fade in
+                        "-i", str(video),            # Input 1: main video
+                        "-i", str(black_video),      # Input 2: black video for fade out
+                        "-filter_complex", filter_complex,
+                        "-map", "[v]",              # Map the output from the filter complex
                         "-c:v", "libx264",
                         "-preset", "medium",
                         "-crf", "23",
                         str(processed_path)
                     ], check=True, capture_output=True)
 
-                # Concatenate processed videos
-                # Create concat file
+                    # Clean up temporary black video
+                    black_video.unlink()
+
+                # Create concat file for final merge
                 concat_file = scene_path / "concat.txt"
                 with open(concat_file, "w") as f:
                     for video in processed_videos:
                         f.write(f"file '{video.name}'\n")
 
-                # Concatenate videos
+                # Merge all processed videos
                 subprocess.run([
                     "ffmpeg", "-y",
                     "-f", "concat",
