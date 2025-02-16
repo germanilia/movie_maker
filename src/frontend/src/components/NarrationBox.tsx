@@ -87,7 +87,7 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
 
       toast({
         title: 'Success',
-        description: 'Audio narration generated successfully',
+        description: `Audio narration generated${projectName ? ' with custom voice sample' : ''}`,
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -122,7 +122,9 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
             {audioUrl ? 'Regenerate Audio' : 'Generate Audio'}
           </Button>
           
-          <Text fontWeight="bold" mb={2}>Narration:</Text>
+          <Text fontWeight="bold" mb={2}>
+            Narration {projectName ? '(Using custom voice sample)' : ''}:
+          </Text>
           <Text color="purple.800">{narrationText}</Text>
         </Box>
         

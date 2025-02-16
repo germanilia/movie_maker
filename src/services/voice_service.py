@@ -155,16 +155,25 @@ class VoiceService:
             
             # Look for a voice with the same name
             for voice in cloned_voices:
-                if voice.get('name') == voice_name:
+                if voice.get('name') == voice_name and voice.get('id'):
                     logger.info(f"Found existing voice with name '{voice_name}' and ID: {voice.get('id')}")
                     return voice.get('id')
             
             # If not found, create new cloned voice
             logger.info(f"No existing voice found with name '{voice_name}'. Creating new clone...")
             result = self.clone_voice(voice_sample_path, voice_name)
+            
+            # Wait for a few seconds to ensure voice is ready
+            import time
+            time.sleep(5)
+            
             voice_id = result.get('id')
             if not voice_id:
                 raise ValueError("API response did not contain voice ID")
+            
+            # Format the voice ID correctly
+            if not voice_id.startswith('s3://'):
+                voice_id = f"s3://{voice_id}"
             
             logger.info(f"Successfully created new cloned voice with ID: {voice_id}")
             return voice_id
@@ -183,11 +192,28 @@ class VoiceService:
             Iterator: An iterator of audio chunks
         """
         try:
-            if not voice_id:
-                voice_id = "s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json"
+            # Default voice if none provided or if there's an error with the provided one
+            default_voice = "s3://voice-cloning-zero-shot/d9ff78ba-d016-47f6-b0ef-dd630f59414e/female-cs/manifest.json"
             
-            if not voice_id.startswith("s3://"):
-                voice_id = f"s3://{voice_id}"
+            if voice_id:
+                try:
+                    if not voice_id.startswith("s3://"):
+                        voice_id = f"s3://{voice_id}"
+                    
+                    client = Client(
+                        user_id=self.user_id,
+                        api_key=self.api_key,
+                    )
+                    options = TTSOptions(voice=voice_id)
+                    
+                    return client.tts(text, options, voice_engine='PlayDialog')
+                except Exception as e:
+                    logger.error(f"Error using custom voice, falling back to default: {str(e)}")
+                    voice_id = default_voice
+            
+            # Use default voice if no custom voice or if there was an error
+            if not voice_id:
+                voice_id = default_voice
             
             load_dotenv()
             client = Client(

@@ -304,6 +304,20 @@ async def generate_narration(project_name: str, request: NarrationRequest):
         aws_service = AWSService(project_name=project_name)
         voice_service = VoiceService()
         
+        # Get or create cloned voice using the voice sample
+        voice_sample_path = f"temp/{project_name}/voice_sample.m4a"
+        if os.path.exists(voice_sample_path):
+            try:
+                voice_id = voice_service.get_or_create_cloned_voice(
+                    voice_sample_path=voice_sample_path,
+                    voice_name=f"{project_name}"
+                )
+            except Exception as e:
+                logger.error(f"Error creating cloned voice: {str(e)}")
+                voice_id = None
+        else:
+            voice_id = None
+        
         # Generate a unique filename for this narration
         audio_path = f"chapter_{request.chapter_number}/scene_{request.scene_number}/narration.wav"
         local_path = aws_service.temp_dir / audio_path
@@ -311,10 +325,10 @@ async def generate_narration(project_name: str, request: NarrationRequest):
         # Create directory if it doesn't exist
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Generate the audio
+        # Generate the audio using the cloned voice if available
         audio_chunks = await voice_service.generate_voice(
             text=request.text,
-            voice_id=request.voice_id
+            voice_id=voice_id or request.voice_id
         )
 
         # Write chunks to file
@@ -322,7 +336,6 @@ async def generate_narration(project_name: str, request: NarrationRequest):
             for chunk in audio_chunks:
                 audio_file.write(chunk)
 
-        # Return the audio file
         return FileResponse(
             path=str(local_path),
             media_type="audio/wav",
