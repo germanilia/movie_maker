@@ -13,6 +13,8 @@ import {
   AccordionPanel,
   AccordionIcon,
   useToast,
+  Spinner,
+  Center,
 } from '@chakra-ui/react';
 import ImageDisplay from './ImageDisplay';
 import NarrationBox from './NarrationBox';
@@ -59,6 +61,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingMusic, setGeneratingMusic] = useState<Set<string>>(new Set());
   const [isGeneratingAllMusic, setIsGeneratingAllMusic] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const toast = useToast();
   const isMounted = useRef(true);
 
@@ -75,68 +78,72 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
   // Effect to fetch all images when script changes
   React.useEffect(() => {
-    isMounted.current = true;
+    let mounted = true;
 
     const fetchAllData = async () => {
+      if (!script) return;
+      
+      setIsLoading(true);
       try {
-        const [imageResponse, narrResponse, videoResponse, musicResponse] = await Promise.all([
-          fetch(`http://localhost:8000/api/get-all-images/${projectName}`),
-          fetch(`http://localhost:8000/api/get-all-narrations/${projectName}`),
-          fetch(`http://localhost:8000/api/get-all-videos/${projectName}`),
-          fetch(`http://localhost:8000/api/get-all-background-music/${projectName}`)
-        ]);
+        const endpoints = [
+          'get-all-images',
+          'get-all-narrations',
+          'get-all-videos',
+          'get-all-background-music'
+        ];
 
-        if (isMounted.current) {
-          // Handle images
-          if (imageResponse.ok) {
-            const imageData = await imageResponse.json() as ImageApiResponse;
-            if (imageData.status === 'success' && imageData.images) {
-              setImageData(imageData.images);
-            }
-          }
+        const responses = await Promise.all(
+          endpoints.map(endpoint => 
+            fetch(`http://localhost:8000/api/${endpoint}/${projectName}`, { cache: 'no-store' })
+          )
+        );
 
-          // Handle narrations
-          if (narrResponse.ok) {
-            const narrData = await narrResponse.json() as NarrationApiResponse;
-            if (narrData.status === 'success' && narrData.narrations) {
-              setNarrationData(narrData.narrations);
-            }
-          }
+        if (!mounted) return;
 
-          // Handle videos
-          if (videoResponse.ok) {
-            const videoData = await videoResponse.json() as VideoApiResponse;
-            if (videoData.status === 'success' && videoData.videos) {
-              setVideoData(videoData.videos);
-            }
-          }
+        const [imageData, narrData, videoData, musicData] = await Promise.all(
+          responses.map(r => r.json())
+        );
 
-          // Handle background music
-          if (musicResponse.ok) {
-            const musicData = await musicResponse.json();
-            if (musicData.status === 'success' && musicData.background_music) {
-              setBackgroundMusicData(musicData.background_music);
-            }
-          }
+        if (!mounted) return;
+
+        if (imageData.status === 'success' && imageData.images) {
+          setImageData(imageData.images);
         }
+
+        if (narrData.status === 'success' && narrData.narrations) {
+          setNarrationData(narrData.narrations);
+        }
+
+        if (videoData.status === 'success' && videoData.videos) {
+          setVideoData(videoData.videos);
+        }
+
+        if (musicData.status === 'success' && musicData.background_music) {
+          setBackgroundMusicData(musicData.background_music);
+        }
+
       } catch (error) {
         console.error('Error fetching data:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch data',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
+        if (mounted) {
+          toast({
+            title: 'Error',
+            description: 'Failed to fetch data',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          });
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    if (script) {
-      fetchAllData();
-    }
+    fetchAllData();
 
     return () => {
-      isMounted.current = false;
+      mounted = false;
     };
   }, [script, projectName, toast]);
 
@@ -496,6 +503,17 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         <Text>No script available. Please go back and generate a script first.</Text>
         <Button onClick={onBack}>Back</Button>
       </Box>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Center height="100vh">
+        <VStack spacing={4}>
+          <Spinner size="xl" />
+          <Text>Loading script data...</Text>
+        </VStack>
+      </Center>
     );
   }
 

@@ -136,140 +136,20 @@ const ProjectDetailsForm: React.FC<ProjectDetailsFormProps> = ({
   };
 
   return (
-    <Box height="100vh" overflow="hidden">
-      <Box height="calc(100vh - 80px)" overflowY="auto" p={4} pb="100px">
-        <VStack spacing={4} align="stretch" maxW="container.md" mx="auto">
-          <Heading size="lg" mb={4}>Project Details</Heading>
-          
-          <FormControl isRequired>
-            <FormLabel>Project Name</FormLabel>
-            <Input
-              value={projectData.project}
-              onChange={(e) => handleChange('project', e.target.value)}
-              placeholder="Enter project name"
-            />
-          </FormControl>
-
-          <FormControl isRequired>
-            <FormLabel>Genre</FormLabel>
-            <Select
-              value={projectData.genre}
-              onChange={(e) => handleChange('genre', e.target.value)}
-            >
-              <option value="documentary">Documentary</option>
-              <option value="drama">Drama</option>
-              <option value="comedy">Comedy</option>
-            </Select>
-          </FormControl>
-
-          <FormControl isRequired>
-            <FormLabel>Subject</FormLabel>
-            <Input
-              value={projectData.subject}
-              onChange={(e) => handleChange('subject', e.target.value)}
-              placeholder="Enter the main subject of your video"
-            />
-          </FormControl>
-
-          <FormControl>
-            <FormLabel>Special Instructions</FormLabel>
-            <Textarea
-              value={projectData.movie_general_instructions}
-              onChange={(e) => handleChange('movie_general_instructions', e.target.value)}
-              placeholder="Enter any special instructions for the video"
-            />
-          </FormControl>
-
-          <FormControl>
-            <FormLabel>Story Background</FormLabel>
-            <Textarea
-              value={projectData.story_background}
-              onChange={(e) => handleChange('story_background', e.target.value)}
-              placeholder="Enter background information for the story"
-            />
-          </FormControl>
-
-          <FormControl>
-            <FormLabel>Narration Instructions</FormLabel>
-            <Textarea
-              value={projectData.narration_instructions}
-              onChange={(e) => handleChange('narration_instructions', e.target.value)}
-              placeholder="Enter instructions for the narration style and tone"
-            />
-          </FormControl>
-
-          <FormControl isRequired>
-            <FormLabel>Number of Chapters</FormLabel>
-            <NumberInput
-              value={projectData.number_of_chapters}
-              onChange={(valueString) => handleChange('number_of_chapters', parseInt(valueString))}
-              min={1}
-              max={10}
-            >
-              <NumberInputField />
-              <NumberInputStepper>
-                <NumberIncrementStepper />
-                <NumberDecrementStepper />
-              </NumberInputStepper>
-            </NumberInput>
-          </FormControl>
-
-          <FormControl isRequired>
-            <FormLabel>Number of Scenes per Chapter</FormLabel>
-            <NumberInput
-              value={projectData.number_of_scenes}
-              onChange={(valueString) => handleChange('number_of_scenes', parseInt(valueString))}
-              min={1}
-              max={10}
-            >
-              <NumberInputField />
-              <NumberInputStepper>
-                <NumberIncrementStepper />
-                <NumberDecrementStepper />
-              </NumberInputStepper>
-            </NumberInput>
-          </FormControl>
-
-          <FormControl isRequired>
-            <FormLabel>Number of Shots per Scene</FormLabel>
-            <NumberInput
-              value={projectData.number_of_shots}
-              onChange={(valueString) => handleChange('number_of_shots', parseInt(valueString))}
-              min={1}
-              max={10}
-            >
-              <NumberInputField />
-              <NumberInputStepper>
-                <NumberIncrementStepper />
-                <NumberDecrementStepper />
-              </NumberInputStepper>
-            </NumberInput>
-          </FormControl>
-
-          <FormControl display="flex" alignItems="center">
-            <FormLabel mb="0">Black and White</FormLabel>
-            <Switch
-              isChecked={projectData.black_and_white}
-              onChange={(e) => handleChange('black_and_white', e.target.checked)}
-            />
-          </FormControl>
-        </VStack>
-      </Box>
-
+    <Box height="100vh" overflow="hidden" position="relative">
+      {/* Top Navigation Bar */}
       <Box
-        position="fixed"
-        bottom={0}
-        left={0}
-        right={0}
         p={4}
+        borderBottomWidth={1}
         bg="white"
-        borderTopWidth={1}
-        borderTopColor="gray.200"
-        zIndex={2}
-        boxShadow="0 -2px 10px rgba(0,0,0,0.1)"
+        position="sticky"
+        top={0}
+        zIndex={3}
+        height="72px"
       >
-        <HStack spacing={4} justify="flex-end" maxW="container.md" mx="auto">
-          <Button 
+        <HStack justify="space-between" align="center">
+          <Heading size="lg">Project Details</Heading>
+          <Button
             colorScheme="blue"
             size="lg"
             isLoading={isLoading}
@@ -279,6 +159,156 @@ const ProjectDetailsForm: React.FC<ProjectDetailsFormProps> = ({
             Generate Script
           </Button>
         </HStack>
+      </Box>
+
+      {/* Main Content */}
+      <Box height="calc(100vh - 72px)" overflow="auto" p={4}>
+        <VStack spacing={6} align="stretch" maxW="container.md" mx="auto">
+          <FormControl isRequired>
+            <FormLabel fontWeight="bold">Project Name</FormLabel>
+            <Input
+              bg="white"
+              value={projectData.project}
+              onChange={(e) => handleChange('project', e.target.value)}
+              placeholder="Enter project name"
+              size="lg"
+            />
+          </FormControl>
+
+          <FormControl isRequired>
+            <FormLabel fontWeight="bold">Genre</FormLabel>
+            <Select
+              bg="white"
+              value={projectData.genre}
+              onChange={(e) => handleChange('genre', e.target.value)}
+              size="lg"
+            >
+              <option value="documentary">Documentary</option>
+              <option value="drama">Drama</option>
+              <option value="comedy">Comedy</option>
+            </Select>
+          </FormControl>
+
+          <FormControl isRequired>
+            <FormLabel fontWeight="bold">Subject</FormLabel>
+            <Input
+              bg="white"
+              value={projectData.subject}
+              onChange={(e) => handleChange('subject', e.target.value)}
+              placeholder="Enter the main subject of your video"
+              size="lg"
+            />
+          </FormControl>
+
+          <FormControl>
+            <FormLabel fontWeight="bold">Special Instructions</FormLabel>
+            <Textarea
+              bg="white"
+              value={projectData.movie_general_instructions}
+              onChange={(e) => handleChange('movie_general_instructions', e.target.value)}
+              placeholder="Enter any special instructions for the video"
+              size="lg"
+              minH="120px"
+            />
+          </FormControl>
+
+          <FormControl>
+            <FormLabel fontWeight="bold">Story Background</FormLabel>
+            <Textarea
+              bg="white"
+              value={projectData.story_background}
+              onChange={(e) => handleChange('story_background', e.target.value)}
+              placeholder="Enter background information for the story"
+              size="lg"
+              minH="120px"
+            />
+          </FormControl>
+
+          <FormControl>
+            <FormLabel fontWeight="bold">Narration Instructions</FormLabel>
+            <Textarea
+              bg="white"
+              value={projectData.narration_instructions}
+              onChange={(e) => handleChange('narration_instructions', e.target.value)}
+              placeholder="Enter instructions for the narration style and tone"
+              size="lg"
+              minH="120px"
+            />
+          </FormControl>
+
+          <Box
+            p={6}
+            bg="gray.50"
+            borderRadius="md"
+            borderWidth="1px"
+            borderColor="gray.200"
+          >
+            <VStack spacing={4}>
+              <FormControl isRequired>
+                <FormLabel fontWeight="bold">Number of Chapters</FormLabel>
+                <NumberInput
+                  bg="white"
+                  value={projectData.number_of_chapters}
+                  onChange={(valueString) => handleChange('number_of_chapters', parseInt(valueString))}
+                  min={1}
+                  max={10}
+                  size="lg"
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
+
+              <FormControl isRequired>
+                <FormLabel fontWeight="bold">Number of Scenes per Chapter</FormLabel>
+                <NumberInput
+                  bg="white"
+                  value={projectData.number_of_scenes}
+                  onChange={(valueString) => handleChange('number_of_scenes', parseInt(valueString))}
+                  min={1}
+                  max={10}
+                  size="lg"
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
+
+              <FormControl isRequired>
+                <FormLabel fontWeight="bold">Number of Shots per Scene</FormLabel>
+                <NumberInput
+                  bg="white"
+                  value={projectData.number_of_shots}
+                  onChange={(valueString) => handleChange('number_of_shots', parseInt(valueString))}
+                  min={1}
+                  max={10}
+                  size="lg"
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
+
+              <FormControl display="flex" alignItems="center">
+                <FormLabel mb="0" fontWeight="bold">Black and White</FormLabel>
+                <Switch
+                  size="lg"
+                  isChecked={projectData.black_and_white}
+                  onChange={(e) => handleChange('black_and_white', e.target.checked)}
+                />
+              </FormControl>
+            </VStack>
+          </Box>
+        </VStack>
       </Box>
     </Box>
   );
