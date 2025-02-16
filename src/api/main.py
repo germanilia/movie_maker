@@ -555,3 +555,35 @@ async def get_all_videos(project_name: str, provider: VideoProvider = VideoProvi
     except Exception as e:
         logger.error(f"Error getting all videos: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class SceneVideoRequest(BaseModel):
+    chapter_number: int
+    scene_number: int
+
+@app.post("/api/generate-scene-video/{project_name}")
+async def generate_scene_video(project_name: str, request: SceneVideoRequest):
+    """Generate a final video for a scene by combining all shots with narration and background music"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        video_service = VideoServiceFactory.create_video_service(VideoProvider.REPLICATE, aws_service)
+        
+        success, output_path = await video_service.generate_scene_video(
+            chapter=str(request.chapter_number),
+            scene=str(request.scene_number)
+        )
+
+        if not success or not output_path:
+            raise HTTPException(status_code=500, detail="Failed to generate scene video")
+
+        return FileResponse(
+            path=output_path,
+            media_type="video/mp4",
+            filename=f"scene_{request.chapter_number}_{request.scene_number}_final.mp4"
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error generating scene video: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

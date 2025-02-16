@@ -1,6 +1,8 @@
 from pathlib import Path
 import logging
 import base64
+import os
+import subprocess
 from typing import Dict, Tuple, Union, List
 from abc import ABC, abstractmethod
 from pydantic import BaseModel
@@ -113,3 +115,96 @@ class BaseVideoService(ABC):
     ) -> Tuple[bool, str | None]:
         """Generate video for a specific shot using the implemented service"""
         pass
+
+    async def generate_scene_video(
+        self,
+        chapter: str,
+        scene: str,
+    ) -> Tuple[bool, str | None]:
+        try:
+            scene_path = self.temp_dir / f"chapter_{chapter}/scene_{scene}"
+            narration_path = scene_path / "narration.wav"
+            bg_music_path = scene_path / "background_music.mp3"
+            output_path = scene_path / "final_scene.mp4"
+            temp_concat_video = scene_path / "temp_concat.mp4"
+            
+            if not narration_path.exists():
+                raise ValueError("Missing narration.wav file")
+            if not bg_music_path.exists():
+                raise ValueError("Missing background_music.mp3 file")
+
+            # Get all video files in correct order
+            video_files = sorted(scene_path.glob("shot_*_video.mp4"))
+            if not video_files:
+                raise ValueError("No video files found for this scene")
+
+            # First, standardize and concatenate all videos
+            filter_complex = []
+            input_args = []
+            for i, video in enumerate(video_files):
+                input_args.extend(["-i", str(video)])
+                filter_complex.append(f"[{i}:v]scale=1280:768:force_original_aspect_ratio=decrease,pad=1280:768:(ow-iw)/2:(oh-ih)/2[v{i}]")
+            
+            # Create the concat part of the filter
+            concat_inputs = ''.join(f'[v{i}]' for i in range(len(video_files)))
+            filter_complex.append(f"{concat_inputs}concat=n={len(video_files)}:v=1[outv]")
+            
+            # Join all filter complex parts
+            filter_complex_str = ';'.join(filter_complex)
+
+            try:
+                # First step: Concatenate videos
+                concat_cmd = [
+                    "ffmpeg", "-y"
+                ] + input_args + [
+                    "-filter_complex", filter_complex_str,
+                    "-map", "[outv]",
+                    "-c:v", "libx264",
+                    "-preset", "medium",
+                    "-crf", "23",
+                    str(temp_concat_video)
+                ]
+                
+                logger.info("Concatenating videos...")
+                subprocess.run(concat_cmd, check=True)
+
+                # Second step: Add audio
+                audio_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", str(temp_concat_video),
+                    "-i", str(narration_path),
+                    "-i", str(bg_music_path),
+                    "-filter_complex",
+                    "[1:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[narr];" +
+                    "[2:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,volume=0.3[music];" +
+                    "[narr][music]amix=inputs=2:duration=longest[a]",
+                    "-map", "0:v",
+                    "-map", "[a]",
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-b:a", "384k",
+                    str(output_path)
+                ]
+                
+                logger.info("Adding audio to video...")
+                subprocess.run(audio_cmd, check=True)
+
+                # Clean up temporary file
+                if temp_concat_video.exists():
+                    temp_concat_video.unlink()
+
+                if output_path.exists():
+                    logger.info("Successfully created scene video with audio")
+                    return True, str(output_path)
+                else:
+                    raise ValueError("Output file was not created")
+
+            except subprocess.CalledProcessError as e:
+                logger.error(f"FFmpeg error: {str(e)}")
+                if hasattr(e, 'stderr'):
+                    logger.error(f"FFmpeg stderr: {e.stderr}")
+                raise ValueError("Error combining videos and audio")
+
+        except Exception as e:
+            logger.error(f"Error generating scene video: {str(e)}")
+            return False, None

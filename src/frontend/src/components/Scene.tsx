@@ -7,6 +7,8 @@ import {
   AccordionButton,
   AccordionPanel,
   AccordionIcon,
+  Button,
+  useToast,
 } from '@chakra-ui/react';
 import { Scene as SceneType, Shot, Script } from '../models/models';
 import BackgroundMusic from './BackgroundMusic';
@@ -112,6 +114,79 @@ const Scene: React.FC<SceneProps> = ({
     );
   };
 
+  const areAllElementsPresent = () => {
+    const hasNarration = !!narrationData[`${chapterNumber}-${scene.scene_number}`];
+    const hasBackgroundMusic = !!backgroundMusicData[`${chapterNumber}-${scene.scene_number}`];
+    const allShotsComplete = scene.shots?.every((shot) => {
+      const shotVideoKey = `${chapterNumber}-${scene.scene_number}-${shot.shot_number}`;
+      const openingImageKey = getImageKey(chapterIndex, sceneIndex, shot.shot_number - 1, 'opening');
+      const closingImageKey = getImageKey(chapterIndex, sceneIndex, shot.shot_number - 1, 'closing');
+      return (
+        !!videoData[shotVideoKey] &&
+        !!imageData[openingImageKey] &&
+        !!imageData[closingImageKey]
+      );
+    }) ?? false;
+
+    return hasNarration && hasBackgroundMusic && allShotsComplete;
+  };
+
+  const [isGeneratingSceneVideo, setIsGeneratingSceneVideo] = React.useState(false);
+  const toast = useToast();
+
+  const handleGenerateSceneVideo = async () => {
+    setIsGeneratingSceneVideo(true);
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/generate-scene-video/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_number: chapterNumber,
+            scene_number: scene.scene_number,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to generate scene video');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `scene_${chapterNumber}_${scene.scene_number}_final.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: 'Success',
+        description: 'Scene video generated successfully',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error generating scene video:', error);
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to generate scene video',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsGeneratingSceneVideo(false);
+    }
+  };
+
   return (
     <AccordionItem>
       <AccordionButton>
@@ -122,6 +197,16 @@ const Scene: React.FC<SceneProps> = ({
       </AccordionButton>
       <AccordionPanel pb={4}>
         <VStack spacing={4} align="stretch">
+          <Button
+            colorScheme="green"
+            isDisabled={!areAllElementsPresent()}
+            isLoading={isGeneratingSceneVideo}
+            loadingText="Generating Scene Video"
+            onClick={handleGenerateSceneVideo}
+          >
+            Generate Scene Video
+          </Button>
+
           <Box bg="gray.50" p={3} borderRadius="md">
             <Text>{scene.description}</Text>
           </Box>
