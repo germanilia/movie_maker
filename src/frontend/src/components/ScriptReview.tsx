@@ -570,6 +570,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         chapterIndex={chapterIndex}
         sceneIndex={sceneIndex}
         shotIndex={shotIndex}
+        projectName={projectName}  // Add projectName prop
       />
     );
   };

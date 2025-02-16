@@ -13,9 +13,11 @@ from src.models.models import ProjectDetails, Script, RegenerateImageRequest
 from src.services.aws_service import AWSService
 from src.services.background_music_service import BackgroundMusicService
 from src.services.video_service_factory import VideoServiceFactory, VideoProvider
+from src.services.face_detection_service import FaceDetectionService
 
 import os
 from pydantic import BaseModel
+import base64
 
 # Configure logging
 logging.basicConfig(
@@ -222,9 +224,10 @@ async def regenerate_image(
             black_and_white=script.project_details.black_and_white,
         )
 
+        # Ensure correct image path with .png extension
         image_path = f"chapter_{request.chapter_index}/scene_{request.scene_index}/shot_{request.shot_index}_{request.type}.png"
         
-        # Generate image and get base64 data
+        # Generate image
         success, local_path = await image_service.generate_image(
             prompt=request.custom_prompt,
             image_path=image_path,
@@ -237,6 +240,7 @@ async def regenerate_image(
         if not success or not local_path:
             return {"status": "error", "message": "Failed to generate image"}
 
+        # Get base64 data with proper prefix
         base64_image = image_service.encode_image_to_base64(local_path)
 
         return {
@@ -599,4 +603,90 @@ async def generate_scene_video(project_name: str, request: SceneVideoRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error generating scene video: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/detect-faces/{project_name}")
+async def detect_faces(project_name: str, chapter_index: int, scene_index: int, shot_index: int, type: str):
+    """Detect faces in an image"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        director = DirectorService(aws_service=aws_service, project_name=project_name)
+        script = await director.get_script()
+        image_service = ImageService(
+            aws_service=aws_service,
+            black_and_white=script.project_details.black_and_white,
+        )
+
+        # Get image path
+        image_path = f"chapter_{chapter_index}/scene_{scene_index}/shot_{shot_index}_{type}.png"
+        local_path = image_service.get_local_path(image_path)
+
+        if not local_path.exists():
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        # Detect faces
+        face_service = FaceDetectionService()
+        result = await face_service.detect_faces_multiple([str(local_path)])
+
+        return {
+            "status": "success",
+            "face_detection_result": result,
+            "image_path": str(local_path)
+        }
+
+    except Exception as e:
+        logger.error(f"Error detecting faces: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class FaceSwapRequest(BaseModel):
+    source_image: str  # Base64 encoded image
+    target_chapter_index: int
+    target_scene_index: int
+    target_shot_index: int
+    target_type: str
+
+@app.post("/api/swap-faces/{project_name}")
+async def swap_faces(project_name: str, request: FaceSwapRequest):
+    """Swap faces between source and target images"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        image_service = ImageService(aws_service=aws_service)
+        face_service = FaceDetectionService()
+
+        # Decode and save source image temporarily
+        source_data = base64.b64decode(request.source_image.split(',')[1])
+        temp_source_path = aws_service.temp_dir / "temp_source_image.png"
+        with open(temp_source_path, "wb") as f:
+            f.write(source_data)
+
+        # Get target image path
+        target_path = f"chapter_{request.target_chapter_index}/scene_{request.target_scene_index}/shot_{request.target_shot_index}_{request.target_type}.png"
+        target_local_path = image_service.get_local_path(target_path)
+
+        if not target_local_path.exists():
+            raise HTTPException(status_code=404, detail="Target image not found")
+
+        # Perform face swapping
+        result_base64 = await face_service.swap_faces(
+            source_image_path=str(temp_source_path),
+            target_image_path=str(target_local_path)
+        )
+
+        # Save the result
+        result_data = base64.b64decode(result_base64)
+        with open(target_local_path, "wb") as f:
+            f.write(result_data)
+
+        # Clean up temp file
+        temp_source_path.unlink()
+
+        return {
+            "status": "success",
+            "base64_image": f"data:image/png;base64,{result_base64}"
+        }
+
+    except Exception as e:
+        logger.error(f"Error swapping faces: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

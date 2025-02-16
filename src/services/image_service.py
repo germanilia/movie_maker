@@ -125,6 +125,10 @@ class ImageService:
             # Set the model before generation
             self.set_model(model_type)
             
+            # Ensure image path ends with .png
+            if not image_path.endswith('.png'):
+                image_path = f"{os.path.splitext(image_path)[0]}.png"
+            
             local_path = self.get_local_path(image_path)
 
             if not overwrite_image and local_path.exists():

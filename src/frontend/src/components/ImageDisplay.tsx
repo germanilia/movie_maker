@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -27,6 +27,16 @@ const dragDropStyles = {
   },
 };
 
+interface FaceDetectionResult {
+  number_of_faces: number;
+  faces: {
+    [key: string]: {
+      top_left: [number, number];
+      bottom_right: [number, number];
+    };
+  };
+}
+
 interface ImageDisplayProps {
   imageKey: string;
   imageData: string | undefined;
@@ -39,6 +49,7 @@ interface ImageDisplayProps {
   chapterIndex: number;
   sceneIndex: number;
   shotIndex: number;
+  projectName: string;  // Add projectName prop
 }
 
 // Update the component to manage its own modelType state
@@ -54,6 +65,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   chapterIndex,
   sceneIndex,
   shotIndex,
+  projectName,  // Add projectName to destructuring
 }) => {
   // Add local modelType state
   const [localModelType, setLocalModelType] = useState(initialModelType);
@@ -66,6 +78,11 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const toast = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [seed, setSeed] = useState(333);
+  const [faceDetectionResult, setFaceDetectionResult] = useState<FaceDetectionResult | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [swapSourceImage, setSwapSourceImage] = useState<string | null>(null);
+  const swapFileInputRef = useRef<HTMLInputElement>(null);
+  const [showFaceTools, setShowFaceTools] = useState(false);
 
   const bgColor = type === 'opening' ? 'teal.50' : 'pink.50';
   const textColor = type === 'opening' ? 'teal.800' : 'pink.800';
@@ -168,6 +185,131 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       setSeed(value);
     }
   };
+
+  const detectFaces = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/detect-faces/${projectName}?` +
+        `chapter_index=${chapterIndex+1}&scene_index=${sceneIndex+1}&shot_index=${shotIndex+1}&type=${type}`,
+        {
+          method: 'POST',
+        }
+      );
+
+      if (!response.ok) throw new Error('Face detection failed');
+      
+      const data = await response.json();
+      if (data.status === 'success' && data.face_detection_result) {
+        setFaceDetectionResult(data.face_detection_result[Object.keys(data.face_detection_result)[0]]);
+      }
+    } catch (error) {
+      console.error('Error detecting faces:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to detect faces in image',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleSwapFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setSwapSourceImage(base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleFaceSwap = async () => {
+    if (!swapSourceImage) {
+      toast({
+        title: 'Error',
+        description: 'Please upload a source image first',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/swap-faces/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source_image: swapSourceImage,
+            target_chapter_index: chapterIndex,
+            target_scene_index: sceneIndex,
+            target_shot_index: shotIndex,
+            target_type: type,
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error('Face swapping failed');
+      
+      const data = await response.json();
+      if (data.status === 'success' && data.base64_image) {
+        // Update the image on success
+        onGenerateImage();
+        toast({
+          title: 'Success',
+          description: 'Face swap completed successfully',
+          status: 'success',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error('Error swapping faces:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to swap faces',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  useEffect(() => {
+    // if (!imageData || !faceDetectionResult || !canvasRef.current) return;
+    if (!imageData || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = new window.Image();
+    // Remove the data URL prefix if it exists
+    img.src = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
+    
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      
+      if (faceDetectionResult && faceDetectionResult.faces) {
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        
+        Object.values(faceDetectionResult.faces).forEach(face => {
+          const [x1, y1] = face.top_left;
+          const [x2, y2] = face.bottom_right;
+          const width = x2 - x1;
+          const height = y2 - y1;
+          
+          ctx.strokeRect(x1, y1, width, height);
+        });
+      }
+    };
+  }, [imageData, faceDetectionResult]);
 
   return (
     <Box bg={bgColor} p={3} borderRadius="md">
@@ -292,15 +434,94 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       )}
       
       {imageData && (
-        <Box mt={4}>
-          <Image
-            src={imageData}
-            alt={`${type} scene`}
-            maxH="300px"
-            objectFit="contain"
-            w="100%"
-            borderRadius="md"
-          />
+        <Box mt={4} position="relative">
+          {faceDetectionResult ? (
+            <canvas
+              ref={canvasRef}
+              style={{
+                maxHeight: '300px',
+                width: '100%',
+                objectFit: 'contain',
+                borderRadius: 'md',
+              }}
+            />
+          ) : (
+            <Image
+              src={imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`}
+              alt={`${type} frame`}
+              maxH="300px"
+              w="100%"
+              objectFit="contain"
+              borderRadius="md"
+            />
+          )}
+
+          <HStack position="absolute" bottom={2} right={2} spacing={2}>
+            {!showFaceTools ? (
+              <Button
+                size="sm"
+                colorScheme={buttonColor}
+                onClick={() => setShowFaceTools(true)}
+              >
+                Face Tools
+              </Button>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  colorScheme={buttonColor}
+                  onClick={detectFaces}
+                >
+                  Detect Faces
+                </Button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={swapFileInputRef}
+                  onChange={handleSwapFileUpload}
+                  style={{ display: 'none' }}
+                />
+                <Button
+                  size="sm"
+                  colorScheme={buttonColor}
+                  onClick={() => swapFileInputRef.current?.click()}
+                >
+                  Upload Face
+                </Button>
+                {swapSourceImage && (
+                  <Button
+                    size="sm"
+                    colorScheme={buttonColor}
+                    onClick={handleFaceSwap}
+                  >
+                    Swap Face
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  colorScheme="gray"
+                  onClick={() => {
+                    setShowFaceTools(false);
+                    setFaceDetectionResult(null);
+                    setSwapSourceImage(null);
+                  }}
+                >
+                  Hide Tools
+                </Button>
+              </>
+            )}
+          </HStack>
+          {swapSourceImage && showFaceTools && (
+            <Box position="absolute" bottom={14} right={2} width="100px">
+              <Image
+                src={swapSourceImage}
+                alt="Source face"
+                maxH="100px"
+                objectFit="contain"
+                borderRadius="md"
+              />
+            </Box>
+          )}
         </Box>
       )}
     </Box>

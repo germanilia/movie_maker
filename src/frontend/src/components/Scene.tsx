@@ -110,6 +110,7 @@ const Scene: React.FC<SceneProps> = ({
         chapterIndex={chapterIndex}
         sceneIndex={sceneIndex}
         shotIndex={shotIndex}
+        projectName={projectName}
       />
     );
   };
