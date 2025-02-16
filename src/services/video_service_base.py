@@ -141,7 +141,6 @@ class BaseVideoService(ABC):
             
             # Sort videos numerically based on the shot number extracted from the filename
             def extract_shot_number(path: Path) -> int:
-                # Expected filename: shot_<number>_video.mp4
                 try:
                     return int(path.stem.split("_")[1])
                 except (IndexError, ValueError):
@@ -172,19 +171,64 @@ class BaseVideoService(ABC):
                         f"pad=1280:768:(ow-iw)/2:(oh-ih)/2,"
                         f"format=yuv420p,setpts=PTS-STARTPTS,fps=30[scaled{i}]"
                     )
-
-                # Chain crossfade transitions with dynamic offsets.
-                # Here we assume each clip has a duration of ~10 seconds and a transition duration of 1 second.
-                transition_duration = 1
-                clip_duration = 10  # adjust if necessary
+                
+                # Define durations.
+                transition_duration = 2  # transition duration in seconds
+                clip_duration = 10       # base duration of each clip (adjust if necessary)
+                n = len(video_files)
+                
+                # Compute base video duration without extra fillers.
+                base_video_duration = clip_duration * n + transition_duration * (n - 1)
+                
+                # Probe narration duration using ffprobe.
+                try:
+                    result = subprocess.run(
+                        ["ffprobe", "-v", "error",
+                         "-show_entries", "format=duration",
+                         "-of", "default=noprint_wrappers=1:nokey=1",
+                         str(narration_path)],
+                        capture_output=True, text=True, check=True
+                    )
+                    audio_duration = float(result.stdout.strip())
+                except Exception as e:
+                    logger.error("Failed to get narration duration: %s", e)
+                    audio_duration = base_video_duration  # default to video duration if probe fails
+                
+                # If narration is longer, distribute extra time evenly by extending each clip.
+                if audio_duration > base_video_duration:
+                    extra_total = audio_duration - base_video_duration
+                    # Distribute extra time across clips so transitions occur between clips.
+                    extra_each = extra_total / n  
+                    logger.debug(f"Extending clips: extra_total={extra_total}, extra_each={extra_each}")
+                else:
+                    extra_total = 0
+                    extra_each = 0
+                
+                # Each clip will now play for an extended duration.
+                extended_clip_duration = clip_duration + extra_each
+                
+                # Chain transitions so that each transition starts after the full (extended) clip ends.
                 last_output = "scaled0"
-                for i in range(1, len(video_files)):
-                    offset = clip_duration * i - transition_duration
+                for i in range(1, n):
+                    # Transition for clip i starts after the entire extended clip duration,
+                    # then lasts for transition_duration.
+                    offset = extended_clip_duration * i - transition_duration
                     filter_complex.append(
                         f"[{last_output}][scaled{i}]xfade=transition=fade:duration={transition_duration}:offset={offset},format=yuv420p[faded{i}]"
                     )
                     last_output = f"faded{i}"
-
+                
+                # Compute final overall duration.
+                final_duration = extended_clip_duration * n + transition_duration
+                
+                # Append fade-out filter so video fades out smoothly.
+                fade_duration = 2  # adjust as needed
+                filter_complex.append(
+                    f"[{last_output}]fade=t=out:st={final_duration - fade_duration}:d={fade_duration},format=yuv420p[final]"
+                )
+                last_output = "final"
+                
+                # Build the ffmpeg command mapping to the final output label.
                 concat_cmd = (
                     ["ffmpeg", "-y"]
                     + input_args
@@ -199,10 +243,10 @@ class BaseVideoService(ABC):
                     ]
                 )
 
-                logger.info("Concatenating videos with transitions...")
+                logger.info("Concatenating videos with extended transitions and fade-out...")
                 subprocess.run(concat_cmd, check=True, capture_output=True, text=True)
 
-                # Add audio with adjusted volume levels
+                # Add audio with adjusted volume levels (adjust background volume as needed)
                 audio_cmd = [
                     "ffmpeg", "-y",
                     "-i", str(temp_concat_video),
@@ -211,8 +255,8 @@ class BaseVideoService(ABC):
                     "-filter_complex",
                     (
                         "[1:a]aformat=sample_fmts=fltp:sample_rates=44100[narr];"
-                        "[2:a]aformat=sample_fmts=fltp:sample_rates=44100,volume=0.08[music];"
-                        "[narr][music]amix=inputs=2:duration=first:weights=10 1[aout]"
+                        "[2:a]aformat=sample_fmts=fltp:sample_rates=44100,volume=0.1[music];"
+                        "[narr][music]amix=inputs=2:duration=first:weights=1 1[aout]"
                     ),
                     "-map", "0:v",
                     "-map", "[aout]",
@@ -221,7 +265,6 @@ class BaseVideoService(ABC):
                     "-b:a", "192k",
                     str(output_path)
                 ]
-
                 logger.info("Adding audio...")
                 subprocess.run(audio_cmd, check=True, capture_output=True, text=True)
 
