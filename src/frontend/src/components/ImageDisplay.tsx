@@ -12,6 +12,16 @@ import {
   Select,
   NumberInput,
   NumberInputField,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  Radio,
+  RadioGroup,
+  Stack,
 } from '@chakra-ui/react';
 import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon } from '@chakra-ui/icons';
 
@@ -52,6 +62,18 @@ interface ImageDisplayProps {
   projectName: string;  // Add projectName prop
 }
 
+interface SourceImage {
+  base64: string;
+  name: string;
+  file: File;  // Add the File type
+}
+
+interface FaceSwapInstruction {
+  target_idx: number;
+  source_img_name: string;
+  source_idx: number;
+}
+
 // Update the component to manage its own modelType state
 const ImageDisplay: React.FC<ImageDisplayProps> = ({
   imageKey,
@@ -83,6 +105,9 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const [swapSourceImage, setSwapSourceImage] = useState<string | null>(null);
   const swapFileInputRef = useRef<HTMLInputElement>(null);
   const [showFaceTools, setShowFaceTools] = useState(false);
+  const [sourceImages, setSourceImages] = useState<SourceImage[]>([]);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [faceMapping, setFaceMapping] = useState<Record<number, string>>({});
 
   const bgColor = type === 'opening' ? 'teal.50' : 'pink.50';
   const textColor = type === 'opening' ? 'teal.800' : 'pink.800';
@@ -272,6 +297,91 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       toast({
         title: 'Error',
         description: 'Failed to swap faces',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleSourceFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = e.target?.result as string;
+          setSourceImages(prev => [...prev, { 
+            base64, 
+            name: file.name,  // Keep the original filename
+            file: file  // Store the original file object
+          }]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  const handleCustomFaceSwap = async () => {
+    if (!faceDetectionResult || Object.keys(faceMapping).length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please detect faces and map them to source images first',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      const swapInstructions = Object.entries(faceMapping).map(([targetIdx, sourceName]) => ({
+        target_idx: parseInt(targetIdx),
+        source_img_name: sourceName,  // Use the original filename
+        source_idx: 0
+      }));
+
+      const formData = new FormData();
+      
+      // Append each source image with its original filename
+      sourceImages.forEach(img => {
+        formData.append('source_images', img.file);
+      });
+
+      // Add swap instructions as JSON string
+      formData.append('swap_instructions', JSON.stringify(swapInstructions));
+
+      const response = await fetch(
+        `http://localhost:8000/api/swap-faces-custom/${projectName}?` +
+        `chapter_index=${chapterIndex+1}&scene_index=${sceneIndex+1}&` +
+        `shot_index=${shotIndex+1}&type=${type}`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Custom face swapping failed');
+      }
+      
+      const data = await response.json();
+      if (data.status === 'success' && data.base64_image) {
+        onGenerateImage();
+        setIsSwapModalOpen(false);
+        setSourceImages([]);
+        setFaceMapping({});
+        toast({
+          title: 'Success',
+          description: 'Face swap completed successfully',
+          status: 'success',
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error('Error swapping faces:', error);
+      toast({
+        title: 'Error',
+        description: (error as any).message || 'Failed to swap faces',
         status: 'error',
         duration: 3000,
       });
@@ -477,24 +587,25 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                 <input
                   type="file"
                   accept="image/*"
-                  ref={swapFileInputRef}
-                  onChange={handleSwapFileUpload}
+                  multiple
+                  onChange={handleSourceFileUpload}
                   style={{ display: 'none' }}
+                  ref={swapFileInputRef}
                 />
                 <Button
                   size="sm"
                   colorScheme={buttonColor}
                   onClick={() => swapFileInputRef.current?.click()}
                 >
-                  Upload Face
+                  Upload Faces
                 </Button>
-                {swapSourceImage && (
+                {sourceImages.length > 0 && faceDetectionResult && (
                   <Button
                     size="sm"
                     colorScheme={buttonColor}
-                    onClick={handleFaceSwap}
+                    onClick={() => setIsSwapModalOpen(true)}
                   >
-                    Swap Face
+                    Map & Swap Faces
                   </Button>
                 )}
                 <Button
@@ -503,7 +614,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                   onClick={() => {
                     setShowFaceTools(false);
                     setFaceDetectionResult(null);
-                    setSwapSourceImage(null);
+                    setSourceImages([]);
+                    setFaceMapping({});
                   }}
                 >
                   Hide Tools
@@ -524,6 +636,56 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           )}
         </Box>
       )}
+
+      {/* Face Mapping Modal */}
+      <Modal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Map Faces</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <Text>Map each detected face to a source image:</Text>
+              {faceDetectionResult && Object.keys(faceDetectionResult.faces).map((faceIdx) => (
+                <Box key={faceIdx} p={4} borderWidth={1} borderRadius="md" width="100%">
+                  <Text mb={2}>Face {parseInt(faceIdx) + 1}:</Text>
+                  <RadioGroup
+                    value={faceMapping[parseInt(faceIdx)] || ''}
+                    onChange={(value) => setFaceMapping(prev => ({
+                      ...prev,
+                      [parseInt(faceIdx)]: value
+                    }))}
+                  >
+                    <Stack>
+                      {sourceImages.map((img, idx) => (
+                        <Radio key={idx} value={img.name}>
+                          <HStack>
+                            <Image
+                              src={img.base64}
+                              alt={`Source ${idx + 1}`}
+                              boxSize="50px"
+                              objectFit="cover"
+                            />
+                            <Text>{img.name}</Text>
+                          </HStack>
+                        </Radio>
+                      ))}
+                    </Stack>
+                  </RadioGroup>
+                </Box>
+              ))}
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="blue" mr={3} onClick={handleCustomFaceSwap}>
+              Swap Faces
+            </Button>
+            <Button variant="ghost" onClick={() => setIsSwapModalOpen(false)}>
+              Cancel
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };

@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 import sys
+from typing import List
 
 from src.services.director_service import DirectorService
 from src.services.image_service import ImageService
@@ -18,6 +19,8 @@ from src.services.face_detection_service import FaceDetectionService
 import os
 from pydantic import BaseModel
 import base64
+from fastapi import UploadFile, File, Form
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -689,4 +692,90 @@ async def swap_faces(project_name: str, request: FaceSwapRequest):
 
     except Exception as e:
         logger.error(f"Error swapping faces: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SwapInstruction(BaseModel):
+    target_idx: int
+    source_img_name: str
+    source_idx: int
+
+class CustomFaceSwapRequest(BaseModel):
+    source_images: List[str]  # List of base64 encoded images
+    swap_instructions: List[SwapInstruction]
+
+@app.post("/api/swap-faces-custom/{project_name}")
+async def swap_faces_custom(
+    project_name: str, 
+    chapter_index: int,
+    scene_index: int, 
+    shot_index: int, 
+    type: str,
+    source_images: List[UploadFile] = File(...),
+    swap_instructions: str = Form(...)
+):
+    """Swap multiple faces based on custom mapping"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        image_service = ImageService(aws_service=aws_service)
+        face_service = FaceDetectionService()
+
+        # Get target image path
+        target_path = f"chapter_{chapter_index}/scene_{scene_index}/shot_{shot_index}_{type}.png"
+        target_local_path = image_service.get_local_path(target_path)
+
+        if not target_local_path.exists():
+            raise HTTPException(status_code=404, detail="Target image not found")
+
+        # Parse swap instructions
+        swap_instructions_list = json.loads(swap_instructions)
+
+        # Save source images temporarily
+        source_images_info = []
+        for source_file in source_images:
+            temp_path = aws_service.temp_dir / source_file.filename
+            content = await source_file.read()
+            with open(temp_path, "wb") as f:
+                f.write(content)
+            source_images_info.append({
+                'path': str(temp_path),
+                'name': source_file.filename
+            })
+
+        try:
+            # Perform face swapping
+            result_base64 = await face_service.swap_faces_custom(
+                target_image_path=str(target_local_path),
+                source_images=source_images_info,
+                swap_instructions=swap_instructions_list
+            )
+
+            if not result_base64:
+                raise ValueError("No result image received from face swapping service")
+
+            # Save the result back to the target path
+            result_data = base64.b64decode(result_base64)
+            with open(target_local_path, "wb") as f:
+                f.write(result_data)
+
+            # Clean up temp files
+            for source in source_images_info:
+                Path(source['path']).unlink()
+
+            return {
+                "status": "success",
+                "base64_image": f"data:image/png;base64,{result_base64}"
+            }
+
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
+
+    except Exception as e:
+        logger.error(f"Error in custom face swapping: {str(e)}")
+        # Clean up temp files in case of error
+        try:
+            for source in source_images_info:
+                Path(source['path']).unlink()
+        except:
+            pass
         raise HTTPException(status_code=500, detail=str(e))

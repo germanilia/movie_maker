@@ -1,5 +1,6 @@
 import aiohttp
 import logging
+import json
 from typing import Dict, List
 import base64
 
@@ -7,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class FaceDetectionService:
     def __init__(self):
-        self.base_url = "http://3.213.241.191:8000"
+        self.base_url = "http://3.213.241.191:8000"  # Update to correct API URL
         self.api_key = "Cowabunga!"
 
     async def detect_faces_multiple(self, image_paths: List[str]) -> Dict:
@@ -74,8 +75,61 @@ class FaceDetectionService:
                         raise Exception(f"Face swapping failed: {await response.text()}")
                     
                     result = await response.json()
-                    return result['swapped_image']  # Base64 encoded image
+                    # Handle both possible response structures
+                    return result.get('swapped_image') or result.get('result_image', '')
 
         except Exception as e:
             logger.error(f"Error in face swapping: {str(e)}")
+            raise
+
+    async def swap_faces_custom(
+        self,
+        target_image_path: str,
+        source_images: List[Dict[str, str]],  # List of {path: str, name: str}
+        swap_instructions: List[Dict]
+    ) -> str:
+        """
+        Swap multiple faces in an image based on custom mapping
+        
+        Args:
+            target_image_path: Path to the target image
+            source_images: List of dicts with image paths and names
+            swap_instructions: List of face swap instructions
+        
+        Returns:
+            Base64 encoded result image
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                data = aiohttp.FormData()
+                data.add_field('target', 
+                             open(target_image_path, 'rb'),
+                             filename='target.png')
+                
+                # Add source images with their original filenames
+                for source in source_images:
+                    data.add_field('source',
+                                 open(source['path'], 'rb'),
+                                 filename=source['name'])  # Use original filename
+                
+                # Add swap instructions
+                data.add_field('swap_instructions_json',
+                             json.dumps(swap_instructions))
+
+                headers = {"X-API-Key": self.api_key}
+                async with session.post(
+                    f"{self.base_url}/swap_faces_custom/",
+                    data=data,
+                    headers=headers
+                ) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        raise Exception(f"Custom face swapping failed: {error_text}")
+                    
+                    result = await response.json()
+                    # Handle both possible response structures
+                    return result.get('swapped_image') or result.get('result_image', '')
+
+        except Exception as e:
+            logger.error(f"Error in custom face swapping: {str(e)}")
             raise

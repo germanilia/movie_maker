@@ -9,7 +9,7 @@ from botocore.config import Config
 import boto3
 from shutil import copy2
 
-from .voice_service import VoiceService
+# from .voice_service import VoiceService
 
 logger = logging.getLogger(__name__)
 
@@ -35,26 +35,26 @@ class AWSService:
         )
         
         # Initialize S3 client
-        self.s3_client = session.client('s3')
+        # self.s3_client = session.client('s3')
         
         # Initialize voice service
-        self.voice_service = VoiceService()
+        # self.voice_service = VoiceService()
         
         # Configure S3 paths
-        self.s3_bucket = os.getenv('S3_BUCKET')
-        if not self.s3_bucket:
-            raise ValueError("S3_BUCKET environment variable must be set")
+        # self.s3_bucket = os.getenv('S3_BUCKET')
+        # if not self.s3_bucket:
+            # raise ValueError("S3_BUCKET environment variable must be set")
             #https://moviemaker-videos.s3.us-east-1.amazonaws.com/my_early_years/chapter_1/scene_1/shot_1_opening.png
         self.project_path = f"{project_name.lower().replace(' ', '_')}"
-        self.s3_base_uri = f"s3://{self.s3_bucket}/{self.project_path}"
-        self.s3_object_uri = f"https://moviemaker-videos.s3.us-east-1.amazonaws.com/{self.project_path}"
+        # self.s3_base_uri = f"s3://{self.s3_bucket}/{self.project_path}"
+        # self.s3_object_uri = f"https://moviemaker-videos.s3.us-east-1.amazonaws.com/{self.project_path}"
         
         # Add temp directory configuration
         self.temp_dir = Path("temp") / self.project_path
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         
         # Ensure project directory exists
-        self._ensure_project_directory()
+        # self._ensure_project_directory()
 
     def _ensure_project_directory(self):
         """Create project directory and subdirectories in S3 if they don't exist."""

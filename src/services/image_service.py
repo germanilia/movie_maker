@@ -71,10 +71,20 @@ class ImageService:
         self.image_model = self.flux_dev_realism
 
     def get_local_path(self, image_path: str) -> Path:
-        """Get the local path for an image"""
-        path = self.temp_dir / image_path
-        logger.debug(f"Resolved local path: {path}")
-        return path
+        """
+        Get the local path for an image file
+        
+        Args:
+            image_path: Relative path to the image file
+            
+        Returns:
+            Path object for the local file path
+        """
+        if isinstance(image_path, Path):
+            if image_path.is_absolute():
+                return image_path
+            return self.temp_dir / image_path
+        return self.temp_dir / image_path
 
     def get_download_path(self, image_path: str) -> Path:
         """Get the download path for images"""

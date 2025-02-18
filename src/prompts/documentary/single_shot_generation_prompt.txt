@@ -48,6 +48,8 @@ It will help understanding the reasons for the selections.
 The director instructions needs to be very clear, it should include the camera instructions,
 the type of shot, and the flow of the shot.
 
+There are some issues regarding camera movement, nee to use instructions like slow camera movement, steady camera and similar.
+
 The opening / closing descriptions are used as still images, the description
 of each one must include the details and without referring to other images.
 This images will be the opening and closing images of a short video, so they must 
