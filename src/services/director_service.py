@@ -432,6 +432,62 @@ class DirectorService:
             logger.error(f"Failed to save script: {str(e)}")
             raise
 
+    async def regenerate_scene(
+        self,
+        script: Script,
+        chapter_index: int,
+        scene_index: int,
+        max_retries: int = 10,
+    ) -> Scene:
+        """Regenerate a specific scene while maintaining context."""
+        chapter = script.chapters[chapter_index]
+        prev_error = "N/A"
+        
+        prompt_template = await self._load_prompt(
+            script.project_details.genre, "single_scene_generation_prompt.txt"
+        )
+
+        try:
+            logger.info(
+                f"Regenerating scene {scene_index + 1} in chapter {chapter_index + 1}"
+            )
+            prompt = await self._format_prompt(
+                prompt_template,
+                genre=script.project_details.genre,
+                subject=script.project_details.subject,
+                movie_general_instructions=script.project_details.movie_general_instructions,
+                story_background=script.project_details.story_background,
+                chapter_high_level_description=chapter.chapter_description,
+                previous_scenes=self._get_previous_scenes_instructions(
+                    chapter=chapter,
+                    total_scenes=script.project_details.number_of_scenes,
+                ),
+                scene_number=scene_index + 1,
+                number_of_scenes=script.project_details.number_of_scenes,
+                narration_instructions=script.project_details.narration_instructions,
+                previous_generation_error=prev_error,
+            )
+
+            response = await self.aws_service.invoke_llm(
+                prompt, prev_errors=prev_error
+            )
+            new_scene = Scene(**json.loads(response))
+            new_scene.scene_number = scene_index + 1
+            
+            # Initialize empty shots list to maintain consistency
+            new_scene.shots = []
+            
+            return new_scene
+
+        except json.JSONDecodeError as e:
+            error_msg = f"JSON parsing error for scene regeneration: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        except Exception as e:
+            error_msg = f"Error regenerating scene: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
 
 def parse_shot_response(response: str) -> Shot:
     try:

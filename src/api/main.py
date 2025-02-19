@@ -408,7 +408,14 @@ async def generate_background_music(project_name: str, request: BackgroundMusicR
         if not request.prompt:
             director = DirectorService(aws_service=aws_service, project_name=project_name)
             script = await director.get_script()
-            scene = script.chapters[request.chapter_number - 1].scenes[request.scene_number - 1]
+            if not script or not script.chapters:
+                raise HTTPException(status_code=404, detail="Script or chapters not found")
+                
+            scenes = script.chapters[request.chapter_number - 1].scenes or []
+            if request.scene_number > len(scenes):
+                raise HTTPException(status_code=400, detail="Invalid scene number")
+                
+            scene = scenes[request.scene_number - 1]
             request.prompt = f"Create background music that matches the mood of: {scene.background_music}"
 
         # Generate the music
@@ -766,7 +773,7 @@ async def swap_faces_custom(
             result_base64 = await face_service.swap_faces_custom(
                 target_image_path=str(target_local_path),
                 source_images=source_images_info,
-                swap_instructions=request.swap_instructions
+                swap_instructions=[instruction.model_dump() for instruction in request.swap_instructions]
             )
 
             if not result_base64:
@@ -819,4 +826,55 @@ async def swap_faces_custom(
 
     except Exception as e:
         logger.error(f"Error in custom face swapping: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/regenerate-scene/{project_name}")
+async def regenerate_scene(
+    project_name: str,
+    chapter_index: int,
+    scene_index: int
+) -> Script:
+    """Regenerate a specific scene in the script"""
+    try:
+        director = DirectorService(
+            aws_service=AWSService(project_name=project_name),
+            project_name=project_name,
+        )
+        script = await director.get_script()
+        
+        if not script or not script.chapters:
+            raise HTTPException(status_code=404, detail="Script or chapters not found")
+            
+        if chapter_index >= len(script.chapters):
+            raise HTTPException(status_code=400, detail="Invalid chapter index")
+            
+        if not script.chapters[chapter_index].scenes or scene_index >= len(script.chapters[chapter_index].scenes or []):
+            raise HTTPException(status_code=400, detail="Invalid scene index")
+        
+        # Regenerate the scene
+        new_scene = await director.regenerate_scene(
+            script=script,
+            chapter_index=chapter_index,
+            scene_index=scene_index
+        )
+        
+        # Initialize scenes list if None
+        if script.chapters[chapter_index].scenes is None:
+            script.chapters[chapter_index].scenes = []
+            
+        # Update the script with the new scene
+        scenes = script.chapters[chapter_index].scenes or []  # Ensure we have a list
+        if scene_index >= len(scenes):
+            scenes.append(new_scene)
+        else:
+            scenes[scene_index] = new_scene
+        script.chapters[chapter_index].scenes = scenes
+        
+        # Save the updated script
+        await director.save_script(script)
+        
+        return script
+        
+    except Exception as e:
+        logger.error(f"Failed to regenerate scene: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

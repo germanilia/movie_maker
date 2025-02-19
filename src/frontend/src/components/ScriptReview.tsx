@@ -658,8 +658,9 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                         handleUpdateDescription={handleUpdateDescription}
                         getImageKey={getImageKey}
                         onVideoGenerated={onVideoGenerated}
+                        onScriptUpdate={setScript}
                       />
-                    ))}
+                    ))}~
                   </Accordion>
                 </VStack>
               </AccordionPanel>

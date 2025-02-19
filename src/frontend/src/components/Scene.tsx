@@ -53,6 +53,7 @@ interface SceneProps {
   ) => Promise<void>;
   getImageKey: (chapterIndex: number, sceneIndex: number, shotIndex: number, type: string) => string;
   onVideoGenerated: () => Promise<void>;
+  onScriptUpdate: (script: Script) => void;
 }
 
 const Scene: React.FC<SceneProps> = ({
@@ -74,6 +75,7 @@ const Scene: React.FC<SceneProps> = ({
   handleUpdateDescription,
   getImageKey,
   onVideoGenerated,
+  onScriptUpdate,
 }) => {
   const renderSceneDescription = (
     shot: Shot,
@@ -81,6 +83,10 @@ const Scene: React.FC<SceneProps> = ({
     type: 'opening' | 'closing'
   ) => {
     const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
+    console.log(`Rendering scene description for key: ${imageKey}`, {
+      hasImage: !!imageData[imageKey],
+      imageUrl: imageData[imageKey]
+    });
     const description = type === 'opening' ? shot.opening_frame : shot.closing_frame;
 
     return (
@@ -136,6 +142,56 @@ const Scene: React.FC<SceneProps> = ({
   const [isGeneratingSceneVideo, setIsGeneratingSceneVideo] = React.useState(false);
   const [isBlackAndWhite, setIsBlackAndWhite] = React.useState(false);
   const toast = useToast();
+  const [isRegeneratingScene, setIsRegeneratingScene] = React.useState(false);
+
+  // Add URL cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      // Cleanup any existing blob URLs when component unmounts
+      Object.values(imageData).forEach(url => {
+        if (url?.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      Object.values(videoData).forEach(url => {
+        if (url?.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      Object.values(narrationData).forEach(url => {
+        if (url?.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+      Object.values(backgroundMusicData).forEach(url => {
+        if (url?.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, [imageData, videoData, narrationData, backgroundMusicData]);
+
+  // Add debugging useEffect
+  React.useEffect(() => {
+    console.group('Media Data Debug');
+    console.log('Image Data:', Object.keys(imageData).map(key => ({
+      key,
+      url: imageData[key]
+    })));
+    console.log('Video Data:', Object.keys(videoData).map(key => ({
+      key,
+      url: videoData[key]
+    })));
+    console.log('Narration Data:', Object.keys(narrationData).map(key => ({
+      key,
+      url: narrationData[key]
+    })));
+    console.log('Background Music Data:', Object.keys(backgroundMusicData).map(key => ({
+      key,
+      url: backgroundMusicData[key]
+    })));
+    console.groupEnd();
+  }, [imageData, videoData, narrationData, backgroundMusicData]);
 
   const handleGenerateSceneVideo = async () => {
     setIsGeneratingSceneVideo(true);
@@ -161,14 +217,18 @@ const Scene: React.FC<SceneProps> = ({
       }
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `scene_${chapterNumber}_${scene.scene_number}_final.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      const url = URL.createObjectURL(blob);
+      
+      try {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `scene_${chapterNumber}_${scene.scene_number}_final.mp4`;
+        document.body.appendChild(a);
+        a.click();
+      } finally {
+        // Always cleanup the blob URL after use
+        URL.revokeObjectURL(url);
+      }
 
       toast({
         title: 'Success',
@@ -191,6 +251,52 @@ const Scene: React.FC<SceneProps> = ({
     }
   };
 
+  const handleRegenerateScene = async () => {
+    setIsRegeneratingScene(true);
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/regenerate-scene/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_index: chapterIndex,
+            scene_index: sceneIndex,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to regenerate scene');
+      }
+
+      const updatedScript = await response.json();
+      onScriptUpdate(updatedScript);
+
+      toast({
+        title: 'Success',
+        description: 'Scene regenerated successfully',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error regenerating scene:', error);
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to regenerate scene',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsRegeneratingScene(false);
+    }
+  };
+
   return (
     <AccordionItem>
       <AccordionButton>
@@ -202,6 +308,14 @@ const Scene: React.FC<SceneProps> = ({
       <AccordionPanel pb={4}>
         <VStack spacing={4} align="stretch">
           <Box display="flex" alignItems="center" gap={4}>
+            <Button
+              colorScheme="blue"
+              isLoading={isRegeneratingScene}
+              loadingText="Regenerating Scene"
+              onClick={handleRegenerateScene}
+            >
+              Regenerate Scene
+            </Button>
             <Button
               colorScheme="green"
               isDisabled={!areAllElementsPresent()}
