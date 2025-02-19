@@ -6,19 +6,23 @@ import os
 from typing import Dict, List
 from insightface.app import FaceAnalysis
 import insightface
-from pathlib import Path
 import tempfile
 import shutil
+
+from src.services.aws_service import AWSService
+from src.services.image_service import ImageService
 
 logger = logging.getLogger(__name__)
 
 
 class FaceDetectionService:
-    def __init__(self):
+    def __init__(self, aws_service: AWSService, image_service: ImageService):
         self.models_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "face_swapping_models",
         )
+        self.image_service = image_service
+        self.aws_service = aws_service
         # Initialize face detection and swapping models
         self.app = FaceAnalysis(name="buffalo_l")
         self.app.prepare(ctx_id=-1, det_size=(640, 640))  # Use -1 for CPU
@@ -90,7 +94,7 @@ class FaceDetectionService:
             # Convert result to base64
             _, buffer = cv2.imencode(".png", result_img)
             img_base64 = base64.b64encode(buffer).decode("utf-8")
-
+            await self.image_service.upscale_image(b64_image=img_base64)
             return img_base64
 
         except Exception as e:

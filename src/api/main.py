@@ -642,7 +642,7 @@ async def detect_faces(project_name: str, chapter_index: int, scene_index: int, 
             raise HTTPException(status_code=404, detail="Image not found")
 
         # Detect faces
-        face_service = FaceDetectionService()
+        face_service = FaceDetectionService(aws_service=aws_service, image_service=image_service)
         result = await face_service.detect_faces_multiple([str(local_path)])
 
         return {
@@ -669,7 +669,7 @@ async def swap_faces(project_name: str, request: FaceSwapRequest):
     try:
         aws_service = AWSService(project_name=project_name)
         image_service = ImageService(aws_service=aws_service)
-        face_service = FaceDetectionService()
+        face_service = FaceDetectionService(aws_service=aws_service, image_service=image_service)
 
         # Create temp directory if it doesn't exist
         temp_dir = Path("temp") / project_name / "face_swap"
@@ -743,7 +743,7 @@ async def swap_faces_custom(
     try:
         aws_service = AWSService(project_name=project_name)
         image_service = ImageService(aws_service=aws_service)
-        face_service = FaceDetectionService()
+        face_service = FaceDetectionService(aws_service=aws_service, image_service=image_service)
 
         # Get target image path
         target_path = f"chapter_{chapter_index}/scene_{scene_index}/shot_{shot_index}_{type}.png"
@@ -878,3 +878,4 @@ async def regenerate_scene(
     except Exception as e:
         logger.error(f"Failed to regenerate scene: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+# 

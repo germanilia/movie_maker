@@ -40,6 +40,14 @@ class ImageService:
         self.temp_dir = Path(aws_service.temp_dir)
         logger.info(f"ImageService initialized. Using temp directory: {self.temp_dir}")
 
+        self.upscale_model = ImageModels(
+            model_name="alexgenovese/upscaler:4f7eb3da655b5182e559d50a0437440f242992d47e5e20bd82829a79dee61ff3",
+            parameters={
+                "scale": 4,
+                "face_enhance": True
+            },
+        )
+
         self.flux_ultra_model = ImageModels(
             model_name="black-forest-labs/flux-1.1-pro-ultra",
             parameters={
@@ -117,6 +125,96 @@ class ImageService:
         except Exception as e:
             logger.error(f"Failed to get fallback image: {str(e)}")
             return None
+
+    async def upscale_image(
+        self,
+        image_path: str = "",
+        b64_image: str = "",
+    ) -> str:
+        """
+        Upscale image using Replicate
+        
+        Args:
+            image_path: Path to image file to upscale and overwrite
+            b64_image: Base64 encoded image string to upscale
+            
+        Returns:
+            str: Path to upscaled image or base64 string of upscaled image
+        """
+        if not image_path and not b64_image:
+            logger.error("Missing image_path or b64_image for upscaling")
+            raise ValueError("Missing image_path or b64_image for upscaling")
+        
+        start_time = time.time()
+        logger.info("Starting image upscaling")
+
+        try:
+            # Handle base64 input
+            if b64_image:
+                # Remove data URL prefix if present
+                if b64_image.startswith('data:image'):
+                    b64_image = b64_image.split(',')[1]
+                
+                # Save base64 to temporary file
+                temp_input_path = self.temp_dir / f"temp_input_{int(time.time())}.png"
+                with open(temp_input_path, "wb") as f:
+                    f.write(base64.b64decode(b64_image))
+                local_path = temp_input_path
+            else:
+                local_path = self.get_local_path(image_path)
+
+            if not local_path.exists():
+                logger.error(f"Image not found at path: {local_path}")
+                raise FileNotFoundError(f"Image not found at path: {local_path}")
+
+            logger.info("Calling Replicate API for image upscaling")
+            output = replicate.run(
+                self.upscale_model.model_name,
+                input=self.upscale_model.parameters,
+                files={"image": local_path},
+            )
+
+            if not output:
+                logger.error("Replicate API failed to return valid response")
+                raise Exception("Failed to upscale image with Replicate")
+
+            # Download the upscaled image
+            if isinstance(output, list) and len(output) > 0 and hasattr(output[0], "url"):
+                response = requests.get(output[0].url)
+            else:
+                response = requests.get(output)
+            response.raise_for_status()
+
+            # Handle saving/returning based on input type
+            if b64_image:
+                # For base64 input, save temporarily and return as base64
+                temp_output_path = self.temp_dir / f"temp_output_{int(time.time())}.png"
+                with open(temp_output_path, "wb") as f:
+                    f.write(response.content)
+                
+                # Clean up temporary input file
+                temp_input_path.unlink()
+                
+                # Return as base64
+                result = self._encode_image_to_base64(temp_output_path)
+                temp_output_path.unlink()  # Clean up temporary output file
+                return result
+            else:
+                # For file input, overwrite original file
+                with open(local_path, "wb") as f:
+                    f.write(response.content)
+                
+                upscaling_time = time.time() - start_time
+                logger.info(
+                    f"Successfully upscaled and saved image to {local_path} in {upscaling_time:.2f} seconds"
+                )
+                return str(local_path)
+
+        except Exception as e:
+            logger.error(
+                f"Image upscaling failed after {time.time() - start_time:.2f} seconds: {str(e)}"
+            )
+            return self.get_fallback_image()
 
     async def generate_image(
         self,
@@ -215,11 +313,14 @@ class ImageService:
         full_path = self.temp_dir / image_path
         return full_path.exists()
 
+
     def set_model(self, model_type: str):
         """Set the image generation model"""
         if model_type == "flux_ultra_model":
             self.image_model = self.flux_ultra_model
         elif model_type == "flux_dev_realism":
             self.image_model = self.flux_dev_realism
+        elif model_type == "flux_dev_artistic":
+            self.image_model = self.flux_dev_artistic
         else:
             raise ValueError(f"Unknown model type: {model_type}")

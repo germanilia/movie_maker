@@ -438,16 +438,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     newDescription: string
   ) => {
     try {
-      // Create a deep copy of the script
-      const updatedScript = JSON.parse(JSON.stringify(script));
-
-      // Update the description in the script
-      if (type === 'opening') {
-        updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].opening_frame = newDescription;
-      } else {
-        updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].closing_frame = newDescription;
-      }
-
       // Call the API to update the script
       const response = await fetch(`http://localhost:8000/api/update-shot-description/${projectName}`, {
         method: 'PUT',
@@ -467,10 +457,11 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         throw new Error('Failed to update description');
       }
 
-      // Update the local script state
-      setScript(updatedScript);
-
-      return;
+      // Update only the specific shot's description in the script
+      if (script?.chapters?.[chapterIndex]?.scenes?.[sceneIndex]?.shots?.[shotIndex]) {
+        const shot = script!.chapters![chapterIndex]!.scenes![sceneIndex]!.shots![shotIndex]!;
+        shot[type === 'opening' ? 'opening_frame' : 'closing_frame'] = newDescription;
+      }
     } catch (error) {
       console.error('Error updating description:', error);
       throw error;
@@ -660,7 +651,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                         onVideoGenerated={onVideoGenerated}
                         onScriptUpdate={setScript}
                       />
-                    ))}~
+                    ))}
                   </Accordion>
                 </VStack>
               </AccordionPanel>

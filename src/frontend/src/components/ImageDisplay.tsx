@@ -125,6 +125,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     try {
       await onUpdateDescription(editedDescription);
       setIsEditing(false);
+      setEditedDescription(editedDescription);
       toast({
         title: "Description updated",
         status: "success",
@@ -390,6 +391,10 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     }
   }, [imageData]);
 
+  useEffect(() => {
+    setEditedDescription(description);
+  }, [description]);
+
   return (
     <Box bg={bgColor} p={3} borderRadius="md" position="relative">
       {/* Add overlay during face operations */}
@@ -532,7 +537,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           </HStack>
         </Box>
       ) : (
-        <Text color={textColor} mb={2}>{description}</Text>
+        <Text color={textColor} mb={2}>{editedDescription}</Text>
       )}
       
       {/* Update the image display section in the return statement */}
