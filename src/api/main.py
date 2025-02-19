@@ -116,8 +116,7 @@ async def update_shot_description(project_name: str, update_data: dict):
             script.chapters[chapter_idx].scenes[scene_idx].shots[shot_idx].director_instructions = update_data["description"]
         elif update_data["action"] == "opening":
             script.chapters[chapter_idx].scenes[scene_idx].shots[shot_idx].opening_frame = update_data["description"]
-        elif update_data["action"] == "closing":
-            script.chapters[chapter_idx].scenes[scene_idx].shots[shot_idx].closing_frame = update_data["description"]
+       
         
         # Save the updated script
         await director.save_script(script)

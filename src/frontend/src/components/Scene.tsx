@@ -88,7 +88,7 @@ const Scene: React.FC<SceneProps> = ({
       hasImage: !!imageData[imageKey],
       imageUrl: imageData[imageKey]
     });
-    const description = type === 'opening' ? shot.opening_frame : shot.closing_frame;
+    const description = shot.opening_frame
 
     return (
       <ImageDisplay
@@ -107,7 +107,7 @@ const Scene: React.FC<SceneProps> = ({
               description,
               true,
               referenceImage,
-              modelType || 'flux_dev_realism',
+              modelType || 'flux_ultra_model',
               seed
             );
           }
@@ -469,7 +469,6 @@ const Scene: React.FC<SceneProps> = ({
                 />
 
                 {shot.opening_frame && renderSceneDescription(shot, shotIndex, 'opening')}
-                {shot.closing_frame && renderSceneDescription(shot, shotIndex, 'closing')}
 
                 <ShotVideo
                   projectName={projectName}

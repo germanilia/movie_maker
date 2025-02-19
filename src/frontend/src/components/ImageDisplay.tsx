@@ -78,7 +78,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   isGenerating,
   onGenerateImage,
   onUpdateDescription,
-  modelType: initialModelType = 'flux_dev_realism',  // Rename to initialModelType
+  modelType: initialModelType = 'flux_ultra_model',
   chapterIndex,
   sceneIndex,
   shotIndex,
@@ -114,8 +114,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const buttonColor = type === 'opening' ? 'teal' : 'pink';
 
   const modelOptions = [
-    { value: 'flux_dev_realism', label: 'Flux Dev Realism' },
     { value: 'flux_ultra_model', label: 'Flux Ultra Model' },
+    { value: 'flux_dev_realism', label: 'Flux Dev Realism' },
   ];
 
   const handleSave = async () => {

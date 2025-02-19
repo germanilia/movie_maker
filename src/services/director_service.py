@@ -162,7 +162,7 @@ class DirectorService:
         for shot in scene.shots:
             if shot.director_instructions:
                 previous_instructions.append(
-                    f"Shot {shot.shot_number}/{script.project_details.number_of_shots} in scene {scene.scene_number}/{script.project_details.number_of_scenes} in chapter {chapter.chapter_number}/{script.project_details.number_of_chapters} director instructions : {shot.director_instructions}\nShot {shot.shot_number}/{script.project_details.number_of_shots} Closing Frame Description : {shot.closing_frame}"
+                    f"Shot {shot.shot_number}/{script.project_details.number_of_shots} in scene {scene.scene_number}/{script.project_details.number_of_scenes} in chapter {chapter.chapter_number}/{script.project_details.number_of_chapters} director instructions : {shot.director_instructions}\nShot {shot.shot_number}/{script.project_details.number_of_shots}"
                 )
 
         return "\n".join(previous_instructions) if previous_instructions else "N/A"

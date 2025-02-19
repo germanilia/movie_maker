@@ -153,7 +153,8 @@ class BaseVideoService(ABC):
                     video_filters = [
                         "scale=1280:768:force_original_aspect_ratio=decrease",
                         "pad=1280:768:(ow-iw)/2:(oh-ih)/2",
-                        "fps=30"
+                        "fps=30",
+                        "setsar=1:1"  # Force 1:1 Sample Aspect Ratio
                     ]
                     if black_and_white:
                         video_filters.append("hue=s=0")  # Remove color saturation
@@ -180,6 +181,7 @@ class BaseVideoService(ABC):
                         "ffmpeg", "-y",
                         "-f", "lavfi",
                         "-i", "color=c=black:s=1280x768:d=1",
+                        "-vf", "setsar=1:1",  # Force 1:1 Sample Aspect Ratio
                         "-r", "30",
                         str(black_video)
                     ], check=True, capture_output=True)

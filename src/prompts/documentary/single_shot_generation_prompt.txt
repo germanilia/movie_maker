@@ -38,15 +38,11 @@ Describe the cloths poses and everything else.
 
 in the frame / image description Same evening, same location. are not allowed, need to describe everything from scratch
 
-The director's instructions must be clear, they need to provide the camera movement from the opening frame to the closing one.
-It also needs to describe the flow of events, it must not exceed 10s, which is the time limit for the shot.
-No need to address the music or speech.
-
-The reasoning will explain the logic behind the other required filed for the shot,
-It will help understanding the reasons for the selections.
-
-The director instructions needs to be very clear, it should include the camera instructions,
-the type of shot, and the flow of the shot.
+The director instructions should provide minimal camera movement, it will use 36mm / 8mm film and cinematic style.
+The flow should be with minimal transitions and should focus on slow and delicate changes in the view. 
+The instructions should provide the scene based on the opening_frame and reasoning, and describe the clothing and character descriptions for consistency purposes.
+each director instruction must contain all the information required and it should not explicitly mention the previous scenes / shots.
+the instructions must advance the plot and not repeat itself.
 
 There are some issues regarding camera movement, nee to use instructions like slow camera movement, steady camera and similar.
 
@@ -83,7 +79,6 @@ Output Format:
 {{
   "reasoning":  "This is the reasoning, based on the instructions above",
   "opening_frame": "The first frame of the shot",
-  "closing_frame": "The last frame of the shot",
   "director_instructions": "The director instructions for this shot based on previous shots and the frames description",
 }}
 

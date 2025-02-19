@@ -19,7 +19,6 @@ class Shot(BaseModel):
     shot_number: int = -1
     director_instructions: str = ""  # Changed to have a default empty string
     opening_frame: str | None = None
-    closing_frame: str | None = None
 
 class Scene(BaseModel):
     reasoning: str | None = None
@@ -51,7 +50,7 @@ class RegenerateImageRequest(BaseModel):
     type: str
     custom_prompt: str | None = None
     overwrite_image: bool = False
-    model_type: str = "flux_dev_realism"
+    model_type: str = "flux_ultra_model"
     reference_image: str | None = None
     seed: int = 333
 

@@ -132,9 +132,7 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
           onChange={(e) => setFrameMode(e.target.value)}
           mb={2}
         >
-          <option value="both">Use Both Frames (not supported by kling)</option>
           <option value="opening">Use Opening Frame Only</option>
-          <option value="closing">Use Closing Frame Only</option>
         </Select>
         <Button
           colorScheme="teal"

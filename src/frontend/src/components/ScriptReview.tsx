@@ -67,6 +67,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const isMounted = useRef(true);
 
   React.useEffect(() => {
+    isMounted.current = true;
     return () => {
       isMounted.current = false;
     };
@@ -187,7 +188,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     description: string,
     overwriteImage: boolean = true,
     referenceImage?: string,
-    modelType: string = 'flux_dev_realism',
+    modelType: string = 'flux_ultra_model',
     seed: number = 333
   ) => {
     const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
@@ -226,7 +227,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       const data = await response.json();
 
       if (data.status === 'success' && data.base64_image) {
-        // Update the image data with the new base64 image
         setImageData(prev => ({
           ...prev,
           [imageKey]: data.base64_image
@@ -252,6 +252,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         duration: 5000,
         isClosable: true,
       });
+      throw error;
     } finally {
       setGeneratingImages(prev => {
         const newSet = new Set(Array.from(prev));
@@ -332,10 +333,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
     try {
       for (const chapter of script.chapters || []) {
-        if (!isMounted.current) break;
-
         for (const scene of chapter.scenes || []) {
-          if (!isMounted.current) break;
           await handleGenerateBackgroundMusic(chapter.chapter_number, scene.scene_number);
         }
       }
@@ -384,15 +382,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               description: shot.opening_frame
             });
           }
-          if (shot.closing_frame) {
-            pendingImages.push({
-              chapterIndex,
-              sceneIndex,
-              shotIndex,
-              type: 'closing',
-              description: shot.closing_frame
-            });
-          }
+          
         });
       });
     });
@@ -402,40 +392,100 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
   const handleGenerateAll = async () => {
     const pendingImages = getAllPendingImages();
-    setIsGeneratingAll(true);
-
-    try {
-      for (const img of pendingImages) {
-        if (!isMounted.current) break;
-
-        await handleGenerateImage(
-          img.chapterIndex,
-          img.sceneIndex,
-          img.shotIndex,
-          img.type,
-          img.description,
-          false  // Set overwrite_image to false for batch generation
-        );
-      }
-
+    console.log(`Found ${pendingImages.length} pending images to generate`);
+    
+    if (pendingImages.length === 0) {
       toast({
-        title: 'Success',
-        description: 'All images have been generated',
-        status: 'success',
+        title: 'Info',
+        description: 'No missing images found to generate',
+        status: 'info',
         duration: 5000,
         isClosable: true,
       });
+      return;
+    }
+
+    setIsGeneratingAll(true);
+    let errorCount = 0;
+    let successCount = 0;
+
+    try {
+      for (const img of pendingImages) {
+        const imageKey = getImageKey(
+          img.chapterIndex,
+          img.sceneIndex,
+          img.shotIndex,
+          img.type
+        );
+        
+        console.log(`Generating image for key: ${imageKey}`, {
+          chapter: img.chapterIndex + 1,
+          scene: img.sceneIndex + 1,
+          shot: img.shotIndex + 1,
+          type: img.type,
+          description: img.description
+        });
+
+        try {
+          await handleGenerateImage(
+            img.chapterIndex,
+            img.sceneIndex,
+            img.shotIndex,
+            img.type,
+            img.description,
+            true // Set to true to ensure generation
+          );
+          
+          successCount++;
+          console.log(`Successfully generated image ${successCount}/${pendingImages.length}`);
+          
+          // Add a small delay between generations
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+        } catch (error) {
+          errorCount++;
+          console.error(`Failed to generate image ${imageKey}:`, error);
+        }
+      }
+
+      if (errorCount > 0) {
+        toast({
+          title: 'Partial Success',
+          description: `Generated ${successCount} images with ${errorCount} failures`,
+          status: 'warning',
+          duration: 5000,
+          isClosable: true,
+        });
+      } else if (successCount > 0) {
+        toast({
+          title: 'Success',
+          description: `Successfully generated ${successCount} images`,
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: 'Info',
+          description: 'No images were generated',
+          status: 'info',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
     } catch (error) {
-      console.error('Error generating all images:', error);
+      console.error('Error in generate all:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate all images',
+        description: 'Failed to complete image generation',
         status: 'error',
         duration: 5000,
         isClosable: true,
       });
     } finally {
-      setIsGeneratingAll(false);
+      if (isMounted.current) {
+        setIsGeneratingAll(false);
+      }
     }
   };
 
@@ -469,7 +519,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       // Update only the specific shot's description in the script
       if (script?.chapters?.[chapterIndex]?.scenes?.[sceneIndex]?.shots?.[shotIndex]) {
         const shot = script!.chapters![chapterIndex]!.scenes![sceneIndex]!.shots![shotIndex]!;
-        shot[type === 'opening' ? 'opening_frame' : 'closing_frame'] = newDescription;
+        shot['opening_frame'] = newDescription;
       }
     } catch (error) {
       console.error('Error updating description:', error);
@@ -540,7 +590,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     type: 'opening' | 'closing'
   ) => {
     const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
-    const description = type === 'opening' ? shot.opening_frame : shot.closing_frame;
+    const description = shot.opening_frame
   
     return (
       <ImageDisplay
@@ -559,7 +609,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               description,
               true,
               referenceImage,
-              modelType || 'flux_dev_realism',
+              modelType || 'flux_ultra_model',
               seed
             );
           }

@@ -14,7 +14,6 @@ export interface Shot {
   reasoning: string;
   director_instructions?: string;
   opening_frame: string;
-  closing_frame: string;
 }
 
 export interface Scene {

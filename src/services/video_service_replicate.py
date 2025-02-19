@@ -60,11 +60,9 @@ class ReplicateVideoService(BaseVideoService):
                 logger.error(f"Opening frame not found at {frame_path}")
                 return False, None
 
-            closing_frame_path = self.get_shot_image_path(chapter, scene, shot, "closing")
             logger.info("Calling Replicate API for video generation")
             reference_image = self._encode_image_to_base64(str(frame_path))
-            if frame_mode == "closing":
-                reference_image = self._encode_image_to_base64(str(closing_frame_path))
+            
             # Call Replicate API with proper type handling
             output = replicate.run(
                 self.video_model.model_name,
