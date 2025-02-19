@@ -262,8 +262,8 @@ const Scene: React.FC<SceneProps> = ({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            chapter_index: chapterIndex,
-            scene_index: sceneIndex,
+            chapter_index: chapterIndex + 1,
+            scene_index: sceneIndex + 1,
           }),
         }
       );

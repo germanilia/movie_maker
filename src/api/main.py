@@ -828,11 +828,14 @@ async def swap_faces_custom(
         logger.error(f"Error in custom face swapping: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class RegenerateSceneRequest(BaseModel):
+    chapter_index: int
+    scene_index: int
+
 @app.post("/api/regenerate-scene/{project_name}")
 async def regenerate_scene(
     project_name: str,
-    chapter_index: int,
-    scene_index: int
+    request: RegenerateSceneRequest
 ) -> Script:
     """Regenerate a specific scene in the script"""
     try:
@@ -845,30 +848,34 @@ async def regenerate_scene(
         if not script or not script.chapters:
             raise HTTPException(status_code=404, detail="Script or chapters not found")
             
-        if chapter_index >= len(script.chapters):
+        # Convert 1-based indices to 0-based
+        chapter_idx = request.chapter_index - 1
+        scene_idx = request.scene_index - 1
+            
+        if chapter_idx >= len(script.chapters) or chapter_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid chapter index")
             
-        if not script.chapters[chapter_index].scenes or scene_index >= len(script.chapters[chapter_index].scenes or []):
+        if not script.chapters[chapter_idx].scenes or scene_idx >= len(script.chapters[chapter_idx].scenes or []) or scene_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid scene index")
         
         # Regenerate the scene
         new_scene = await director.regenerate_scene(
             script=script,
-            chapter_index=chapter_index,
-            scene_index=scene_index
+            chapter_index=chapter_idx,
+            scene_index=scene_idx
         )
         
         # Initialize scenes list if None
-        if script.chapters[chapter_index].scenes is None:
-            script.chapters[chapter_index].scenes = []
+        if script.chapters[chapter_idx].scenes is None:
+            script.chapters[chapter_idx].scenes = []
             
         # Update the script with the new scene
-        scenes = script.chapters[chapter_index].scenes or []  # Ensure we have a list
-        if scene_index >= len(scenes):
+        scenes = script.chapters[chapter_idx].scenes or []  # Ensure we have a list
+        if scene_idx >= len(scenes):
             scenes.append(new_scene)
         else:
-            scenes[scene_index] = new_scene
-        script.chapters[chapter_index].scenes = scenes
+            scenes[scene_idx] = new_scene
+        script.chapters[chapter_idx].scenes = scenes
         
         # Save the updated script
         await director.save_script(script)
