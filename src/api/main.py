@@ -571,13 +571,28 @@ async def get_video(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/get-all-videos/{project_name}")
-async def get_all_videos(project_name: str, provider: VideoProvider = VideoProvider.REPLICATE):
+async def get_all_videos(project_name: str) -> dict:
     """Get all generated videos for a project"""
     try:
         aws_service = AWSService(project_name=project_name)
-        video_service = VideoServiceFactory.create_video_service(provider, aws_service)
+        video_service = VideoServiceFactory.create_video_service(VideoProvider.REPLICATE, aws_service)
 
         videos = video_service.get_all_videos()
+        
+        # Add final scene videos
+        temp_dir = Path("temp") / project_name
+        if temp_dir.exists():
+            for chapter_dir in temp_dir.glob("chapter_*"):
+                chapter_num = int(chapter_dir.name.split("_")[1])
+                for scene_dir in chapter_dir.glob("scene_*"):
+                    scene_num = int(scene_dir.name.split("_")[1])
+                    final_scene_path = scene_dir / "final_scene.mp4"
+                    
+                    if final_scene_path.exists():
+                        with open(final_scene_path, "rb") as f:
+                            video_data = base64.b64encode(f.read()).decode("utf-8")
+                            videos[f"final_scene_{chapter_num}_{scene_num}"] = video_data
+
         return {
             "status": "success",
             "videos": videos
@@ -884,5 +899,31 @@ async def regenerate_scene(
         
     except Exception as e:
         logger.error(f"Failed to regenerate scene: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-scene-video/{project_name}/{chapter_number}/{scene_number}")
+async def get_scene_video(
+    project_name: str,
+    chapter_number: int,
+    scene_number: int
+):
+    """Get the final scene video if it exists"""
+    try:
+        video_path = Path("temp") / project_name / f"chapter_{chapter_number}" / f"scene_{scene_number}" / "final_scene.mp4"
+        
+        if not video_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Video not found for chapter {chapter_number}, scene {scene_number}"
+            )
+
+        return FileResponse(
+            path=str(video_path),
+            media_type="video/mp4",
+            filename=f"final_scene_{chapter_number}_{scene_number}.mp4"
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting scene video: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 # 

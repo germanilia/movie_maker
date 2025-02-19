@@ -77,7 +77,35 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     []
   );
 
-  // Effect to fetch all images when script changes
+  // Function to load all videos including final scene videos
+  const loadAllVideos = React.useCallback(async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/get-all-videos/${projectName}`,
+        { cache: 'no-store' }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch videos');
+      }
+
+      const data = await response.json() as VideoApiResponse;
+      if (data.status === 'success' && data.videos) {
+        setVideoData(data.videos);
+      }
+    } catch (error) {
+      console.error('Error loading videos:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load videos',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  }, [projectName, toast]);
+
+  // Effect to load all data when script changes
   React.useEffect(() => {
     let mounted = true;
 
@@ -89,7 +117,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         const endpoints = [
           'get-all-images',
           'get-all-narrations',
-          'get-all-videos',
           'get-all-background-music'
         ];
 
@@ -101,7 +128,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
         if (!mounted) return;
 
-        const [imageData, narrData, videoData, musicData] = await Promise.all(
+        const [imageData, narrData, musicData] = await Promise.all(
           responses.map(r => r.json())
         );
 
@@ -115,13 +142,12 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           setNarrationData(narrData.narrations);
         }
 
-        if (videoData.status === 'success' && videoData.videos) {
-          setVideoData(videoData.videos);
-        }
-
         if (musicData.status === 'success' && musicData.background_music) {
           setBackgroundMusicData(musicData.background_music);
         }
+
+        // Load videos separately since they might be larger
+        await loadAllVideos();
 
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -146,28 +172,11 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     return () => {
       mounted = false;
     };
-  }, [script, projectName, toast]);
+  }, [script, projectName, toast, loadAllVideos]);
 
-  const fetchAllVideos = async () => {
-    try {
-      const videoResponse = await fetch(
-        `http://localhost:8000/api/get-all-videos/${projectName}`
-      );
-
-      if (!videoResponse.ok || !isMounted.current) return;
-
-      const videoData = await videoResponse.json() as VideoApiResponse;
-
-      if (videoData.status === 'success' && videoData.videos && isMounted.current) {
-        setVideoData(videoData.videos);
-      }
-    } catch (error) {
-      console.error('Error fetching videos:', error);
-    }
-  };
-
+  // Update onVideoGenerated to use loadAllVideos
   const onVideoGenerated = async () => {
-    await fetchAllVideos();
+    await loadAllVideos();
   };
 
   const handleGenerateImage = async (

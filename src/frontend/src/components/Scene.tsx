@@ -10,6 +10,7 @@ import {
   Button,
   useToast,
   Switch,
+  AspectRatio,
 } from '@chakra-ui/react';
 import { Scene as SceneType, Shot, Script } from '../models/models';
 import BackgroundMusic from './BackgroundMusic';
@@ -143,6 +144,45 @@ const Scene: React.FC<SceneProps> = ({
   const [isBlackAndWhite, setIsBlackAndWhite] = React.useState(false);
   const toast = useToast();
   const [isRegeneratingScene, setIsRegeneratingScene] = React.useState(false);
+
+  const [isLoadingVideo, setIsLoadingVideo] = React.useState(false);
+  const [finalSceneVideoUrl, setFinalSceneVideoUrl] = React.useState<string | null>(null);
+
+  // Effect to fetch video URL when video data is available
+  React.useEffect(() => {
+    const loadVideo = async () => {
+      const videoKey = `final_scene_${chapterNumber}_${scene.scene_number}`;
+      if (videoData[videoKey]) {
+        setIsLoadingVideo(true);
+        try {
+          const response = await fetch(
+            `http://localhost:8000/api/get-scene-video/${projectName}/${chapterNumber}/${scene.scene_number}`,
+            { cache: 'no-store' }
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch video');
+          }
+
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          setFinalSceneVideoUrl(url);
+        } catch (error) {
+          console.error('Error loading video:', error);
+        } finally {
+          setIsLoadingVideo(false);
+        }
+      }
+    };
+
+    loadVideo();
+
+    return () => {
+      if (finalSceneVideoUrl) {
+        URL.revokeObjectURL(finalSceneVideoUrl);
+      }
+    };
+  }, [videoData, chapterNumber, scene.scene_number, projectName]);
 
   // Add URL cleanup on unmount
   React.useEffect(() => {
@@ -307,6 +347,31 @@ const Scene: React.FC<SceneProps> = ({
       </AccordionButton>
       <AccordionPanel pb={4}>
         <VStack spacing={4} align="stretch">
+          {/* Final scene video display */}
+          {(finalSceneVideoUrl || isLoadingVideo) && (
+            <Box borderWidth="1px" borderRadius="md" p={4} bg="white">
+              <Text fontWeight="bold" mb={2}>Final Scene Video</Text>
+              <AspectRatio ratio={16 / 9}>
+                {isLoadingVideo ? (
+                  <Box display="flex" alignItems="center" justifyContent="center">
+                    <Text>Loading video...</Text>
+                  </Box>
+                ) : (
+                  <video
+                    controls
+                    src={finalSceneVideoUrl || undefined}
+                    style={{ width: '100%', borderRadius: 'md' }}
+                    preload="auto"
+                    playsInline
+                  >
+                    <source src={finalSceneVideoUrl || undefined} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                )}
+              </AspectRatio>
+            </Box>
+          )}
+
           <Box display="flex" alignItems="center" gap={4}>
             <Button
               colorScheme="blue"
