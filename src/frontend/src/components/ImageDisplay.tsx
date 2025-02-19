@@ -22,6 +22,7 @@ import {
   Radio,
   RadioGroup,
   Stack,
+  Spinner,
 } from '@chakra-ui/react';
 import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon } from '@chakra-ui/icons';
 
@@ -37,13 +38,12 @@ const dragDropStyles = {
   },
 };
 
+// Update the FaceDetectionResult interface to match the new response structure
 interface FaceDetectionResult {
-  number_of_faces: number;
-  faces: {
-    [key: string]: {
-      top_left: [number, number];
-      bottom_right: [number, number];
-    };
+  [key: string]: {
+    bbox: number[];
+    kps: [number, number][];
+    det_score: number;
   };
 }
 
@@ -68,11 +68,6 @@ interface SourceImage {
   file: File;  // Add the File type
 }
 
-interface FaceSwapInstruction {
-  target_idx: number;
-  source_img_name: string;
-  source_idx: number;
-}
 
 // Update the component to manage its own modelType state
 const ImageDisplay: React.FC<ImageDisplayProps> = ({
@@ -108,6 +103,11 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const [sourceImages, setSourceImages] = useState<SourceImage[]>([]);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const [faceMapping, setFaceMapping] = useState<Record<number, string>>({});
+  const [localImageData, setLocalImageData] = useState<string | undefined>(imageData);
+
+  // Add new loading states
+  const [isDetectingFaces, setIsDetectingFaces] = useState(false);
+  const [isSwapping, setIsSwapping] = useState(false);
 
   const bgColor = type === 'opening' ? 'teal.50' : 'pink.50';
   const textColor = type === 'opening' ? 'teal.800' : 'pink.800';
@@ -204,14 +204,12 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     }
   };
 
-  const handleSeedChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(event.target.value);
-    if (!isNaN(value)) {
-      setSeed(value);
-    }
-  };
 
+  // Update the detectFaces function
   const detectFaces = async () => {
+    setIsDetectingFaces(true);
+    setShowFaceTools(false); // Hide tools during detection
+    
     try {
       const response = await fetch(
         `http://localhost:8000/api/detect-faces/${projectName}?` +
@@ -225,7 +223,17 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       
       const data = await response.json();
       if (data.status === 'success' && data.face_detection_result) {
-        setFaceDetectionResult(data.face_detection_result[Object.keys(data.face_detection_result)[0]]);
+        setFaceDetectionResult(data.face_detection_result);
+        setShowFaceTools(true);
+        
+        if (Object.keys(data.face_detection_result).length === 0) {
+          toast({
+            title: 'No faces detected',
+            description: 'No faces were found in the image',
+            status: 'warning',
+            duration: 3000,
+          });
+        }
       }
     } catch (error) {
       console.error('Error detecting faces:', error);
@@ -235,73 +243,12 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         status: 'error',
         duration: 3000,
       });
+    } finally {
+      setIsDetectingFaces(false);
     }
   };
 
-  const handleSwapFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        setSwapSourceImage(base64);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
-  const handleFaceSwap = async () => {
-    if (!swapSourceImage) {
-      toast({
-        title: 'Error',
-        description: 'Please upload a source image first',
-        status: 'error',
-        duration: 3000,
-      });
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `http://localhost:8000/api/swap-faces/${projectName}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            source_image: swapSourceImage,
-            target_chapter_index: chapterIndex,
-            target_scene_index: sceneIndex,
-            target_shot_index: shotIndex,
-            target_type: type,
-          }),
-        }
-      );
-
-      if (!response.ok) throw new Error('Face swapping failed');
-      
-      const data = await response.json();
-      if (data.status === 'success' && data.base64_image) {
-        // Update the image on success
-        onGenerateImage();
-        toast({
-          title: 'Success',
-          description: 'Face swap completed successfully',
-          status: 'success',
-          duration: 3000,
-        });
-      }
-    } catch (error) {
-      console.error('Error swapping faces:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to swap faces',
-        status: 'error',
-        duration: 3000,
-      });
-    }
-  };
 
   const handleSourceFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -321,6 +268,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     }
   };
 
+  // Update the handleCustomFaceSwap function
   const handleCustomFaceSwap = async () => {
     if (!faceDetectionResult || Object.keys(faceMapping).length === 0) {
       toast({
@@ -331,34 +279,35 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       });
       return;
     }
-
+  
+    setIsSwapping(true);
     try {
-      const swapInstructions = Object.entries(faceMapping).map(([targetIdx, sourceName]) => ({
-        target_idx: parseInt(targetIdx),
-        source_img_name: sourceName,  // Use the original filename
-        source_idx: 0
-      }));
-
-      const formData = new FormData();
-      
-      // Append each source image with its original filename
-      sourceImages.forEach(img => {
-        formData.append('source_images', img.file);
+      const swapInstructions = Object.entries(faceMapping).map(([targetIdx, sourceName]) => {
+        // Find the index of the source image in the sourceImages array
+        const sourceIdx = sourceImages.findIndex(img => img.name === sourceName);
+        return {
+          target_idx: parseInt(targetIdx),
+          source_img_name: sourceName,
+          source_idx: sourceIdx // Use the actual index from the array
+        };
       });
-
-      // Add swap instructions as JSON string
-      formData.append('swap_instructions', JSON.stringify(swapInstructions));
-
+  
       const response = await fetch(
         `http://localhost:8000/api/swap-faces-custom/${projectName}?` +
         `chapter_index=${chapterIndex+1}&scene_index=${sceneIndex+1}&` +
         `shot_index=${shotIndex+1}&type=${type}`,
         {
           method: 'POST',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source_images: sourceImages.map(img => img.base64),
+            swap_instructions: swapInstructions
+          }),
         }
       );
-
+  
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Custom face swapping failed');
@@ -366,10 +315,17 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       
       const data = await response.json();
       if (data.status === 'success' && data.base64_image) {
-        onGenerateImage();
+        // Clear face detection result
+        setFaceDetectionResult(null);
+        
+        // Update image data directly without triggering regeneration
+        setLocalImageData(data.base64_image);
+  
+        // Reset states
         setIsSwapModalOpen(false);
         setSourceImages([]);
         setFaceMapping({});
+        
         toast({
           title: 'Success',
           description: 'Face swap completed successfully',
@@ -385,44 +341,80 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         status: 'error',
         duration: 3000,
       });
+    } finally {
+      setIsSwapping(false);
     }
   };
 
+  // Update the useEffect that draws the faces
   useEffect(() => {
-    // if (!imageData || !faceDetectionResult || !canvasRef.current) return;
-    if (!imageData || !canvasRef.current) return;
+    if (!localImageData || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const img = new window.Image();
-    // Remove the data URL prefix if it exists
-    img.src = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
+    img.src = localImageData.startsWith('data:') ? localImageData : `data:image/png;base64,${localImageData}`;
     
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
       
-      if (faceDetectionResult && faceDetectionResult.faces) {
+      if (faceDetectionResult) {
         ctx.strokeStyle = 'red';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 4;
+        ctx.font = '48px Arial'; // Increased font size to 48px
+        ctx.fillStyle = 'red';
         
-        Object.values(faceDetectionResult.faces).forEach(face => {
-          const [x1, y1] = face.top_left;
-          const [x2, y2] = face.bottom_right;
+        Object.entries(faceDetectionResult).forEach(([faceIdx, face]) => {
+          const [x1, y1, x2, y2] = face.bbox;
           const width = x2 - x1;
           const height = y2 - y1;
           
+          // Draw rectangle around face
           ctx.strokeRect(x1, y1, width, height);
+          
+          // Draw face index (starting from 1)
+          const displayNumber = (parseInt(faceIdx) + 1).toString();
+          ctx.fillText(displayNumber, x1, y1 - 15); // Increased y-offset for larger text
         });
       }
     };
-  }, [imageData, faceDetectionResult]);
+  }, [localImageData, faceDetectionResult]);
+
+  useEffect(() => {
+    if (imageData !== undefined) {
+      setLocalImageData(imageData);
+    }
+  }, [imageData]);
 
   return (
-    <Box bg={bgColor} p={3} borderRadius="md">
+    <Box bg={bgColor} p={3} borderRadius="md" position="relative">
+      {/* Add overlay during face operations */}
+      {(isDetectingFaces || isSwapping) && (
+        <Box
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          bg="rgba(255, 255, 255, 0.8)"
+          zIndex={5}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <VStack spacing={4}>
+            <Spinner size="xl" color={buttonColor} />
+            <Text fontWeight="bold">
+              {isDetectingFaces ? 'Detecting Faces...' : 'Swapping Faces...'}
+            </Text>
+          </VStack>
+        </Box>
+      )}
+
       <HStack justify="space-between" mb={2}>
         <Text fontWeight="bold">{type === 'opening' ? 'Opening' : 'Closing'} Scene Description:</Text>
         <HStack spacing={2}>
@@ -543,7 +535,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         <Text color={textColor} mb={2}>{description}</Text>
       )}
       
-      {imageData && (
+      {/* Update the image display section in the return statement */}
+      {localImageData && (
         <Box mt={4} position="relative">
           {faceDetectionResult ? (
             <canvas
@@ -557,7 +550,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
             />
           ) : (
             <Image
-              src={imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`}
+              src={localImageData.startsWith('data:') ? localImageData : `data:image/png;base64,${localImageData}`}
               alt={`${type} frame`}
               maxH="300px"
               w="100%"
@@ -581,6 +574,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                   size="sm"
                   colorScheme={buttonColor}
                   onClick={detectFaces}
+                  isLoading={isDetectingFaces}
+                  loadingText="Detecting"
                 >
                   Detect Faces
                 </Button>
@@ -591,11 +586,13 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                   onChange={handleSourceFileUpload}
                   style={{ display: 'none' }}
                   ref={swapFileInputRef}
+                  disabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
                 />
                 <Button
                   size="sm"
                   colorScheme={buttonColor}
                   onClick={() => swapFileInputRef.current?.click()}
+                  isDisabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
                 >
                   Upload Faces
                 </Button>
@@ -604,6 +601,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                     size="sm"
                     colorScheme={buttonColor}
                     onClick={() => setIsSwapModalOpen(true)}
+                    isDisabled={isSwapping}
                   >
                     Map & Swap Faces
                   </Button>
@@ -638,15 +636,20 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       )}
 
       {/* Face Mapping Modal */}
-      <Modal isOpen={isSwapModalOpen} onClose={() => setIsSwapModalOpen(false)} size="xl">
+      <Modal 
+        isOpen={isSwapModalOpen} 
+        onClose={() => setIsSwapModalOpen(false)}
+        closeOnOverlayClick={!isSwapping}
+        closeOnEsc={!isSwapping}
+      >
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Map Faces</ModalHeader>
-          <ModalCloseButton />
+          {!isSwapping && <ModalCloseButton />}
           <ModalBody>
             <VStack spacing={4}>
               <Text>Map each detected face to a source image:</Text>
-              {faceDetectionResult && Object.keys(faceDetectionResult.faces).map((faceIdx) => (
+              {faceDetectionResult && Object.entries(faceDetectionResult).map(([faceIdx, face]) => (
                 <Box key={faceIdx} p={4} borderWidth={1} borderRadius="md" width="100%">
                   <Text mb={2}>Face {parseInt(faceIdx) + 1}:</Text>
                   <RadioGroup
@@ -677,10 +680,20 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
             </VStack>
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={handleCustomFaceSwap}>
+            <Button 
+              colorScheme="blue" 
+              mr={3} 
+              onClick={handleCustomFaceSwap}
+              isLoading={isSwapping}
+              loadingText="Swapping Faces"
+            >
               Swap Faces
             </Button>
-            <Button variant="ghost" onClick={() => setIsSwapModalOpen(false)}>
+            <Button 
+              variant="ghost" 
+              onClick={() => setIsSwapModalOpen(false)}
+              isDisabled={isSwapping}
+            >
               Cancel
             </Button>
           </ModalFooter>
@@ -689,5 +702,4 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     </Box>
   );
 };
-
 export default ImageDisplay;

@@ -9,6 +9,7 @@ import {
   AccordionIcon,
   Button,
   useToast,
+  Switch,
 } from '@chakra-ui/react';
 import { Scene as SceneType, Shot, Script } from '../models/models';
 import BackgroundMusic from './BackgroundMusic';
@@ -133,6 +134,7 @@ const Scene: React.FC<SceneProps> = ({
   };
 
   const [isGeneratingSceneVideo, setIsGeneratingSceneVideo] = React.useState(false);
+  const [isBlackAndWhite, setIsBlackAndWhite] = React.useState(false);
   const toast = useToast();
 
   const handleGenerateSceneVideo = async () => {
@@ -148,6 +150,7 @@ const Scene: React.FC<SceneProps> = ({
           body: JSON.stringify({
             chapter_number: chapterNumber,
             scene_number: scene.scene_number,
+            black_and_white: isBlackAndWhite,
           }),
         }
       );
@@ -198,15 +201,24 @@ const Scene: React.FC<SceneProps> = ({
       </AccordionButton>
       <AccordionPanel pb={4}>
         <VStack spacing={4} align="stretch">
-          <Button
-            colorScheme="green"
-            isDisabled={!areAllElementsPresent()}
-            isLoading={isGeneratingSceneVideo}
-            loadingText="Generating Scene Video"
-            onClick={handleGenerateSceneVideo}
-          >
-            Generate Scene Video
-          </Button>
+          <Box display="flex" alignItems="center" gap={4}>
+            <Button
+              colorScheme="green"
+              isDisabled={!areAllElementsPresent()}
+              isLoading={isGeneratingSceneVideo}
+              loadingText="Generating Scene Video"
+              onClick={handleGenerateSceneVideo}
+            >
+              Generate Scene Video
+            </Button>
+            <Box display="flex" alignItems="center" gap={2}>
+              <Text>Black & White:</Text>
+              <Switch
+                isChecked={isBlackAndWhite}
+                onChange={(e) => setIsBlackAndWhite(e.target.checked)}
+              />
+            </Box>
+          </Box>
 
           <Box bg="gray.50" p={3} borderRadius="md">
             <Text>{scene.description}</Text>

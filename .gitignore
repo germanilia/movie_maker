@@ -6,6 +6,7 @@ __pycache__
 stock_images
 node_modules
 temp
+temp_
 *.png
 *.jpg
 *.jpeg
@@ -17,4 +18,4 @@ temp
 **/stock_images/**
 **/temp/**
 egg-info*
-
+face_swapping_models

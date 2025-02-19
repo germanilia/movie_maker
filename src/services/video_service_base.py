@@ -120,6 +120,7 @@ class BaseVideoService(ABC):
         self,
         chapter: str,
         scene: str,
+        black_and_white: bool = True
     ) -> Tuple[bool, str | None]:
         try:
             scene_path = self.temp_dir / f"chapter_{chapter}/scene_{scene}"
@@ -148,12 +149,19 @@ class BaseVideoService(ABC):
                     normalized_path = scene_path / f"normalized_{i}.mp4"
                     normalized_videos.append(normalized_path)
                     
+                    # Add grayscale filter if black_and_white is True
+                    video_filters = [
+                        "scale=1280:768:force_original_aspect_ratio=decrease",
+                        "pad=1280:768:(ow-iw)/2:(oh-ih)/2",
+                        "fps=30"
+                    ]
+                    if black_and_white:
+                        video_filters.append("hue=s=0")  # Remove color saturation
+                    
                     subprocess.run([
                         "ffmpeg", "-y",
                         "-i", str(video),
-                        "-vf", "scale=1280:768:force_original_aspect_ratio=decrease,"
-                               "pad=1280:768:(ow-iw)/2:(oh-ih)/2,"
-                               "fps=30",
+                        "-vf", ",".join(video_filters),
                         "-c:v", "libx264",
                         "-preset", "medium",
                         "-crf", "23",

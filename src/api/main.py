@@ -22,6 +22,10 @@ import base64
 from fastapi import UploadFile, File, Form
 import json
 
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -232,7 +236,7 @@ async def regenerate_image(
         
         # Generate image
         success, local_path = await image_service.generate_image(
-            prompt=request.custom_prompt,
+            prompt=request.custom_prompt or "",
             image_path=image_path,
             overwrite_image=request.overwrite_image,
             model_type=request.model_type,
@@ -301,8 +305,8 @@ class NarrationRequest(BaseModel):
     text: str
     chapter_number: int
     scene_number: int
-    shot_number: int = None
-    voice_id: str = None
+    shot_number: int | None = None
+    voice_id: str | None = None
 
 @app.post("/api/generate-narration/{project_name}")
 async def generate_narration(project_name: str, request: NarrationRequest):
@@ -580,6 +584,7 @@ async def get_all_videos(project_name: str, provider: VideoProvider = VideoProvi
 class SceneVideoRequest(BaseModel):
     chapter_number: int
     scene_number: int
+    black_and_white: bool = True
 
 @app.post("/api/generate-scene-video/{project_name}")
 async def generate_scene_video(project_name: str, request: SceneVideoRequest):
@@ -590,7 +595,8 @@ async def generate_scene_video(project_name: str, request: SceneVideoRequest):
         
         success, output_path = await video_service.generate_scene_video(
             chapter=str(request.chapter_number),
-            scene=str(request.scene_number)
+            scene=str(request.scene_number),
+            black_and_white=request.black_and_white
         )
 
         if not success or not output_path:
@@ -658,37 +664,50 @@ async def swap_faces(project_name: str, request: FaceSwapRequest):
         image_service = ImageService(aws_service=aws_service)
         face_service = FaceDetectionService()
 
-        # Decode and save source image temporarily
+        # Create temp directory if it doesn't exist
+        temp_dir = Path("temp") / project_name / "face_swap"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save source image from base64
+        source_path = temp_dir / "source_image.png"
         source_data = base64.b64decode(request.source_image.split(',')[1])
-        temp_source_path = aws_service.temp_dir / "temp_source_image.png"
-        with open(temp_source_path, "wb") as f:
+        with open(source_path, "wb") as f:
             f.write(source_data)
 
         # Get target image path
-        target_path = f"chapter_{request.target_chapter_index}/scene_{request.target_scene_index}/shot_{request.target_shot_index}_{request.target_type}.png"
+        target_path = (
+            f"chapter_{request.target_chapter_index}/"
+            f"scene_{request.target_scene_index}/"
+            f"shot_{request.target_shot_index}_{request.target_type}.png"
+        )
         target_local_path = image_service.get_local_path(target_path)
 
         if not target_local_path.exists():
             raise HTTPException(status_code=404, detail="Target image not found")
 
-        # Perform face swapping
-        result_base64 = await face_service.swap_faces(
-            source_image_path=str(temp_source_path),
-            target_image_path=str(target_local_path)
-        )
+        try:
+            # Perform face swapping
+            result_base64 = await face_service.swap_faces(
+                source_image_path=str(source_path),
+                target_image_path=str(target_local_path)
+            )
 
-        # Save the result
-        result_data = base64.b64decode(result_base64)
-        with open(target_local_path, "wb") as f:
-            f.write(result_data)
+            # Save the result
+            result_data = base64.b64decode(result_base64)
+            with open(target_local_path, "wb") as f:
+                f.write(result_data)
 
-        # Clean up temp file
-        temp_source_path.unlink()
+            return {
+                "status": "success",
+                "base64_image": f"data:image/png;base64,{result_base64}"
+            }
 
-        return {
-            "status": "success",
-            "base64_image": f"data:image/png;base64,{result_base64}"
-        }
+        finally:
+            # Clean up temp files
+            if source_path.exists():
+                source_path.unlink()
+            if temp_dir.exists():
+                temp_dir.rmdir()
 
     except Exception as e:
         logger.error(f"Error swapping faces: {str(e)}")
@@ -711,8 +730,7 @@ async def swap_faces_custom(
     scene_index: int, 
     shot_index: int, 
     type: str,
-    source_images: List[UploadFile] = File(...),
-    swap_instructions: str = Form(...)
+    request: CustomFaceSwapRequest
 ):
     """Swap multiple faces based on custom mapping"""
     try:
@@ -727,27 +745,28 @@ async def swap_faces_custom(
         if not target_local_path.exists():
             raise HTTPException(status_code=404, detail="Target image not found")
 
-        # Parse swap instructions
-        swap_instructions_list = json.loads(swap_instructions)
+        # Create temp directory for source images
+        temp_dir = aws_service.temp_dir / "face_swap_temp"
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save source images temporarily
         source_images_info = []
-        for source_file in source_images:
-            temp_path = aws_service.temp_dir / source_file.filename
-            content = await source_file.read()
-            with open(temp_path, "wb") as f:
-                f.write(content)
-            source_images_info.append({
-                'path': str(temp_path),
-                'name': source_file.filename
-            })
-
         try:
+            # Save source images from base64
+            for idx, base64_img in enumerate(request.source_images):
+                img_data = base64.b64decode(base64_img.split(',')[1])
+                temp_path = temp_dir / f"source_{idx}.png"
+                with open(temp_path, "wb") as f:
+                    f.write(img_data)
+                source_images_info.append({
+                    'path': str(temp_path),
+                    'name': f"source_{idx}.png"
+                })
+
             # Perform face swapping
             result_base64 = await face_service.swap_faces_custom(
                 target_image_path=str(target_local_path),
                 source_images=source_images_info,
-                swap_instructions=swap_instructions_list
+                swap_instructions=request.swap_instructions
             )
 
             if not result_base64:
@@ -755,27 +774,49 @@ async def swap_faces_custom(
 
             # Save the result back to the target path
             result_data = base64.b64decode(result_base64)
+            logger.info(f"Writing swapped image to {target_local_path}")
+            
+            if not result_data:
+                raise ValueError("Empty result data from face swapping")
+                
             with open(target_local_path, "wb") as f:
                 f.write(result_data)
+            
+            if not target_local_path.exists():
+                raise ValueError(f"Failed to write file to {target_local_path}")
+                
+            # Verify file size
+            file_size = target_local_path.stat().st_size
+            logger.info(f"Written file size: {file_size} bytes")
+            if file_size == 0:
+                raise ValueError("Written file is empty")
 
-            # Clean up temp files
-            for source in source_images_info:
-                Path(source['path']).unlink()
+            # Verify image can be read
+            result_img = cv2.imread(str(target_local_path))
+            if result_img is None:
+                raise ValueError("Failed to read written image")
+
+            # Read back and encode the final result
+            with open(target_local_path, "rb") as f:
+                final_base64 = base64.b64encode(f.read()).decode("utf-8")
 
             return {
                 "status": "success",
-                "base64_image": f"data:image/png;base64,{result_base64}"
+                "base64_image": f"data:image/png;base64,{final_base64}"
             }
 
-        except ValueError as ve:
-            raise HTTPException(status_code=400, detail=str(ve))
+        finally:
+            # Clean up temp files
+            for source in source_images_info:
+                try:
+                    Path(source['path']).unlink()
+                except Exception as e:
+                    logger.warning(f"Failed to delete temp file {source['path']}: {e}")
+            try:
+                temp_dir.rmdir()
+            except Exception as e:
+                logger.warning(f"Failed to delete temp directory {temp_dir}: {e}")
 
     except Exception as e:
         logger.error(f"Error in custom face swapping: {str(e)}")
-        # Clean up temp files in case of error
-        try:
-            for source in source_images_info:
-                Path(source['path']).unlink()
-        except:
-            pass
         raise HTTPException(status_code=500, detail=str(e))
