@@ -374,10 +374,32 @@ const Scene: React.FC<SceneProps> = ({
                   chapterIndex={chapterIndex}
                   sceneIndex={sceneIndex}
                   shotIndex={shotIndex}
-                  onInstructionsUpdated={(newInstructions) => {
-                    const updatedScript = JSON.parse(JSON.stringify(script));
-                    updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].director_instructions = newInstructions;
-                    setScript(updatedScript);
+                  onInstructionsUpdated={async (newInstructions) => {
+                    try {
+                      const response = await fetch(`http://localhost:8000/api/update-shot-description/${projectName}`, {
+                        method: 'PUT',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          chapter_index: chapterIndex + 1,
+                          scene_index: sceneIndex + 1,
+                          shot_index: shotIndex + 1,
+                          action: 'director_instructions',
+                          description: newInstructions,
+                        }),
+                      });
+
+                      if (!response.ok) {
+                        throw new Error('Failed to update director instructions');
+                      }
+
+                      // Don't update the script state here, let the local state handle the update
+                      return Promise.resolve();
+                    } catch (error) {
+                      console.error('Error updating director instructions:', error);
+                      throw error;
+                    }
                   }}
                 />
 

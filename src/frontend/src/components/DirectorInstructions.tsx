@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Text, 
@@ -16,7 +16,7 @@ interface DirectorInstructionsProps {
   chapterIndex: number;
   sceneIndex: number;
   shotIndex: number;
-  onInstructionsUpdated: (newInstructions: string) => void;
+  onInstructionsUpdated: (newInstructions: string) => Promise<void>;
 }
 
 const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({ 
@@ -30,31 +30,22 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editedInstructions, setEditedInstructions] = useState(instructions || '');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [localInstructions, setLocalInstructions] = useState(instructions || '');
   const toast = useToast();
+
+  useEffect(() => {
+    if (instructions !== undefined) {
+      setLocalInstructions(instructions);
+      setEditedInstructions(instructions);
+    }
+  }, [instructions]);
 
   const handleSave = async () => {
     try {
       setIsUpdating(true);
       
-      const response = await fetch(`http://localhost:8000/api/update-shot-description/${projectName}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chapter_index: chapterIndex + 1,
-          scene_index: sceneIndex + 1,
-          shot_index: shotIndex + 1,
-          action: 'director_instructions',
-          description: editedInstructions,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update director instructions');
-      }
-
-      onInstructionsUpdated(editedInstructions);
+      await onInstructionsUpdated(editedInstructions);
+      setLocalInstructions(editedInstructions);
       setIsEditing(false);
       
       toast({
@@ -78,7 +69,7 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
     }
   };
 
-  if (!instructions && !isEditing) {
+  if (!localInstructions && !isEditing) {
     return null;
   }
 
@@ -107,7 +98,7 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
             <Button
               size="sm"
               onClick={() => {
-                setEditedInstructions(instructions || '');
+                setEditedInstructions(localInstructions);
                 setIsEditing(false);
               }}
             >
@@ -124,7 +115,7 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
           </HStack>
         </>
       ) : (
-        <Text color="blue.800">{instructions}</Text>
+        <Text color="blue.800">{localInstructions}</Text>
       )}
     </Box>
   );

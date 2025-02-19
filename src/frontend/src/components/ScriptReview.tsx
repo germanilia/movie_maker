@@ -25,7 +25,7 @@ import Scene from './Scene';
 
 interface ScriptReviewProps {
   script: Script | null;
-  setScript: (script: Script | null) => void;
+  setScript: React.Dispatch<React.SetStateAction<Script | null>>;
   onNext: () => void;
   onBack: () => void;
   projectName: string;
