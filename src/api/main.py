@@ -873,23 +873,23 @@ async def regenerate_scene(
             raise HTTPException(status_code=400, detail="Invalid scene index")
         
         # Regenerate the scene
-        new_scene = await director.regenerate_scene(
+        script = await director.regenerate_scene(
             script=script,
             chapter_index=chapter_idx,
             scene_index=scene_idx
         )
         
-        # Initialize scenes list if None
-        if script.chapters[chapter_idx].scenes is None:
-            script.chapters[chapter_idx].scenes = []
+        # # Initialize scenes list if None
+        # if script.chapters[chapter_idx].scenes is None:
+        #     script.chapters[chapter_idx].scenes = []
             
-        # Update the script with the new scene
-        scenes = script.chapters[chapter_idx].scenes or []  # Ensure we have a list
-        if scene_idx >= len(scenes):
-            scenes.append(new_scene)
-        else:
-            scenes[scene_idx] = new_scene
-        script.chapters[chapter_idx].scenes = scenes
+        # # Update the script with the new scene
+        # scenes = script.chapters[chapter_idx].scenes or []  # Ensure we have a list
+        # if scene_idx >= len(scenes):
+        #     scenes.append(new_scene)
+        # else:
+        #     scenes[scene_idx] = new_scene
+        # script.chapters[chapter_idx].scenes = scenes
         
         # Save the updated script
         await director.save_script(script)

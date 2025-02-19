@@ -120,7 +120,7 @@ class DirectorService:
         return scenes
 
     def _get_previous_scenes_instructions(
-        self, chapter: Chapter, total_scenes: int
+        self, chapter: Chapter, total_scenes: int, current_scene:int
     ) -> str:
         """Get director instructions from previous shots or return 'N/A' if none exist."""
         if not chapter.scenes:
@@ -130,6 +130,8 @@ class DirectorService:
         previous_narration_text = []
         previous_reasoning = []
         for scene in chapter.scenes:
+            if scene.scene_number == current_scene:
+                break
             if scene.main_story:
                 previous_main_story.append(
                     f"Scene {scene.scene_number}: {scene.main_story}"
@@ -226,6 +228,7 @@ class DirectorService:
                                 previous_scenes=self._get_previous_scenes_instructions(
                                     chapter=chapter,
                                     total_scenes=script.project_details.number_of_scenes,
+                                    current_scene=scene.scene_number,
                                 ),
                                 previous_generation_error=prev_error,
                             )
@@ -438,7 +441,7 @@ class DirectorService:
         chapter_index: int,
         scene_index: int,
         max_retries: int = 10,
-    ) -> Scene:
+    ) -> Script:
         """Regenerate a specific scene while maintaining context."""
         chapter = script.chapters[chapter_index]
         prev_error = "N/A"
@@ -461,6 +464,7 @@ class DirectorService:
                 previous_scenes=self._get_previous_scenes_instructions(
                     chapter=chapter,
                     total_scenes=script.project_details.number_of_scenes,
+                    current_scene=scene_index,
                 ),
                 scene_number=scene_index + 1,
                 number_of_scenes=script.project_details.number_of_scenes,
@@ -476,8 +480,8 @@ class DirectorService:
             
             # Initialize empty shots list to maintain consistency
             new_scene.shots = []
-            
-            return new_scene
+            script = await self.generate_shots(script, script.project_details.number_of_shots)
+            return script
 
         except json.JSONDecodeError as e:
             error_msg = f"JSON parsing error for scene regeneration: {str(e)}"
