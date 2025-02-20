@@ -50,6 +50,7 @@ class DirectorService:
     async def generate_scenes(
         self,
         request: ProjectDetails,
+        chapters: list[Chapter],
         chapter: Chapter,
         max_retries: int = 10,
     ) -> List[Scene]:
@@ -76,7 +77,11 @@ class DirectorService:
                         movie_general_instructions=request.movie_general_instructions,
                         story_background=request.story_background,
                         chapter_high_level_description=chapter.chapter_description,
-                        previous_scenes=scenes,
+                        previous_scenes_and_chapters=self._get_previous_scenes_instructions(
+                            chapters=chapters,
+                            total_scenes=request.number_of_scenes,
+                            current_scene=scene_number,
+                        ),
                         scene_number=scene_number + 1,
                         number_of_scenes=request.number_of_scenes,
                         narration_instructions=request.narration_instructions,
@@ -120,41 +125,69 @@ class DirectorService:
         return scenes
 
     def _get_previous_scenes_instructions(
-        self, chapter: Chapter, total_scenes: int, current_scene:int
+        self, chapters: list[Chapter], total_scenes: int, current_scene: int
     ) -> str:
-        """Get director instructions from previous shots or return 'N/A' if none exist."""
-        if not chapter.scenes:
+        """Get instructions from all previous scenes across chapters."""
+        if not chapters:
             return "N/A"
 
         previous_main_story = []
         previous_narration_text = []
         previous_reasoning = []
-        for scene in chapter.scenes:
-            if current_scene + 1 <= scene.scene_number:
-                break
-            if scene.main_story:
-                previous_main_story.append(
-                    f"Scene {scene.scene_number}: {scene.main_story}"
-                )
+        current_chapter_found = False
 
-            if scene.narration_text:
-                previous_narration_text.append(
-                    f"Scene {scene.scene_number}: {scene.narration_text}"
-                )
+        for chapter in chapters:
+            # Add chapter context
+            chapter_context = f"\nChapter {chapter.chapter_number} - {chapter.chapter_title}: {chapter.chapter_description}"
+            previous_main_story.append(chapter_context)
 
-            if scene.reasoning:
-                previous_reasoning.append(
-                    f"Scene {scene.scene_number}: {scene.reasoning}"
-                )
+            if not chapter.scenes:
+                continue
 
-        response = f"Scene number:{scene.scene_number}/{total_scenes} In chapter number: {chapter.chapter_number}\n"
-        response += "\n".join(previous_main_story)
-        response += "\n".join(previous_reasoning)
-        response += "\n".join(previous_narration_text)
-        return response
+            for scene in chapter.scenes:
+                # Stop if we've reached the current scene in the current chapter
+                if scene.scene_number > current_scene and current_chapter_found:
+                    break
+
+                if scene.main_story:
+                    previous_main_story.append(
+                        f"Scene {scene.scene_number} main story: {scene.main_story}"
+                    )
+
+                if scene.narration_text:
+                    previous_narration_text.append(
+                        f"Scene {scene.scene_number} narration: {scene.narration_text}"
+                    )
+
+                if scene.reasoning:
+                    previous_reasoning.append(
+                        f"Scene {scene.scene_number} reasoning: {scene.reasoning}"
+                    )
+
+                if scene.shots:
+                    for shot in scene.shots:
+                        if shot.director_instructions:
+                            previous_reasoning.append(
+                                f"Shot {shot.shot_number}/{len(scene.shots)} in scene {scene.scene_number}/{total_scenes} director instructions: {shot.director_instructions}"
+                            )
+
+        response = []
+        if previous_main_story:
+            response.append("Previous Story Context:")
+            response.extend(previous_main_story)
+
+        if previous_reasoning:
+            response.append("\nPrevious Scene Reasoning:")
+            response.extend(previous_reasoning)
+
+        if previous_narration_text:
+            response.append("\nPrevious Narration:")
+            response.extend(previous_narration_text)
+
+        return "\n".join(response)
 
     def _get_previous_shots_instructions(
-        self, scene: Scene, chapter: Chapter, script: Script, current_shot_number:int
+        self, scene: Scene, chapter: Chapter, script: Script, current_shot_number: int
     ) -> str:
         """Get director instructions from previous shots or return 'N/A' if none exist."""
         if not scene.shots:
@@ -191,7 +224,10 @@ class DirectorService:
                     # Calculate how many shots we need to generate
                     existing_shots = len(scene.shots)
 
-                    if not regenerate and existing_shots >= script.project_details.number_of_shots:
+                    if (
+                        not regenerate
+                        and existing_shots >= script.project_details.number_of_shots
+                    ):
                         logger.info(
                             f"Scene {scene.scene_number} already has all required shots"
                         )
@@ -226,13 +262,13 @@ class DirectorService:
                                 general_scene_description_and_motivations=scene.main_story,
                                 story_background=script.project_details.story_background,
                                 chapter_high_level_description=chapter.chapter_description,
-                                previous_shots=self._get_previous_shots_instructions(
-                                    scene=scene, script=script, chapter=chapter, current_shot_number=i
-                                ),
-                                previous_scenes=self._get_previous_scenes_instructions(
-                                    chapter=chapter,
+                                # previous_shots=self._get_previous_shots_instructions(
+                                #     scene=scene, script=script, chapter=chapter, current_shot_number=i
+                                # ),
+                                previous_scenes_and_chapters=self._get_previous_scenes_instructions(
+                                    chapters=script.chapters,
                                     total_scenes=script.project_details.number_of_scenes,
-                                    current_scene=scene.scene_number-1,
+                                    current_scene=scene.scene_number - 1,
                                 ),
                                 previous_generation_error=prev_error,
                             )
@@ -362,13 +398,17 @@ class DirectorService:
         logger.info(f"Generated {len(chapters)} chapters")
 
         # Generate scenes and shots for each chapter
+        previous_chapters = []
         for chapter in chapters:
             logger.info(
                 f"\nGenerating scenes for chapter {chapter.chapter_number}: {chapter.chapter_title}"
             )
             scenes = await self.generate_scenes(
-                request, chapter, request.number_of_scenes
+                request=request,
+                chapters=previous_chapters,
+                chapter=chapter,
             )
+            previous_chapters.append(chapter)
             chapter.scenes = scenes
             logger.info(
                 f"Generated {len(scenes)} scenes for chapter {chapter.chapter_number}"
@@ -449,7 +489,7 @@ class DirectorService:
         """Regenerate a specific scene while maintaining context."""
         chapter = script.chapters[chapter_index]
         prev_error = "N/A"
-        
+
         prompt_template = await self._load_prompt(
             script.project_details.genre, "single_scene_generation_prompt.txt"
         )
@@ -465,8 +505,8 @@ class DirectorService:
                 movie_general_instructions=script.project_details.movie_general_instructions,
                 story_background=script.project_details.story_background,
                 chapter_high_level_description=chapter.chapter_description,
-                previous_scenes=self._get_previous_scenes_instructions(
-                    chapter=chapter,
+                previous_scenes_and_chapters=self._get_previous_scenes_instructions(
+                    chapters=script.chapters,
                     total_scenes=script.project_details.number_of_scenes,
                     current_scene=scene_index,
                 ),
@@ -476,15 +516,15 @@ class DirectorService:
                 previous_generation_error=prev_error,
             )
 
-            response = await self.aws_service.invoke_llm(
-                prompt, prev_errors=prev_error
-            )
+            response = await self.aws_service.invoke_llm(prompt, prev_errors=prev_error)
             new_scene = Scene(**json.loads(response))
             new_scene.scene_number = scene_index + 1
-            
+
             # Initialize empty shots list to maintain consistency
             new_scene.shots = []
-            script = await self.generate_shots(script, script.project_details.number_of_shots, True)
+            script = await self.generate_shots(
+                script, script.project_details.number_of_shots, True
+            )
             return script
 
         except json.JSONDecodeError as e:

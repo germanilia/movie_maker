@@ -8,8 +8,8 @@ story background:
 chapter_high_level_description:
 {chapter_high_level_description}
 ####
-previously generated scenes:
-{previous_scenes}
+previously generated scenes and chapters:
+{previous_scenes_and_chapters}
 ####
 current Scene Number: {scene_number}/{number_of_scenes}
 ####
@@ -21,6 +21,7 @@ Based on the story background, chapter description, and maintaining continuity w
 Need to make sure the plot continues and doesn't repeat what once already mentioned in the previous scene.
 
 If there are previous scenes make sure you continue the story line, don't  repeat yourself, continue to make progress to cover all the required main events.
+Avoid showing images and events already happened in previous scenes or shots.
 If this is the opening or closing scene of the chapter, give it attention, and make sure it continues the logic and story line from previous scenes
 If this is the firs scene of the first chapter, there are none to continue, and just make sure you are on topic and follow instructions.
 

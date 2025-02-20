@@ -21,14 +21,12 @@ Story Background:
 Chapter Overview:
 {chapter_high_level_description}
 
-Previous Scenes:
-{previous_scenes}
-
-Previous Shots in Scene:
-{previous_shots}
+Previous Scenes And chapters:
+{previous_scenes_and_chapters}
 
 Previous Generation Issues:
 {previous_generation_error}
+
 
 The opening and closing images, are still photos which are the first and last frames for the shot, it needs to keep
 consistency, in clothing, characters, age, time frame etc.
@@ -43,6 +41,7 @@ The flow should be with minimal transitions and should focus on slow and delicat
 The instructions should provide the scene based on the opening_frame and reasoning, and describe the clothing and character descriptions for consistency purposes.
 each director instruction must contain all the information required and it should not explicitly mention the previous scenes / shots.
 the instructions must advance the plot and not repeat itself.
+The instructions must reflect the narration text
 
 There are some issues regarding camera movement, nee to use instructions like slow camera movement, steady camera and similar.
 
@@ -72,14 +71,14 @@ Notes:
 - Avoid "...Same garden, minutes later..." descriptions, during the image generation there is no access to the previous descriptions 
 - No need to add addresses to the descriptions it doesn't really help
 - Inside the same living room is a bad description, need to describe provide the full description and not a reference 
-
+- The shot must reflect the narration text
 avoid repeating the closing  
 
 Output Format:
 {{
   "reasoning":  "This is the reasoning, based on the instructions above",
-  "opening_frame": "The first frame of the shot",
-  "director_instructions": "The director instructions for this shot based on previous shots and the frames description",
+  "opening_frame": "The first frame of the shot based on the reasoning and the narration of this scene",
+  "director_instructions": "The director instructions for this shot, it should reflect the narration and the events happening in this shot",
 }}
 
 
