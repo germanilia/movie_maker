@@ -92,7 +92,7 @@ class RunwayMLVideoService(BaseVideoService):
 
             logger.info("Calling RunwayML API for video generation")
 
-            images = prompt_images[0]["uri"]
+            images = f"data:image/jpeg;base64,{prompt_images[0]['uri']}"
             image_to_video = self.client.image_to_video.create(
                 model=self.video_model.model_name,
                 prompt_image=images,

@@ -130,7 +130,7 @@ class DirectorService:
         previous_narration_text = []
         previous_reasoning = []
         for scene in chapter.scenes:
-            if scene.scene_number == current_scene:
+            if current_scene + 1 <= scene.scene_number:
                 break
             if scene.main_story:
                 previous_main_story.append(
@@ -154,7 +154,7 @@ class DirectorService:
         return response
 
     def _get_previous_shots_instructions(
-        self, scene: Scene, chapter: Chapter, script: Script
+        self, scene: Scene, chapter: Chapter, script: Script, current_shot_number:int
     ) -> str:
         """Get director instructions from previous shots or return 'N/A' if none exist."""
         if not scene.shots:
@@ -162,6 +162,8 @@ class DirectorService:
 
         previous_instructions = []
         for shot in scene.shots:
+            if current_shot_number + 1 <= shot.shot_number:
+                break
             if shot.director_instructions:
                 previous_instructions.append(
                     f"Shot {shot.shot_number}/{script.project_details.number_of_shots} in scene {scene.scene_number}/{script.project_details.number_of_scenes} in chapter {chapter.chapter_number}/{script.project_details.number_of_chapters} director instructions : {shot.director_instructions}\nShot {shot.shot_number}/{script.project_details.number_of_shots}"
@@ -173,6 +175,7 @@ class DirectorService:
         self,
         script: Script,
         max_retries: int = 10,
+        regenerate: bool = False,
     ) -> Script:
         """Generate shots for a specific scene with retry mechanism."""
         prompt_template = await self._load_prompt(
@@ -188,12 +191,13 @@ class DirectorService:
                     # Calculate how many shots we need to generate
                     existing_shots = len(scene.shots)
 
-                    if existing_shots >= script.project_details.number_of_shots:
+                    if not regenerate and existing_shots >= script.project_details.number_of_shots:
                         logger.info(
                             f"Scene {scene.scene_number} already has all required shots"
                         )
                         continue
-
+                    if regenerate:
+                        existing_shots = 0
                     remaining_attempts = max_retries
                     prev_error = "N/A"
                     for i in range(
@@ -201,7 +205,7 @@ class DirectorService:
                     ):
                         try:
                             logger.info(
-                                f"Shot generation attempt {max_retries - remaining_attempts + 1}/{max_retries}"
+                                f"Shot generation attempt chapter: {chapter.chapter_number}, scene: {scene.scene_number} shot: {i} attempt: {max_retries - remaining_attempts + 1}/{max_retries}"
                             )
                             prompt = await self._format_prompt(
                                 prompt_template,
@@ -223,12 +227,12 @@ class DirectorService:
                                 story_background=script.project_details.story_background,
                                 chapter_high_level_description=chapter.chapter_description,
                                 previous_shots=self._get_previous_shots_instructions(
-                                    scene=scene, script=script, chapter=chapter
+                                    scene=scene, script=script, chapter=chapter, current_shot_number=i
                                 ),
                                 previous_scenes=self._get_previous_scenes_instructions(
                                     chapter=chapter,
                                     total_scenes=script.project_details.number_of_scenes,
-                                    current_scene=scene.scene_number,
+                                    current_scene=scene.scene_number-1,
                                 ),
                                 previous_generation_error=prev_error,
                             )
@@ -480,7 +484,7 @@ class DirectorService:
             
             # Initialize empty shots list to maintain consistency
             new_scene.shots = []
-            script = await self.generate_shots(script, script.project_details.number_of_shots)
+            script = await self.generate_shots(script, script.project_details.number_of_shots, True)
             return script
 
         except json.JSONDecodeError as e:
