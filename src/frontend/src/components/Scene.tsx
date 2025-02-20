@@ -126,16 +126,35 @@ const Scene: React.FC<SceneProps> = ({
   const areAllElementsPresent = () => {
     const hasNarration = !!narrationData[`${chapterNumber}-${scene.scene_number}`];
     const hasBackgroundMusic = !!backgroundMusicData[`${chapterNumber}-${scene.scene_number}`];
+
+    // Check if all shots have both their videos and images
     const allShotsComplete = scene.shots?.every((shot) => {
+      // Check video
       const shotVideoKey = `${chapterNumber}-${scene.scene_number}-${shot.shot_number}`;
+      const hasVideo = !!videoData[shotVideoKey];
+
+      // Check images
       const openingImageKey = getImageKey(chapterIndex, sceneIndex, shot.shot_number - 1, 'opening');
-      const closingImageKey = getImageKey(chapterIndex, sceneIndex, shot.shot_number - 1, 'closing');
-      return (
-        !!videoData[shotVideoKey] &&
-        !!imageData[openingImageKey] &&
-        !!imageData[closingImageKey]
-      );
+      const hasOpeningImage = !!imageData[openingImageKey];
+
+      // Log for debugging
+      console.log(`Shot ${shot.shot_number} status:`, {
+        hasVideo,
+        hasOpeningImage,
+        videoKey: shotVideoKey,
+        imageKey: openingImageKey
+      });
+
+      return hasVideo && hasOpeningImage;
     }) ?? false;
+
+    // Log overall status
+    console.log('Scene completion status:', {
+      hasNarration,
+      hasBackgroundMusic,
+      allShotsComplete,
+      sceneNumber: scene.scene_number
+    });
 
     return hasNarration && hasBackgroundMusic && allShotsComplete;
   };
@@ -258,7 +277,7 @@ const Scene: React.FC<SceneProps> = ({
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      
+
       try {
         const a = document.createElement('a');
         a.href = url;
