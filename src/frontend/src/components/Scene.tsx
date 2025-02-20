@@ -252,7 +252,87 @@ const Scene: React.FC<SceneProps> = ({
     console.groupEnd();
   }, [imageData, videoData, narrationData, backgroundMusicData]);
 
+  const getMissingElements = () => {
+    const missingElements: string[] = [];
+    
+    // Check narration
+    if (!narrationData[`${chapterNumber}-${scene.scene_number}`]) {
+      missingElements.push('Narration');
+    }
+    
+    // Check background music
+    if (!backgroundMusicData[`${chapterNumber}-${scene.scene_number}`]) {
+      missingElements.push('Background Music');
+    }
+
+    // Check shots for videos and images
+    scene.shots?.forEach((shot) => {
+      const shotVideoKey = `${chapterNumber}-${scene.scene_number}-${shot.shot_number}`;
+      const openingImageKey = getImageKey(chapterIndex, sceneIndex, shot.shot_number - 1, 'opening');
+      
+      // Debug logging for video data
+      console.log('Checking video for shot:', {
+        shotVideoKey,
+        videoExists: !!videoData[shotVideoKey],
+        videoData: videoData[shotVideoKey],
+        allVideoKeys: Object.keys(videoData)
+      });
+
+      // Check if video exists and is not an empty string
+      if (!videoData[shotVideoKey] || videoData[shotVideoKey].trim() === '') {
+        missingElements.push(`Video for Shot ${shot.shot_number}`);
+      }
+
+      // Debug logging for image data
+      console.log('Checking image for shot:', {
+        openingImageKey,
+        imageExists: !!imageData[openingImageKey],
+        imageData: imageData[openingImageKey]
+      });
+
+      if (!imageData[openingImageKey] || imageData[openingImageKey].trim() === '') {
+        missingElements.push(`Image for Shot ${shot.shot_number}`);
+      }
+    });
+
+    // Debug log the final result
+    console.log('Missing elements check result:', {
+      missingElements,
+      narrationKey: `${chapterNumber}-${scene.scene_number}`,
+      hasNarration: !!narrationData[`${chapterNumber}-${scene.scene_number}`],
+      hasBackgroundMusic: !!backgroundMusicData[`${chapterNumber}-${scene.scene_number}`]
+    });
+
+    return missingElements;
+  };
+
   const handleGenerateSceneVideo = async () => {
+    const missingElements = getMissingElements();
+    
+    // Debug log the video data before checking missing elements
+    console.log('Video data before generation:', {
+      videoData,
+      scene: {
+        chapterNumber,
+        sceneNumber: scene.scene_number,
+        shots: scene.shots?.map(shot => ({
+          shotNumber: shot.shot_number,
+          videoKey: `${chapterNumber}-${scene.scene_number}-${shot.shot_number}`
+        }))
+      }
+    });
+    
+    if (missingElements.length > 0) {
+      toast({
+        title: 'Missing Elements',
+        description: `Cannot generate scene video. Missing: ${missingElements.join(', ')}`,
+        status: 'error',
+        duration: 7000,
+        isClosable: true,
+      });
+      return;
+    }
+
     setIsGeneratingSceneVideo(true);
     try {
       const response = await fetch(
@@ -402,7 +482,6 @@ const Scene: React.FC<SceneProps> = ({
             </Button>
             <Button
               colorScheme="green"
-              isDisabled={!areAllElementsPresent()}
               isLoading={isGeneratingSceneVideo}
               loadingText="Generating Scene Video"
               onClick={handleGenerateSceneVideo}
