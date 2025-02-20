@@ -11,6 +11,15 @@ import {
   useToast,
   Switch,
   AspectRatio,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  Textarea,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { Scene as SceneType, Shot, Script } from '../models/models';
 import BackgroundMusic from './BackgroundMusic';
@@ -166,6 +175,9 @@ const Scene: React.FC<SceneProps> = ({
 
   const [isLoadingVideo, setIsLoadingVideo] = React.useState(false);
   const [finalSceneVideoUrl, setFinalSceneVideoUrl] = React.useState<string | null>(null);
+
+  const [regenerateInstructions, setRegenerateInstructions] = React.useState('');
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   // Effect to fetch video URL when video data is available
   React.useEffect(() => {
@@ -403,6 +415,7 @@ const Scene: React.FC<SceneProps> = ({
           body: JSON.stringify({
             chapter_index: chapterIndex + 1,
             scene_index: sceneIndex + 1,
+            instructions: regenerateInstructions,
           }),
         }
       );
@@ -414,6 +427,8 @@ const Scene: React.FC<SceneProps> = ({
 
       const updatedScript = await response.json();
       onScriptUpdate(updatedScript);
+      onClose();
+      setRegenerateInstructions('');
 
       toast({
         title: 'Success',
@@ -446,6 +461,40 @@ const Scene: React.FC<SceneProps> = ({
       </AccordionButton>
       <AccordionPanel pb={4}>
         <VStack spacing={4} align="stretch">
+          {/* Modal for regeneration instructions */}
+          <Modal isOpen={isOpen} onClose={onClose}>
+            <ModalOverlay />
+            <ModalContent>
+              <ModalHeader>Scene Regeneration Instructions</ModalHeader>
+              <ModalCloseButton />
+              <ModalBody>
+                <Text mb={4}>
+                  Enter any specific instructions for regenerating this scene. These instructions will help guide the AI in creating a new version of the scene.
+                </Text>
+                <Textarea
+                  value={regenerateInstructions}
+                  onChange={(e) => setRegenerateInstructions(e.target.value)}
+                  placeholder="Enter instructions for scene regeneration..."
+                  size="lg"
+                  rows={6}
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="ghost" mr={3} onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  colorScheme="blue"
+                  onClick={handleRegenerateScene}
+                  isLoading={isRegeneratingScene}
+                  loadingText="Regenerating Scene"
+                >
+                  Regenerate
+                </Button>
+              </ModalFooter>
+            </ModalContent>
+          </Modal>
+
           {/* Final scene video display */}
           {(finalSceneVideoUrl || isLoadingVideo) && (
             <Box borderWidth="1px" borderRadius="md" p={4} bg="white">
@@ -476,7 +525,7 @@ const Scene: React.FC<SceneProps> = ({
               colorScheme="blue"
               isLoading={isRegeneratingScene}
               loadingText="Regenerating Scene"
-              onClick={handleRegenerateScene}
+              onClick={onOpen}
             >
               Regenerate Scene
             </Button>

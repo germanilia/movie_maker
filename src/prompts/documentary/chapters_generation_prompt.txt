@@ -1,33 +1,29 @@
-Generate artistic instructions for a {genre} screenplay about "{subject}". 
-special instructions:
+Generate chapter outline for a {genre} movie about "{subject}".
+Number of chapters: {number_of_chapters}
+Number of scenes per chapter: {number_of_scenes}
+special instructions: 
 {movie_general_instructions}
 #####
-story background: 
+story background:
 {story_background}
 ####
+complete script context (if regenerating):
+{complete_script}
+####
+Previous Generation Error:
+{previous_generation_error}
+####
 
-Total number of requested chapters: {number_of_chapters}
-Total number of requested scenes per chapter {number_of_scenes}
+Based on the story background, number of scenes, and complete script context (if regenerating), create detailed chapter descriptions that follow a clear narrative arc.
 
-
-Based on the story background, create a list of chapters for the screenplay.
-Each chapter should contain the high level description of the chapter, the key events and the main characters.
-The requested number of chapters is {number_of_chapters}. These chapters must cover the entire story and be in chronological order.
-
-The chapters should start with a more calm and natural tone, the first chapter should be a prologue.
-As the story progresses, the chapters should become more engaging and interesting.
-
-chapter_description should provide a detailed overview of what happens in the chapter, it should tell the main events of the chapter
-in a detailed way, it should also mention the time of the chapter, i.e. spring 1938 amsterdam holland
-
-Output Structure:
-{{
+Output format should be a JSON object containing an array of chapters:
+{
   "chapters": [
-    {{
-      "reasoning": "This string represents the logic for creating the chapter content, it needs to take under consideration the number of requested chapters, each chapter has scenes
-      the number of events needs to match this, describe in details the reasoning process lead to the decisions and considerations for creating the chapters."
-      "chapter_title": "This string will represent the title of the chapter",
-      "chapter_description": "A string describing the high level events which will take place in this chapter",
-    }}
+    {
+      "chapter_number": 1,
+      "chapter_title": "Title of chapter 1",
+      "chapter_description": "Detailed description of what this chapter covers"
+    }
+    // ... more chapters
   ]
-}}
+}

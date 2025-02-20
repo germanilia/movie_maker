@@ -19,12 +19,7 @@ from src.services.face_detection_service import FaceDetectionService
 import os
 from pydantic import BaseModel
 import base64
-from fastapi import UploadFile, File, Form
-import json
-
 import cv2
-import numpy as np
-import matplotlib.pyplot as plt
 
 # Configure logging
 logging.basicConfig(
@@ -845,6 +840,7 @@ async def swap_faces_custom(
 class RegenerateSceneRequest(BaseModel):
     chapter_index: int
     scene_index: int
+    instructions: str | None = None  # Optional instructions for scene regeneration
 
 @app.post("/api/regenerate-scene/{project_name}")
 async def regenerate_scene(
@@ -872,33 +868,32 @@ async def regenerate_scene(
         if not script.chapters[chapter_idx].scenes or scene_idx >= len(script.chapters[chapter_idx].scenes or []) or scene_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid scene index")
         
-        # Regenerate the scene
-        script = await director.regenerate_scene(
-            script=script,
-            chapter_index=chapter_idx,
-            scene_index=scene_idx
-        )
-        
-        # # Initialize scenes list if None
-        # if script.chapters[chapter_idx].scenes is None:
-        #     script.chapters[chapter_idx].scenes = []
+        try:
+            # Regenerate the scene with custom instructions if provided
+            script = await director.regenerate_scene(
+                script=script,
+                chapter_index=chapter_idx,
+                scene_index=scene_idx,
+                custom_instructions=request.instructions
+            )
             
-        # # Update the script with the new scene
-        # scenes = script.chapters[chapter_idx].scenes or []  # Ensure we have a list
-        # if scene_idx >= len(scenes):
-        #     scenes.append(new_scene)
-        # else:
-        #     scenes[scene_idx] = new_scene
-        # script.chapters[chapter_idx].scenes = scenes
+            await director.save_script(script)
+            
+            return script
+            
+        except ValueError as ve:
+            # Convert ValueError to HTTPException with the error message
+            raise HTTPException(status_code=500, detail=str(ve))
         
-        # Save the updated script
-        await director.save_script(script)
-        
-        return script
-        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Failed to regenerate scene: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred while regenerating the scene: {str(e)}"
+        )
 
 @app.get("/api/get-scene-video/{project_name}/{chapter_number}/{scene_number}")
 async def get_scene_video(
@@ -925,4 +920,44 @@ async def get_scene_video(
     except Exception as e:
         logger.error(f"Error getting scene video: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-# 
+
+class RegenerateChapterRequest(BaseModel):
+    chapter_index: int
+    instructions: str | None = None  # Optional instructions for chapter regeneration
+
+@app.post("/api/regenerate-chapter/{project_name}")
+async def regenerate_chapter(
+    project_name: str,
+    request: RegenerateChapterRequest
+) -> Script:
+    """Regenerate a specific chapter in the script"""
+    try:
+        director = DirectorService(
+            aws_service=AWSService(project_name=project_name),
+            project_name=project_name,
+        )
+        script = await director.get_script()
+        
+        if not script or not script.chapters:
+            raise HTTPException(status_code=404, detail="Script or chapters not found")
+            
+        # Convert 1-based index to 0-based
+        chapter_idx = request.chapter_index - 1
+            
+        if chapter_idx >= len(script.chapters) or chapter_idx < 0:
+            raise HTTPException(status_code=400, detail="Invalid chapter index")
+        
+        # Regenerate the chapter with custom instructions if provided
+        script = await director.regenerate_chapter(
+            script=script,
+            chapter_index=chapter_idx,
+            custom_instructions=request.instructions
+        )
+        
+        await director.save_script(script)
+        
+        return script
+        
+    except Exception as e:
+        logger.error(f"Failed to regenerate chapter: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

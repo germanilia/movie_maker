@@ -5,16 +5,19 @@ special instructions:
 story background: 
 {story_background}
 ####
-previously generated chapters:
-{previous_chapters}
+complete script context:
+{complete_script}
 ####
 regeneration_instructions:
 {regeneration_instructions}
 ####
+Previous Generation Error:
+{previous_generation_error}
+####
 
-Based on the story background and maintaining continuity with the previously generated chapters, create the next chapter for the screenplay.
+Based on the story background and complete script context, create the next chapter for the screenplay.
 The chapter should contain a high level description, key events, and main characters.
-The chapter must follow chronologically from the previous chapters and maintain the story's progression.
+The chapter must follow chronologically from any existing chapters and maintain the story's progression.
 Pay special attention to the regeneration instructions to address any specific changes or improvements requested.
 
 As the story progresses, the chapter should become more engaging and interesting than the previous ones.

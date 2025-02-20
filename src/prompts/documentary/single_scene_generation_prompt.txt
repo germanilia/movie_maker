@@ -5,44 +5,46 @@ special instructions:
 story background: 
 {story_background}
 ####
+complete script context:
+{complete_script}
+####
 chapter_high_level_description:
 {chapter_high_level_description}
 ####
-previously generated scenes and chapters:
-{previous_scenes_and_chapters}
-####
 current Scene Number: {scene_number}/{number_of_scenes}
+####
+regeneration instructions are the most IMPORTANT instructions if provided:
+{regeneration_instructions}
 ####
 Previous Generation Error:
 {previous_generation_error}
 ####
 
-Based on the story background, chapter description, and maintaining continuity with the previously generated scenes, create the next scene for this chapter.
-Need to make sure the plot continues and doesn't repeat what once already mentioned in the previous scene.
+Based on the story background, chapter description, and maintaining continuity with the complete script context, create the next scene for this chapter.
+If regeneration instructions are provided, make sure to follow them while maintaining continuity with the rest of the script.
 
-If there are previous scenes make sure you continue the story line, don't  repeat yourself, continue to make progress to cover all the required main events.
-Avoid showing images and events already happened in previous scenes or shots.
-If this is the opening or closing scene of the chapter, give it attention, and make sure it continues the logic and story line from previous scenes
-If this is the firs scene of the first chapter, there are none to continue, and just make sure you are on topic and follow instructions.
+Need to make sure the plot continues and doesn't repeat what was already mentioned in the previous scenes.
+If this is the opening or closing scene of the chapter, give it attention, and make sure it continues the logic and storyline from previous scenes.
 
 Follow the chapter's narrative, and the storyline, do not deviate and make sure the things you are covering have not been already.
-But still avoid repetition when the end of the pervious chapter overlaps.
+But still avoid repetition when the end of the previous chapter overlaps.
 
-You are required to provide solid reasoning on the selections in the scene, it needs to avoid repeating and progress the plot
-It should stick to the narrative of the chapter, and make sure to progress from the previous scene / shots.
+You are required to provide solid reasoning on the selections in the scene, it needs to avoid repeating and progress the plot.
+It should stick to the narrative of the chapter, and make sure to progress from the previous scenes.
 
 In the reasoning explain how this scene continues from where the previous scene ended, and also provide explanation
 on how this scene corresponds to the other instructions.
 
-If provided with the next scenes, it means you are operating in regenerate mode, so you need to pay attention to the following scenes, 
-so you don't overlap with them as well
+The output MUST be a valid JSON object with exactly these fields:
 
-Output Structure:
+{regeneration_instructions}
+
+The response must start with a {{ and end with }} nothing is allowed before or after
 {{
-    "reasoning": "A deep explanation on how the output follows the given instructions, why each part was chosen and how is it the best possible selection, need to be sure the opening and closing scenes make sense together",
-    "main_story": A string which represents the overview of the scene, which events should it cover 2-3 main events, it must be correlated to the previous scenes to create logical events flow and prevent repetition.
-    "narration_text": {narration_instructions}, limited to 100 words these will be played during the scene, This needs to consider the events which are displayed during the scene and the the previous events if any,
-    "background_music": String which describes the background music which needs to be played in the background of this shot
+    "reasoning": "<detailed explanation of scene continuity>"
+    "scene_number": <integer>,
+    "description": "<brief description of the scene>",
+    "main_story": "<array or string of main story points>",
+    "background_music": "<array or string of music suggestions>",
+    "narration_text": "<narration text for this scene>",
 }}
-
-The final output must be a valid json, the first character will be {{ and the last will be }}

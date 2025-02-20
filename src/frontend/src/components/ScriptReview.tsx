@@ -22,6 +22,7 @@ import BackgroundMusic from './BackgroundMusic';
 import ShotVideo from './ShotVideo';
 import DirectorInstructions from './DirectorInstructions';
 import Scene from './Scene';
+import Chapter from './Chapter';
 
 interface ScriptReviewProps {
   script: Script | null;
@@ -670,51 +671,26 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       <Box height="calc(100vh - 72px)" overflow="auto" p={4}>
         <Accordion defaultIndex={[0]} allowMultiple>
           {(script?.chapters || []).map((chapter, chapterIndex) => (
-            <AccordionItem key={chapterIndex}>
-              <AccordionButton>
-                <Box flex="1" textAlign="left">
-                  <Text fontWeight="bold">
-                    Chapter {chapter.chapter_number}: {chapter.title}
-                  </Text>
-                </Box>
-                <AccordionIcon />
-              </AccordionButton>
-              <AccordionPanel pb={4}>
-                <VStack spacing={4} align="stretch">
-                  {/* Chapter Description */}
-                  <Box bg="gray.50" p={3} borderRadius="md">
-                    <Text>{chapter.description}</Text>
-                  </Box>
-
-                  <Accordion defaultIndex={[]} allowMultiple>
-                    {(chapter.scenes || []).map((scene, sceneIndex) => (
-                      <Scene
-                        key={sceneIndex}
-                        scene={scene}
-                        chapterIndex={chapterIndex}
-                        sceneIndex={sceneIndex}
-                        chapterNumber={chapter.chapter_number}
-                        projectName={projectName}
-                        script={script}
-                        setScript={setScript}
-                        imageData={imageData}
-                        narrationData={narrationData}
-                        backgroundMusicData={backgroundMusicData}
-                        videoData={videoData}
-                        generatingImages={generatingImages}
-                        generatingMusic={generatingMusic}
-                        handleGenerateImage={handleGenerateImage}
-                        handleGenerateBackgroundMusic={handleGenerateBackgroundMusic}
-                        handleUpdateDescription={handleUpdateDescription}
-                        getImageKey={getImageKey}
-                        onVideoGenerated={onVideoGenerated}
-                        onScriptUpdate={setScript}
-                      />
-                    ))}
-                  </Accordion>
-                </VStack>
-              </AccordionPanel>
-            </AccordionItem>
+            <Chapter
+              key={chapterIndex}
+              chapter={chapter}
+              chapterIndex={chapterIndex}
+              projectName={projectName}
+              script={script}
+              setScript={setScript}
+              imageData={imageData}
+              narrationData={narrationData}
+              backgroundMusicData={backgroundMusicData}
+              videoData={videoData}
+              generatingImages={generatingImages}
+              generatingMusic={generatingMusic}
+              handleGenerateImage={handleGenerateImage}
+              handleGenerateBackgroundMusic={handleGenerateBackgroundMusic}
+              handleUpdateDescription={handleUpdateDescription}
+              getImageKey={getImageKey}
+              onVideoGenerated={onVideoGenerated}
+              onScriptUpdate={setScript}
+            />
           ))}
         </Accordion>
       </Box>
