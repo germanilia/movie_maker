@@ -124,6 +124,7 @@ const ProjectSelection: React.FC<ProjectSelectionProps> = ({
         onNext={onNext}
         setScript={setScript}
         setProjectName={setProjectName}
+        goHome={() => setShowProjectForm(false)}
       />
     );
   }

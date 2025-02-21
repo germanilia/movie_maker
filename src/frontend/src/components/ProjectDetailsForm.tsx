@@ -26,14 +26,18 @@ import {
   Divider,
   Progress,
   IconButton,
+  Tooltip,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
+import { FaHome } from 'react-icons/fa';
 import { Script } from '../models/models';
+import { ChakraIcon } from './utils/ChakraIcon';
 
 interface ProjectDetailsFormProps {
   onNext: () => void;
   setScript: (script: Script | null) => void;
   setProjectName: (name: string) => void;
+  goHome: () => void;
 }
 
 interface ProjectData {
@@ -55,6 +59,7 @@ const ProjectDetailsForm: React.FC<ProjectDetailsFormProps> = ({
   onNext,
   setScript,
   setProjectName,
+  goHome,
 }): JSX.Element => {
   const [isLoading, setIsLoading] = React.useState(false);
   const [currentStep, setCurrentStep] = React.useState(1);
@@ -373,6 +378,16 @@ const ProjectDetailsForm: React.FC<ProjectDetailsFormProps> = ({
             height="72px"
           >
             <HStack spacing={4}>
+              <Tooltip label="Return to Projects" placement="bottom">
+                <IconButton
+                  aria-label="Return to Projects"
+                  icon={<ChakraIcon icon={FaHome} />}
+                  variant="solid"
+                  colorScheme="blue"
+                  onClick={goHome}
+                  size="md"
+                />
+              </Tooltip>
               <Heading size="lg">Project Details</Heading>
               <Badge colorScheme="blue" fontSize="md" px={3} py={1}>
                 Step {currentStep} of {TOTAL_STEPS}
