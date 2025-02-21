@@ -367,7 +367,7 @@ class DirectorService:
         # s3_path = f"{self.aws_service.s3_base_uri}/script.json"
         # await self.aws_service.upload_file(str(script_path), s3_path)
 
-    async def get_script(self) -> Optional[Script]:
+    async def get_script(self) -> Script:
         """Get the current script for the project."""
         try:
             script = await self._try_load_script(

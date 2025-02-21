@@ -11,10 +11,11 @@ import {
   SimpleGrid,
   Center,
   Spinner,
-  Icon as ChakraIcon,
   useColorModeValue,
+  useTheme,
 } from '@chakra-ui/react';
 import { AddIcon } from '@chakra-ui/icons';
+import { IconType } from 'react-icons';
 import { FaFolder } from 'react-icons/fa';
 import ProjectDetailsForm from './ProjectDetailsForm';
 
@@ -24,6 +25,23 @@ interface ProjectSelectionProps {
   setCurrentStep: (step: number) => void;
   setScript: (script: any) => void;
 }
+
+interface IconWrapperProps {
+  icon: IconType;
+  size?: string | number;
+  color?: string;
+}
+
+const IconWrapper = ({ icon: Icon, size = 8, color = "blue.500" }: IconWrapperProps): JSX.Element => {
+  const theme = useTheme();
+  const finalSize = typeof size === 'number' ? `${size * 4}px` : size;
+  const finalColor = color in theme.colors ? theme.colors[color as keyof typeof theme.colors] : color;
+  
+  return React.createElement(Icon as React.ComponentType<{ size: string; color: string }>, {
+    size: finalSize,
+    color: finalColor,
+  });
+};
 
 const ProjectSelection: React.FC<ProjectSelectionProps> = ({ 
   onNext, 
@@ -167,7 +185,7 @@ const ProjectSelection: React.FC<ProjectSelectionProps> = ({
                 <CardBody>
                   <Center height="100%">
                     <VStack spacing={4}>
-                      <ChakraIcon as={FaFolder} boxSize={8} color="blue.500" />
+                      <IconWrapper icon={FaFolder} size={8} color="blue.500" />
                       <Text fontSize="lg" fontWeight="bold">
                         {project}
                       </Text>
