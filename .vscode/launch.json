@@ -26,7 +26,6 @@
                 "src.api.main:app",
                 "--reload",
                 "--reload-delay", "0",
-                "--force-reload",
                 "--host",
                 "0.0.0.0",
                 "--port",
