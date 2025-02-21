@@ -20,6 +20,7 @@ import os
 from pydantic import BaseModel
 import base64
 import cv2
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -1009,4 +1010,134 @@ async def regenerate_chapter(
         
     except Exception as e:
         logger.error(f"Failed to regenerate chapter: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class RegenerateNarrationRequest(BaseModel):
+    chapter_number: int
+    scene_number: int
+    instructions: str | None = None
+
+class UpdateNarrationRequest(BaseModel):
+    chapter_number: int
+    scene_number: int
+    narration_text: str
+
+@app.post("/api/regenerate-narration/{project_name}")
+async def regenerate_narration(project_name: str, request: RegenerateNarrationRequest):
+    """Regenerate narration for a specific scene using LLM"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        director = DirectorService(aws_service=aws_service, project_name=project_name)
+        script = await director.get_script()
+        
+        # Convert 1-based indices to 0-based
+        chapter_idx = request.chapter_number - 1
+        scene_idx = request.scene_number - 1
+        
+        if not script or not script.chapters:
+            raise HTTPException(status_code=404, detail="Script or chapters not found")
+            
+        if chapter_idx >= len(script.chapters) or chapter_idx < 0:
+            raise HTTPException(status_code=400, detail="Invalid chapter index")
+            
+        chapter = script.chapters[chapter_idx]
+        if not chapter.scenes or scene_idx >= len(chapter.scenes) or scene_idx < 0:
+            raise HTTPException(status_code=400, detail="Invalid scene index")
+
+        # Load and format the regenerate narration prompt
+        prompt_template = await director._load_prompt("regenerate_narration_prompt.txt")
+        prompt = await director._format_prompt(
+            prompt_template,
+            script=script,
+            regenerate_narration_instructions=request.instructions or "N/A"
+        )
+
+        # Get LLM response
+        response = await aws_service.invoke_llm(prompt)
+        
+        try:
+            narration_data = json.loads(response)
+            if not isinstance(narration_data, dict):
+                raise ValueError("Response is not a valid JSON object")
+
+            # Update the script with new narration
+            chapter.scenes[scene_idx].narration_text = narration_data["narration"]
+            await director.save_script(script)
+
+            # Generate audio using voice service
+            voice_service = VoiceService()
+            success, result = await voice_service.regenerate_narration(
+                text=narration_data["narration"],
+                project_name=project_name,
+                chapter_number=request.chapter_number,
+                scene_number=request.scene_number,
+                temp_dir=aws_service.temp_dir
+            )
+
+            if not success:
+                raise ValueError(f"Failed to generate audio: {result}")
+
+            return {
+                "status": "success",
+                "narration": narration_data["narration"],
+                "reasoning": narration_data["reasoning"]
+            }
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error: {str(e)}\nResponse: {response}")
+            raise ValueError(f"Invalid JSON response: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error processing narration data: {str(e)}")
+            raise ValueError(f"Failed to process narration data: {str(e)}")
+
+    except Exception as e:
+        logger.error(f"Error regenerating narration: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/update-narration/{project_name}")
+async def update_narration(project_name: str, request: UpdateNarrationRequest):
+    """Update narration text and regenerate audio"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        director = DirectorService(aws_service=aws_service, project_name=project_name)
+        script = await director.get_script()
+        
+        # Convert 1-based indices to 0-based
+        chapter_idx = request.chapter_number - 1
+        scene_idx = request.scene_number - 1
+        
+        if not script or not script.chapters:
+            raise HTTPException(status_code=404, detail="Script or chapters not found")
+            
+        if chapter_idx >= len(script.chapters) or chapter_idx < 0:
+            raise HTTPException(status_code=400, detail="Invalid chapter index")
+            
+        chapter = script.chapters[chapter_idx]
+        if not chapter.scenes or scene_idx >= len(chapter.scenes) or scene_idx < 0:
+            raise HTTPException(status_code=400, detail="Invalid scene index")
+
+        # Update script with new narration text
+        chapter.scenes[scene_idx].narration_text = request.narration_text
+        await director.save_script(script)
+
+        # Generate new audio using voice service
+        voice_service = VoiceService()
+        success, result = await voice_service.update_narration(
+            text=request.narration_text,
+            project_name=project_name,
+            chapter_number=request.chapter_number,
+            scene_number=request.scene_number,
+            temp_dir=aws_service.temp_dir
+        )
+
+        if not success:
+            raise ValueError(f"Failed to generate audio: {result}")
+
+        return {
+            "status": "success",
+            "narration": request.narration_text
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating narration: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

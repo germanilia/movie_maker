@@ -14,13 +14,23 @@ import {
   SliderThumb,
   useColorModeValue,
   Progress,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  ModalFooter,
+  Textarea,
+  useDisclosure,
 } from '@chakra-ui/react';
 import { 
   FaPlay, 
   FaPause, 
   FaVolumeUp, 
   FaVolumeMute,
-  FaRedo
+  FaRedo,
+  FaEdit,
 } from 'react-icons/fa';
 import { ChakraIcon } from './utils/ChakraIcon';
 
@@ -30,6 +40,7 @@ interface NarrationBoxProps {
   sceneIndex: number;
   projectName: string;
   narrationText: string;
+  onNarrationUpdate?: (newText: string) => void;
 }
 
 const NarrationBox: React.FC<NarrationBoxProps> = ({
@@ -37,7 +48,8 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
   chapterIndex,
   sceneIndex,
   projectName,
-  narrationText
+  narrationText,
+  onNarrationUpdate,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -46,9 +58,13 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [audioError, setAudioError] = useState(false);
+  const [regenerateInstructions, setRegenerateInstructions] = useState('');
+  const [editedNarration, setEditedNarration] = useState(narrationText);
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressInterval = useRef<NodeJS.Timeout>();
   const toast = useToast();
+  const { isOpen: isRegenerateModalOpen, onOpen: onRegenerateModalOpen, onClose: onRegenerateModalClose } = useDisclosure();
+  const { isOpen: isEditModalOpen, onOpen: onEditModalOpen, onClose: onEditModalClose } = useDisclosure();
 
   const audioKey = `${chapterIndex + 1}-${sceneIndex + 1}`;
   const audioPath = `/temp/${projectName}/chapter_${chapterIndex + 1}/scene_${sceneIndex + 1}/narration.wav`;
@@ -163,7 +179,7 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
     setIsLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/api/generate-narration/${projectName}`,
+        `http://localhost:8000/api/regenerate-narration/${projectName}`,
         {
           method: 'POST',
           headers: {
@@ -172,12 +188,18 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
           body: JSON.stringify({
             chapter_number: chapterIndex + 1,
             scene_number: sceneIndex + 1,
+            instructions: regenerateInstructions,
           }),
         }
       );
 
       if (!response.ok) {
         throw new Error('Failed to regenerate narration');
+      }
+
+      const result = await response.json();
+      if (onNarrationUpdate) {
+        onNarrationUpdate(result.narration);
       }
 
       toast({
@@ -187,6 +209,9 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
         duration: 3000,
         isClosable: true,
       });
+
+      onRegenerateModalClose();
+      setRegenerateInstructions('');
     } catch (error) {
       console.error('Error regenerating narration:', error);
       toast({
@@ -196,6 +221,56 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
         duration: 5000,
         isClosable: true,
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateNarration = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/update-narration/${projectName}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_number: chapterIndex + 1,
+            scene_number: sceneIndex + 1,
+            narration_text: editedNarration,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update narration');
+      }
+
+      if (onNarrationUpdate) {
+        onNarrationUpdate(editedNarration);
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Narration updated successfully',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      onEditModalClose();
+    } catch (error) {
+      console.error('Error updating narration:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update narration',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -230,17 +305,26 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
           >
             {!audioError ? 'Narration Ready' : 'No Narration'}
           </Badge>
-          <Button
-            size="sm"
-            leftIcon={<ChakraIcon icon={FaRedo} />}
-            onClick={regenerateNarration}
-            isLoading={isLoading}
-            loadingText="Regenerating"
-            colorScheme="blue"
-            variant="ghost"
-          >
-            Regenerate
-          </Button>
+          <HStack spacing={2}>
+            <Button
+              size="sm"
+              leftIcon={<ChakraIcon icon={FaEdit} />}
+              onClick={onEditModalOpen}
+              colorScheme="blue"
+              variant="ghost"
+            >
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              leftIcon={<ChakraIcon icon={FaRedo} />}
+              onClick={onRegenerateModalOpen}
+              colorScheme="blue"
+              variant="ghost"
+            >
+              Regenerate
+            </Button>
+          </HStack>
         </HStack>
 
         <Box 
@@ -321,6 +405,74 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
           </VStack>
         </>
       </VStack>
+
+      {/* Regenerate Modal */}
+      <Modal isOpen={isRegenerateModalOpen} onClose={onRegenerateModalClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Regenerate Narration</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Text mb={4}>
+              Enter instructions for regenerating the narration. These instructions will help guide the AI in creating a new version.
+            </Text>
+            <Textarea
+              value={regenerateInstructions}
+              onChange={(e) => setRegenerateInstructions(e.target.value)}
+              placeholder="Enter instructions for narration regeneration..."
+              size="lg"
+              rows={6}
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onRegenerateModalClose}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={regenerateNarration}
+              isLoading={isLoading}
+              loadingText="Regenerating"
+            >
+              Regenerate
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={onEditModalClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Edit Narration</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Text mb={4}>
+              Edit the narration text directly. The audio will be regenerated with your changes.
+            </Text>
+            <Textarea
+              value={editedNarration}
+              onChange={(e) => setEditedNarration(e.target.value)}
+              placeholder="Enter narration text..."
+              size="lg"
+              rows={6}
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onEditModalClose}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={updateNarration}
+              isLoading={isLoading}
+              loadingText="Updating"
+            >
+              Update
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };

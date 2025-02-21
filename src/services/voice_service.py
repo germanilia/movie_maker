@@ -6,9 +6,10 @@ import urllib3  # Import urllib3 directly
 from pyht import Client
 from dotenv import load_dotenv
 from pyht.client import TTSOptions
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from pathlib import Path
 
 # Disable warnings (use urllib3 directly)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -232,3 +233,80 @@ class VoiceService:
         except Exception as e:
             logger.error(f"Failed to generate voice: {str(e)}")
             raise
+
+    async def regenerate_narration(
+        self,
+        text: str,
+        project_name: str,
+        chapter_number: int,
+        scene_number: int,
+        temp_dir: Path
+    ) -> Tuple[bool, str]:
+        """
+        Generate new audio narration for a scene.
+        
+        Args:
+            text: The narration text to convert to speech
+            project_name: Name of the project
+            chapter_number: Chapter number
+            scene_number: Scene number
+            temp_dir: Base temporary directory for the project
+            
+        Returns:
+            Tuple[bool, str]: (success, audio_file_path)
+        """
+        try:
+            # Generate audio path
+            audio_path = f"chapter_{chapter_number}/scene_{scene_number}/narration.wav"
+            local_path = temp_dir / audio_path
+            local_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Get or create cloned voice
+            voice_sample_path = f"temp/{project_name}/voice_sample.m4a"
+            voice_id = None
+            if os.path.exists(voice_sample_path):
+                try:
+                    voice_id = self.get_or_create_cloned_voice(
+                        voice_sample_path=voice_sample_path,
+                        voice_name=f"{project_name}"
+                    )
+                except Exception as e:
+                    logger.error(f"Error creating cloned voice: {str(e)}")
+
+            # Generate audio
+            audio_chunks = await self.generate_voice(
+                text=text,
+                voice_id=voice_id
+            )
+
+            # Write audio file
+            with open(local_path, "wb") as audio_file:
+                for chunk in audio_chunks:
+                    audio_file.write(chunk)
+
+            return True, str(local_path)
+
+        except Exception as e:
+            logger.error(f"Error generating narration audio: {str(e)}")
+            return False, str(e)
+
+    async def update_narration(
+        self,
+        text: str,
+        project_name: str,
+        chapter_number: int,
+        scene_number: int,
+        temp_dir: Path
+    ) -> Tuple[bool, str]:
+        """
+        Update narration audio for a scene.
+        This is essentially the same as regenerate_narration but with a different name
+        to make the API more intuitive.
+        """
+        return await self.regenerate_narration(
+            text=text,
+            project_name=project_name,
+            chapter_number=chapter_number,
+            scene_number=scene_number,
+            temp_dir=temp_dir
+        )

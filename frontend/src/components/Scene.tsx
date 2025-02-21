@@ -209,6 +209,16 @@ const Scene: React.FC<SceneProps> = ({
   ).length || 0;
   const progress = (completedShots / totalShots) * 100;
 
+  const handleNarrationUpdate = (newText: string) => {
+    const updatedScript = { ...script };
+    const scenes = updatedScript.chapters[chapterIndex]?.scenes;
+    if (scenes && scenes[sceneIndex]) {
+      scenes[sceneIndex].narration_text = newText;
+      setScript(updatedScript);
+      onScriptUpdate(updatedScript);
+    }
+  };
+
   return (
     <>
       <Box 
@@ -340,6 +350,7 @@ const Scene: React.FC<SceneProps> = ({
                   sceneIndex={sceneIndex}
                   projectName={projectName}
                   narrationText={scene.narration_text}
+                  onNarrationUpdate={handleNarrationUpdate}
                 />
               </Box>
             </ModalBody>
