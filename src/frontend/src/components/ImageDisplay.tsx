@@ -23,8 +23,19 @@ import {
   RadioGroup,
   Stack,
   Spinner,
+  Badge,
+  Progress,
+  useColorModeValue,
+  Tooltip,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Divider,
 } from '@chakra-ui/react';
-import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon } from '@chakra-ui/icons';
+import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon, ChevronDownIcon } from '@chakra-ui/icons';
+import { FaImage, FaUserAlt } from 'react-icons/fa';
+import { ChakraIcon } from './utils/ChakraIcon';
 
 const dragDropStyles = {
   border: '2px dashed',
@@ -109,9 +120,11 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const [isDetectingFaces, setIsDetectingFaces] = useState(false);
   const [isSwapping, setIsSwapping] = useState(false);
 
-  const bgColor = type === 'opening' ? 'teal.50' : 'pink.50';
-  const textColor = type === 'opening' ? 'teal.800' : 'pink.800';
-  const buttonColor = type === 'opening' ? 'teal' : 'pink';
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const buttonColorScheme = type === 'opening' ? 'teal' : 'pink';
+  const accentBgColor = useColorModeValue(`${buttonColorScheme}.50`, `${buttonColorScheme}.900`);
+  const accentTextColor = useColorModeValue(`${buttonColorScheme}.700`, `${buttonColorScheme}.100`);
 
   const modelOptions = [
     { value: 'flux_ultra_model', label: 'Flux Ultra Model' },
@@ -145,15 +158,6 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const handleCancel = () => {
     setEditedDescription(description);
     setIsEditing(false);
-  };
-
-  const handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newModelType = event.target.value;
-    setLocalModelType(newModelType);
-    // Clear reference image when switching away from flux_ultra_model
-    if (newModelType !== 'flux_ultra_model') {
-      setReferenceImage(null);
-    }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,249 +400,287 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   }, [description]);
 
   return (
-    <Box bg={bgColor} p={3} borderRadius="md" position="relative">
-      {/* Add overlay during face operations */}
-      {(isDetectingFaces || isSwapping) && (
-        <Box
+    <Box 
+      bg={bgColor} 
+      p={4} 
+      borderWidth={1} 
+      borderRadius="md"
+      borderColor={borderColor}
+      position="relative"
+    >
+      {(isGenerating || isDetectingFaces || isSwapping) && (
+        <Progress 
+          size="xs" 
+          isIndeterminate 
           position="absolute"
           top={0}
           left={0}
           right={0}
-          bottom={0}
-          bg="rgba(255, 255, 255, 0.8)"
-          zIndex={5}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <VStack spacing={4}>
-            <Spinner size="xl" color={buttonColor} />
-            <Text fontWeight="bold">
-              {isDetectingFaces ? 'Detecting Faces...' : 'Swapping Faces...'}
-            </Text>
-          </VStack>
-        </Box>
+        />
       )}
 
-      <HStack justify="space-between" mb={2}>
-        <Text fontWeight="bold">{type === 'opening' ? 'Opening' : 'Closing'} Scene Description:</Text>
-        <HStack spacing={2}>
-          {onUpdateDescription && !isEditing && (
-            <IconButton
-              aria-label="Edit description"
-              icon={<EditIcon />}
-              size="sm"
-              colorScheme={buttonColor}
-              onClick={() => setIsEditing(true)}
-            />
-          )}
-          {localModelType === 'flux_ultra_model' && (
-            <Box
-              onDragEnter={handleDragEnter}
-              onDragLeave={handleDragLeave}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-              {...dragDropStyles}
-              borderColor={isDragging ? 'teal.500' : 'gray.300'}
-              bg={isDragging ? 'teal.50' : 'transparent'}
-              w="200px"
-            >
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-              />
-              <VStack spacing={2}>
+      <VStack spacing={4} align="stretch">
+        {/* Header Section */}
+        <HStack justify="space-between">
+          <Badge 
+            colorScheme={buttonColorScheme}
+            variant="subtle"
+            px={2}
+            py={1}
+          >
+            {type === 'opening' ? 'Opening Shot' : 'Closing Shot'}
+          </Badge>
+          
+          <HStack spacing={2}>
+            {onUpdateDescription && !isEditing && (
+              <Tooltip label="Edit description">
                 <IconButton
-                  aria-label="Add reference image"
-                  icon={<AttachmentIcon />}
+                  aria-label="Edit description"
+                  icon={<EditIcon />}
                   size="sm"
-                  colorScheme={referenceImage ? 'green' : buttonColor}
-                  onClick={() => fileInputRef.current?.click()}
+                  colorScheme={buttonColorScheme}
+                  variant="ghost"
+                  onClick={() => setIsEditing(true)}
                 />
-                <Text fontSize="sm">
-                  {referenceImage ? 'Image loaded' : 'Drop image here or click to upload'}
-                </Text>
-                {referenceImage && (
-                  <Image
-                    src={referenceImage}
-                    alt="Reference"
-                    maxH="100px"
-                    objectFit="contain"
-                  />
-                )}
-              </VStack>
-            </Box>
-          )}
-          <Select
-            size="sm"
-            width="200px"
-            value={localModelType}
-            onChange={handleModelChange}
-          >
-            {modelOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-          <NumberInput
-            size="sm"
-            width="80px"
-            value={seed}
-            min={0}
-            max={999999}
-            defaultValue={333}
-            onChange={(valueString) => setSeed(parseInt(valueString))}
-          >
-            <NumberInputField />
-          </NumberInput>
-          <Button
-            size="sm"
-            colorScheme={buttonColor}
-            onClick={handleGenerateWithReference}
-            isLoading={isGenerating}
-            loadingText="Generating"
-            leftIcon={<RepeatIcon />}
-          >
-            Generate Image
-          </Button>
-        </HStack>
-      </HStack>
-      
-      {isEditing ? (
-        <Box mb={2}>
-          <Textarea
-            value={editedDescription}
-            onChange={(e) => setEditedDescription(e.target.value)}
-            color={textColor}
-            mb={2}
-          />
-          <HStack justify="flex-end" spacing={2}>
+              </Tooltip>
+            )}
+            
+            <Menu>
+              <MenuButton
+                as={Button}
+                size="sm"
+                rightIcon={<ChevronDownIcon />}
+                leftIcon={<ChakraIcon icon={FaImage} />}
+                variant="outline"
+                colorScheme={buttonColorScheme}
+              >
+                {modelOptions.find(opt => opt.value === localModelType)?.label}
+              </MenuButton>
+              <MenuList>
+                {modelOptions.map(option => (
+                  <MenuItem 
+                    key={option.value}
+                    onClick={() => {
+                      setLocalModelType(option.value);
+                      if (option.value !== 'flux_ultra_model') {
+                        setReferenceImage(null);
+                      }
+                    }}
+                  >
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </MenuList>
+            </Menu>
+
+            <NumberInput
+              size="sm"
+              width="100px"
+              value={seed}
+              min={0}
+              max={999999}
+              defaultValue={333}
+              onChange={(valueString) => setSeed(parseInt(valueString))}
+            >
+              <NumberInputField />
+            </NumberInput>
+
             <Button
               size="sm"
-              colorScheme="gray"
-              onClick={handleCancel}
-              leftIcon={<CloseIcon />}
+              colorScheme={buttonColorScheme}
+              onClick={handleGenerateWithReference}
+              isLoading={isGenerating}
+              loadingText="Generating"
+              leftIcon={<RepeatIcon />}
             >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              colorScheme={buttonColor}
-              onClick={handleSave}
-              isLoading={isSaving}
-              leftIcon={<CheckIcon />}
-            >
-              Save
+              Generate
             </Button>
           </HStack>
-        </Box>
-      ) : (
-        <Text color={textColor} mb={2}>{editedDescription}</Text>
-      )}
-      
-      {/* Update the image display section in the return statement */}
-      {localImageData && (
-        <Box mt={4} position="relative">
-          {faceDetectionResult ? (
-            <canvas
-              ref={canvasRef}
-              style={{
-                maxHeight: '300px',
-                width: '100%',
-                objectFit: 'contain',
-                borderRadius: 'md',
-              }}
-            />
-          ) : (
-            <Image
-              src={localImageData.startsWith('data:') ? localImageData : `data:image/png;base64,${localImageData}`}
-              alt={`${type} frame`}
-              maxH="300px"
-              w="100%"
-              objectFit="contain"
-              borderRadius="md"
-            />
-          )}
+        </HStack>
 
-          <HStack position="absolute" bottom={2} right={2} spacing={2}>
-            {!showFaceTools ? (
+        {/* Description Section */}
+        {isEditing ? (
+          <Box>
+            <Textarea
+              value={editedDescription}
+              onChange={(e) => setEditedDescription(e.target.value)}
+              color={accentTextColor}
+              mb={2}
+              bg={accentBgColor}
+              _hover={{ borderColor: `${buttonColorScheme}.300` }}
+              _focus={{ borderColor: `${buttonColorScheme}.500`, boxShadow: `0 0 0 1px ${buttonColorScheme}.500` }}
+            />
+            <HStack justify="flex-end" spacing={2}>
               <Button
                 size="sm"
-                colorScheme={buttonColor}
-                onClick={() => setShowFaceTools(true)}
+                variant="ghost"
+                onClick={handleCancel}
+                leftIcon={<CloseIcon />}
               >
-                Face Tools
+                Cancel
               </Button>
-            ) : (
-              <>
-                <Button
-                  size="sm"
-                  colorScheme={buttonColor}
-                  onClick={detectFaces}
-                  isLoading={isDetectingFaces}
-                  loadingText="Detecting"
-                >
-                  Detect Faces
-                </Button>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleSourceFileUpload}
-                  style={{ display: 'none' }}
-                  ref={swapFileInputRef}
-                  disabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
+              <Button
+                size="sm"
+                colorScheme={buttonColorScheme}
+                onClick={handleSave}
+                isLoading={isSaving}
+                leftIcon={<CheckIcon />}
+              >
+                Save
+              </Button>
+            </HStack>
+          </Box>
+        ) : (
+          <Text color={accentTextColor}>{editedDescription}</Text>
+        )}
+
+        {/* Reference Image Upload Section */}
+        {localModelType === 'flux_ultra_model' && (
+          <Box
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            borderWidth={2}
+            borderStyle="dashed"
+            borderRadius="md"
+            p={4}
+            borderColor={isDragging ? `${buttonColorScheme}.500` : 'gray.300'}
+            bg={isDragging ? `${buttonColorScheme}.50` : 'transparent'}
+            transition="all 0.2s"
+          >
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
+            />
+            <VStack spacing={2}>
+              <IconButton
+                aria-label="Add reference image"
+                icon={<AttachmentIcon />}
+                size="sm"
+                colorScheme={referenceImage ? 'green' : buttonColorScheme}
+                onClick={() => fileInputRef.current?.click()}
+              />
+              <Text fontSize="sm" color="gray.600">
+                {referenceImage ? 'Reference image loaded' : 'Drop reference image here or click to upload'}
+              </Text>
+              {referenceImage && (
+                <Image
+                  src={referenceImage}
+                  alt="Reference"
+                  maxH="100px"
+                  objectFit="contain"
+                  borderRadius="md"
                 />
+              )}
+            </VStack>
+          </Box>
+        )}
+
+        {/* Image Display Section */}
+        {localImageData && (
+          <Box>
+            <Box 
+              position="relative" 
+              borderWidth={1}
+              borderColor={borderColor}
+              borderRadius="md"
+              overflow="hidden"
+            >
+              {faceDetectionResult ? (
+                <canvas
+                  ref={canvasRef}
+                  style={{
+                    maxHeight: '400px',
+                    width: '100%',
+                    objectFit: 'contain',
+                  }}
+                />
+              ) : (
+                <Image
+                  src={localImageData.startsWith('data:') ? localImageData : `data:image/png;base64,${localImageData}`}
+                  alt={`${type} frame`}
+                  maxH="400px"
+                  w="100%"
+                  objectFit="contain"
+                />
+              )}
+            </Box>
+
+            {/* Face Tools */}
+            <HStack justify="flex-end" mt={2} spacing={2}>
+              {!showFaceTools ? (
                 <Button
                   size="sm"
-                  colorScheme={buttonColor}
-                  onClick={() => swapFileInputRef.current?.click()}
-                  isDisabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
+                  colorScheme={buttonColorScheme}
+                  variant="outline"
+                  leftIcon={<ChakraIcon icon={FaUserAlt} />}
+                  onClick={() => setShowFaceTools(true)}
                 >
-                  Upload Faces
+                  Face Tools
                 </Button>
-                {sourceImages.length > 0 && faceDetectionResult && (
+              ) : (
+                <>
                   <Button
                     size="sm"
-                    colorScheme={buttonColor}
-                    onClick={() => setIsSwapModalOpen(true)}
-                    isDisabled={isSwapping}
+                    colorScheme={buttonColorScheme}
+                    onClick={detectFaces}
+                    isLoading={isDetectingFaces}
+                    loadingText="Detecting"
+                    variant="outline"
                   >
-                    Map & Swap Faces
+                    Detect Faces
                   </Button>
-                )}
-                <Button
-                  size="sm"
-                  colorScheme="gray"
-                  onClick={() => {
-                    setShowFaceTools(false);
-                    setFaceDetectionResult(null);
-                    setSourceImages([]);
-                    setFaceMapping({});
-                  }}
-                >
-                  Hide Tools
-                </Button>
-              </>
-            )}
-          </HStack>
-          {swapSourceImage && showFaceTools && (
-            <Box position="absolute" bottom={14} right={2} width="100px">
-              <Image
-                src={swapSourceImage}
-                alt="Source face"
-                maxH="100px"
-                objectFit="contain"
-                borderRadius="md"
-              />
-            </Box>
-          )}
-        </Box>
-      )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleSourceFileUpload}
+                    style={{ display: 'none' }}
+                    ref={swapFileInputRef}
+                    disabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
+                  />
+                  <Button
+                    size="sm"
+                    colorScheme={buttonColorScheme}
+                    onClick={() => swapFileInputRef.current?.click()}
+                    isDisabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
+                    variant="outline"
+                  >
+                    Upload Faces
+                  </Button>
+                  {sourceImages.length > 0 && faceDetectionResult && (
+                    <Button
+                      size="sm"
+                      colorScheme={buttonColorScheme}
+                      onClick={() => setIsSwapModalOpen(true)}
+                      isDisabled={isSwapping}
+                      variant="outline"
+                    >
+                      Map & Swap
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowFaceTools(false);
+                      setFaceDetectionResult(null);
+                      setSourceImages([]);
+                      setFaceMapping({});
+                    }}
+                  >
+                    Hide Tools
+                  </Button>
+                </>
+              )}
+            </HStack>
+          </Box>
+        )}
+      </VStack>
 
       {/* Face Mapping Modal */}
       <Modal 
@@ -646,17 +688,25 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         onClose={() => setIsSwapModalOpen(false)}
         closeOnOverlayClick={!isSwapping}
         closeOnEsc={!isSwapping}
+        size="xl"
       >
-        <ModalOverlay />
+        <ModalOverlay bg="blackAlpha.800" backdropFilter="blur(3px)" />
         <ModalContent>
-          <ModalHeader>Map Faces</ModalHeader>
+          <ModalHeader>Map Faces for Swapping</ModalHeader>
           {!isSwapping && <ModalCloseButton />}
           <ModalBody>
-            <VStack spacing={4}>
-              <Text>Map each detected face to a source image:</Text>
+            <VStack spacing={4} align="stretch">
+              <Text>Select a source image for each detected face:</Text>
               {faceDetectionResult && Object.entries(faceDetectionResult).map(([faceIdx, face]) => (
-                <Box key={faceIdx} p={4} borderWidth={1} borderRadius="md" width="100%">
-                  <Text mb={2}>Face {parseInt(faceIdx) + 1}:</Text>
+                <Box 
+                  key={faceIdx} 
+                  p={4} 
+                  borderWidth={1} 
+                  borderRadius="md" 
+                  borderColor={borderColor}
+                  bg={bgColor}
+                >
+                  <Text mb={2} fontWeight="bold">Face {parseInt(faceIdx) + 1}:</Text>
                   <RadioGroup
                     value={faceMapping[parseInt(faceIdx)] || ''}
                     onChange={(value) => setFaceMapping(prev => ({
@@ -666,13 +716,18 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                   >
                     <Stack>
                       {sourceImages.map((img, idx) => (
-                        <Radio key={idx} value={img.name}>
+                        <Radio 
+                          key={idx} 
+                          value={img.name}
+                          colorScheme={buttonColorScheme}
+                        >
                           <HStack>
                             <Image
                               src={img.base64}
                               alt={`Source ${idx + 1}`}
                               boxSize="50px"
                               objectFit="cover"
+                              borderRadius="md"
                             />
                             <Text>{img.name}</Text>
                           </HStack>
@@ -686,20 +741,20 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           </ModalBody>
           <ModalFooter>
             <Button 
-              colorScheme="blue" 
+              variant="ghost" 
               mr={3} 
+              onClick={() => setIsSwapModalOpen(false)}
+              isDisabled={isSwapping}
+            >
+              Cancel
+            </Button>
+            <Button
+              colorScheme={buttonColorScheme}
               onClick={handleCustomFaceSwap}
               isLoading={isSwapping}
               loadingText="Swapping Faces"
             >
               Swap Faces
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={() => setIsSwapModalOpen(false)}
-              isDisabled={isSwapping}
-            >
-              Cancel
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -707,4 +762,5 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     </Box>
   );
 };
+
 export default ImageDisplay;
