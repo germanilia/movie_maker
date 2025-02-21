@@ -1,57 +1,59 @@
 import React, { useState } from 'react';
-import { ChakraProvider } from '@chakra-ui/react';
-import ProjectDetailsForm from './components/ProjectDetailsForm';
+import { ChakraProvider, Box, Container, extendTheme } from '@chakra-ui/react';
+import ProjectSelection from './components/ProjectSelection';
+import ScriptGeneration from './components/ScriptGeneration';
 import ScriptReview from './components/ScriptReview';
-import ProjectSelector from './components/ProjectSelector';
 import { Script } from './models/models';
+
+const theme = extendTheme({
+  styles: {
+    global: {
+      body: {
+        bg: 'gray.50',
+      },
+    },
+  },
+});
 
 const App: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [projectName, setProjectName] = useState('');
   const [script, setScript] = useState<Script | null>(null);
-
-  const handleProjectSelect = async (selectedProject: string) => {
-    try {
-      const response = await fetch(`http://localhost:8000/api/get-script/${selectedProject}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch script');
-      }
-      const scriptData = await response.json();
-      setScript(scriptData);
-      setProjectName(selectedProject);
-      setCurrentStep(2);
-    } catch (error) {
-      console.error('Error fetching script:', error);
-    }
-  };
-
-  const handleNewProject = () => {
-    setCurrentStep(1);
-  };
+  const [projectName, setProjectName] = useState('');
 
   const handleNext = () => {
-    setCurrentStep(currentStep + 1);
+    // Don't increment step here as it's handled by the components
   };
 
   const handleBack = () => {
     setCurrentStep(currentStep - 1);
   };
 
+  const handleHome = () => {
+    setCurrentStep(0);
+    setScript(null);
+    setProjectName('');
+  };
+
   const renderStep = () => {
     switch (currentStep) {
       case 0:
         return (
-          <ProjectSelector
-            onProjectSelect={handleProjectSelect}
-            onNewProject={handleNewProject}
+          <ProjectSelection 
+            onNext={handleNext} 
+            setProjectName={setProjectName} 
+            setCurrentStep={setCurrentStep}
+            setScript={setScript}
           />
         );
       case 1:
         return (
-          <ProjectDetailsForm
-            onNext={handleNext}
-            setScript={setScript}
-            setProjectName={setProjectName}
+          <ScriptGeneration 
+            script={script} 
+            setScript={setScript} 
+            onNext={handleNext} 
+            onBack={handleBack} 
+            projectName={projectName}
+            onHome={handleHome}
           />
         );
       case 2:
@@ -62,16 +64,21 @@ const App: React.FC = () => {
             onNext={handleNext}
             onBack={handleBack}
             projectName={projectName}
+            onHome={handleHome}
           />
         );
       default:
-        return <div>Unknown step</div>;
+        return null;
     }
   };
 
   return (
-    <ChakraProvider>
-      {renderStep()}
+    <ChakraProvider theme={theme}>
+      <Box minH="100vh" w="100%" bg="gray.50">
+        <Container maxW="container.xl" py={8}>
+          {renderStep()}
+        </Container>
+      </Box>
     </ChakraProvider>
   );
 };

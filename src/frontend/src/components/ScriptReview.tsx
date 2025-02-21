@@ -37,6 +37,7 @@ import {
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
 import { FaRedo } from 'react-icons/fa';
+import { MdHome } from 'react-icons/md';
 import ImageDisplay from './ImageDisplay';
 import NarrationBox from './NarrationBox';
 import BackgroundMusic from './BackgroundMusic';
@@ -44,6 +45,7 @@ import ShotVideo from './ShotVideo';
 import DirectorInstructions from './DirectorInstructions';
 import Scene from './Scene';
 import Chapter from './Chapter';
+import { createIcon } from '@chakra-ui/react';
 
 interface ScriptReviewProps {
   script: Script | null;
@@ -51,6 +53,7 @@ interface ScriptReviewProps {
   onNext: () => void;
   onBack: () => void;
   projectName: string;
+  onHome: () => void;
 }
 
 interface ImageApiResponse {
@@ -89,12 +92,24 @@ interface DirectorInstructionsProps {
   handleUpdate: (newInstructions: string) => Promise<void>;
 }
 
+const HomeIcon = createIcon({
+  displayName: 'HomeIcon',
+  viewBox: '0 0 24 24',
+  path: (
+    <path
+      fill="currentColor"
+      d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"
+    />
+  ),
+});
+
 const ScriptReview: React.FC<ScriptReviewProps> = ({
   script,
   setScript,
   onNext,
   onBack,
-  projectName
+  projectName,
+  onHome
 }) => {
   const [generatingImages, setGeneratingImages] = useState<Set<string>>(new Set());
   const [imageData, setImageData] = useState<Record<string, string>>({});
@@ -870,6 +885,13 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             </Button>
             <Button onClick={onBack} size="sm">Back</Button>
             <Button colorScheme="blue" onClick={onNext} size="sm">Next</Button>
+            <IconButton
+              aria-label="Home"
+              icon={<HomeIcon />}
+              onClick={onHome}
+              size="sm"
+              variant="ghost"
+            />
           </HStack>
         </Flex>
 
