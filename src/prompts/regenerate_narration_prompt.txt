@@ -4,10 +4,10 @@ Current script:
 Regenerate narration instructions:
 {regenerate_narration_instructions}
 
-The response must start with a {{ and end with }} nothing is allowed before or after
+The response must start with a {{ and end with }} nothing is allowed before or after and never use new lines in the response
 
 The output format should be a json object with the following fields:
 {{
     "reasoning": "Explain in detail why this narration was chosen and how it fits with the script and the regenerate narration instructions",
-    "narration": "The new narration for the script"
+    "narration": "The new narration for the script, which should be in the same style as the original narration but with the new instructions, this is the actual narration text"
 }}
