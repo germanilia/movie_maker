@@ -24,13 +24,15 @@ logging.basicConfig(
 # Get the logger for this module
 logger = logging.getLogger(__name__)
 
+
 def to_snake_case(name: str) -> str:
     """Convert a string to snake case."""
     # Replace spaces and special characters with underscores
-    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
+    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+    s2 = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1)
     # Convert to lowercase and replace spaces/special chars with underscores
-    return re.sub(r'[^a-z0-9]+', '_', s2.lower()).strip('_')
+    return re.sub(r"[^a-z0-9]+", "_", s2.lower()).strip("_")
+
 
 class DirectorService:
     def __init__(self, aws_service: AWSService, project_name: str):
@@ -41,9 +43,9 @@ class DirectorService:
         self.temp_dir = self.temp_base_path / self.project_name
         self.temp_dir.mkdir(parents=True, exist_ok=True)
 
-    async def _load_prompt(self, genre: str, prompt_name: str) -> str:
+    async def _load_prompt(self, prompt_name: str) -> str:
         """Load a prompt file based on genre and name."""
-        prompt_path = self.prompts_base_path / genre / prompt_name
+        prompt_path = self.prompts_base_path / prompt_name
         with open(prompt_path, "r") as f:
             return f.read()
 
@@ -56,14 +58,18 @@ class DirectorService:
     async def _format_prompt(self, prompt_template: str, **kwargs) -> str:
         """Format a prompt template with the given kwargs."""
         # Add complete script context if available
-        if 'script' in kwargs:
-            kwargs['complete_script'] = json.dumps(kwargs['script'].model_dump(), indent=2) if kwargs['script'] else "N/A"
+        if "script" in kwargs:
+            kwargs["complete_script"] = (
+                json.dumps(kwargs["script"].model_dump(), indent=2)
+                if kwargs["script"]
+                else "N/A"
+            )
         else:
-            kwargs['complete_script'] = "N/A"
+            kwargs["complete_script"] = "N/A"
 
         # Handle regeneration instructions
-        if 'regeneration_instructions' not in kwargs:
-            kwargs['regeneration_instructions'] = "N/A"
+        if "regeneration_instructions" not in kwargs:
+            kwargs["regeneration_instructions"] = "N/A"
 
         return prompt_template.format(**kwargs)
 
@@ -75,17 +81,12 @@ class DirectorService:
         max_retries: int = 10,
     ) -> List[Scene]:
         """Generate scenes for a specific chapter with retry mechanism."""
-        prompt_template = await self._load_prompt(
-            request.genre, "single_scene_generation_prompt.txt"
-        )
+        prompt_template = await self._load_prompt("single_scene_generation_prompt.txt")
         scenes = []
         prev_error = "N/A"
 
         # Create a temporary Script object to provide full context
-        temp_script = Script(
-            chapters=chapters,
-            project_details=request
-        )
+        temp_script = Script(chapters=chapters, project_details=request)
 
         for scene_number in range(request.number_of_scenes):
             remaining_attempts = max_retries
@@ -107,17 +108,21 @@ class DirectorService:
                         number_of_scenes=request.number_of_scenes,
                         narration_instructions=request.narration_instructions,
                         previous_generation_error=prev_error,
-                        script=temp_script
+                        script=temp_script,
                     )
 
-                    response = await self.aws_service.invoke_llm(prompt, prev_errors=prev_error)
+                    response = await self.aws_service.invoke_llm(
+                        prompt, prev_errors=prev_error
+                    )
                     scene = Scene(**json.loads(response))
                     scene.scene_number = scene_number + 1
                     scenes.append(scene)
                     scene_generated = True
 
                 except json.JSONDecodeError as e:
-                    prev_error = f"JSON parsing error for scene {scene_number + 1}: {str(e)}"
+                    prev_error = (
+                        f"JSON parsing error for scene {scene_number + 1}: {str(e)}"
+                    )
                     remaining_attempts -= 1
                 except Exception as e:
                     prev_error = f"Error generating scene {scene_number + 1}: {str(e)}"
@@ -146,25 +151,32 @@ class DirectorService:
         specific_scene_index: int | None = None,
     ) -> Script:
         """Generate shots for scenes with retry mechanism.
-        If specific_chapter_index and specific_scene_index are provided, only generate shots for that scene."""
-        prompt_template = await self._load_prompt(
-            script.project_details.genre, "single_shot_generation_prompt.txt"
-        )
+        If specific_chapter_index and specific_scene_index are provided, only generate shots for that scene.
+        """
+        prompt_template = await self._load_prompt("single_shot_generation_prompt.txt")
 
         for chapter_idx, chapter in enumerate(script.chapters):
-            if specific_chapter_index is not None and chapter_idx != specific_chapter_index:
+            if (
+                specific_chapter_index is not None
+                and chapter_idx != specific_chapter_index
+            ):
                 continue
 
             if chapter.scenes:
                 for scene_idx, scene in enumerate(chapter.scenes):
-                    if specific_scene_index is not None and scene_idx != specific_scene_index:
+                    if (
+                        specific_scene_index is not None
+                        and scene_idx != specific_scene_index
+                    ):
                         continue
 
                     if not scene.shots or regenerate:
                         scene.shots = []
                         prev_error = "N/A"
-                        
-                        for shot_number in range(script.project_details.number_of_shots):
+
+                        for shot_number in range(
+                            script.project_details.number_of_shots
+                        ):
                             remaining_attempts = max_retries
                             shot_generated = False
                             logger.info(
@@ -183,10 +195,12 @@ class DirectorService:
                                         shot_number=shot_number + 1,
                                         number_of_shots=script.project_details.number_of_shots,
                                         previous_generation_error=prev_error,
-                                        script=script
+                                        script=script,
                                     )
 
-                                    response = await self.aws_service.invoke_llm(prompt, prev_errors=prev_error)
+                                    response = await self.aws_service.invoke_llm(
+                                        prompt, prev_errors=prev_error
+                                    )
                                     shot = parse_shot_response(response)
                                     shot.shot_number = shot_number + 1
                                     scene.shots.append(shot)
@@ -221,13 +235,13 @@ class DirectorService:
         max_retries: int = 10,
     ) -> List[Chapter]:
         """Generate chapters for the video with retry mechanism."""
-        prompt_template = await self._load_prompt(
-            request.genre, "chapters_generation_prompt.txt"
-        )
+        prompt_template = await self._load_prompt("chapters_generation_prompt.txt")
 
         prev_error = "N/A"
-        temp_script = Script(chapters=[], project_details=request)  # Empty script for initial generation
-        
+        temp_script = Script(
+            chapters=[], project_details=request
+        )  # Empty script for initial generation
+
         for attempt in range(max_retries):
             try:
                 logger.info(f"Chapter generation attempt {attempt + 1}/{max_retries}")
@@ -240,7 +254,7 @@ class DirectorService:
                     subject=request.subject,
                     movie_general_instructions=request.movie_general_instructions,
                     story_background=request.story_background,
-                    script=temp_script
+                    script=temp_script,
                 )
 
                 response = await self.aws_service.invoke_llm(
@@ -401,9 +415,7 @@ class DirectorService:
         chapter = script.chapters[chapter_index]
         prev_error = "N/A"
 
-        prompt_template = await self._load_prompt(
-            script.project_details.genre, "single_scene_generation_prompt.txt"
-        )
+        prompt_template = await self._load_prompt("single_scene_generation_prompt.txt")
 
         try:
             logger.info(
@@ -422,41 +434,48 @@ class DirectorService:
                 narration_instructions=script.project_details.narration_instructions,
                 previous_generation_error=prev_error,
                 script=script,
-                regeneration_instructions=f"This is the most important instructions of all, you are required to follow and explain in the reasoning process how did you comply {custom_instructions}" or ""
+                regeneration_instructions=f"This is the most important instructions of all, you are required to follow and explain in the reasoning process how did you comply {custom_instructions}"
+                or "",
             )
 
             response = await self.aws_service.invoke_llm(prompt, prev_errors=prev_error)
-            
+
             try:
                 scene_data = json.loads(response)
                 # Ensure proper JSON structure
                 if not isinstance(scene_data, dict):
                     raise ValueError("Response is not a valid JSON object")
-                
+
                 new_scene = Scene(**scene_data)
                 new_scene.scene_number = scene_index + 1
 
                 # Initialize empty shots list to maintain consistency
                 new_scene.shots = []
-                
+
                 # Initialize scenes if None and ensure proper typing
                 chapter = script.chapters[chapter_index]
                 if chapter.scenes is None:
                     chapter.scenes = []
-                
+
                 scenes = chapter.scenes
                 if scenes is not None:  # Type guard for the list operations
                     while len(scenes) <= scene_index:
-                        scenes.append(Scene(main_story="", narration_text="", scene_number=len(scenes) + 1))
+                        scenes.append(
+                            Scene(
+                                main_story="",
+                                narration_text="",
+                                scene_number=len(scenes) + 1,
+                            )
+                        )
                     scenes[scene_index] = new_scene
-                
+
                 # Generate shots only for this specific scene
                 script = await self.generate_shots(
-                    script, 
-                    script.project_details.number_of_shots, 
+                    script,
+                    script.project_details.number_of_shots,
                     regenerate=True,
                     specific_chapter_index=chapter_index,
-                    specific_scene_index=scene_index
+                    specific_scene_index=scene_index,
                 )
                 return script
 
@@ -481,7 +500,7 @@ class DirectorService:
     ) -> Script:
         """Regenerate a specific chapter while maintaining context."""
         prompt_template = await self._load_prompt(
-            script.project_details.genre, "single_chapter_generation_prompt.txt"
+            "single_chapter_generation_prompt.txt"
         )
         prev_error = "N/A"
 
@@ -499,7 +518,7 @@ class DirectorService:
                     next_chapter_number=chapter_index + 1,
                     script=script,
                     regeneration_instructions=custom_instructions or "N/A",
-                    previous_generation_error=prev_error
+                    previous_generation_error=prev_error,
                 )
 
                 response = await self.aws_service.invoke_llm(

@@ -62,7 +62,7 @@ const ProjectSelection: React.FC<ProjectSelectionProps> = ({
   const fetchProjects = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('http://localhost:8000/api/list-projects');
+      const response = await fetch('http://localhost:8000/list-projects');
       if (!response.ok) {
         throw new Error('Failed to fetch projects');
       }
@@ -95,7 +95,7 @@ const ProjectSelection: React.FC<ProjectSelectionProps> = ({
   const handleSelectProject = async (projectName: string) => {
     try {
       setIsLoading(true);
-      const response = await fetch(`http://localhost:8000/api/get-script/${projectName}`);
+      const response = await fetch(`http://localhost:8000/api/script/${projectName}`);
       if (!response.ok) {
         throw new Error('Failed to fetch script');
       }

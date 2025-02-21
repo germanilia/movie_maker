@@ -1,6 +1,0 @@
-Special Instructions for Opening Scenes:
-- Start with an establishing shot that reflects {style}.
-- Introduce main character in a way that highlights {story_highlights}.
-- Use camera movements ({camera_movements}) to set the tone.
-- Example (Documentary): "Open with a 10-second static wide shot of an abandoned factory, then cut to hands sorting relics."
-- Example (Children): "Begin with a spinning overhead shot of a magical map unfolding."

@@ -15,7 +15,6 @@ from src.services.aws_service import AWSService
 from src.services.background_music_service import BackgroundMusicService
 from src.services.video_service_factory import VideoServiceFactory, VideoProvider
 from src.services.face_detection_service import FaceDetectionService
-from src.backend.app.api.project_routes import router as project_router
 
 import os
 from pydantic import BaseModel
@@ -60,9 +59,6 @@ if not temp_dir.exists():
     logger.warning(f"Creating temp directory: {temp_dir}")
     temp_dir.mkdir(parents=True)
 
-# Include project routes
-logger.info("Mounting project routes at /api")
-app.include_router(project_router, prefix="/api", tags=["projects"])
 
 # Mount static directories
 app.mount("/temp", StaticFiles(directory=str(temp_dir)), name="temp")
@@ -76,6 +72,42 @@ frontend_dir = os.path.join(
 )
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+
+
+class ProjectList(BaseModel):
+    projects: List[str]
+
+def get_workspace_root() -> Path:
+    """Get the workspace root directory."""
+    current_file = Path(__file__)
+    # Navigate up from src/backend/app/api to the workspace root
+    return current_file.parents[2]
+
+@app.get("/list-projects", response_model=ProjectList)
+async def list_projects():
+    """List all projects in the temp directory"""
+    try:
+        # Get the workspace root and temp directory
+        workspace_root = get_workspace_root()
+        temp_dir = workspace_root / "temp"
+        
+        logger.info(f"Looking for projects in directory: {temp_dir}")
+        
+        if not temp_dir.exists():
+            logger.warning(f"Temp directory does not exist, creating it: {temp_dir}")
+            temp_dir.mkdir(parents=True)
+        
+        # Get all directories in temp folder
+        projects = [
+            d.name for d in temp_dir.iterdir() 
+            if d.is_dir() and not d.name.startswith('.')
+        ]
+        
+        logger.info(f"Found projects: {projects}")
+        return {"projects": sorted(projects)}
+    except Exception as e:
+        logger.error(f"Error listing projects: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/generate-script")

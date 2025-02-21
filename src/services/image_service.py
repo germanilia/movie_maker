@@ -113,7 +113,7 @@ class ImageService:
             logger.error(
                 f"Failed to encode image to base64: {image_path}. Error: {str(e)}"
             )
-            return None
+            raise e
 
     def get_fallback_image(self) -> str:
         """Get fallback image as base64 with data URL prefix"""
@@ -124,7 +124,7 @@ class ImageService:
             return self._encode_image_to_base64(stock_image_path)
         except Exception as e:
             logger.error(f"Failed to get fallback image: {str(e)}")
-            return None
+            raise e
 
     async def upscale_image(
         self,
@@ -171,7 +171,7 @@ class ImageService:
             output = replicate.run(
                 self.upscale_model.model_name,
                 input=self.upscale_model.parameters,
-                files={"image": local_path},
+                files={"image": local_path}, # type: ignore
             )
 
             if not output:
@@ -182,7 +182,7 @@ class ImageService:
             if isinstance(output, list) and len(output) > 0 and hasattr(output[0], "url"):
                 response = requests.get(output[0].url)
             else:
-                response = requests.get(output)
+                response = requests.get(output) # type: ignore
             response.raise_for_status()
 
             # Handle saving/returning based on input type
@@ -276,7 +276,7 @@ class ImageService:
             ):
                 response = requests.get(output[0].url)
             else:
-                response = requests.get(output)
+                response = requests.get(output) # type: ignore
             response.raise_for_status()
 
             with open(downloaded_path, "wb") as f:
@@ -320,7 +320,5 @@ class ImageService:
             self.image_model = self.flux_ultra_model
         elif model_type == "flux_dev_realism":
             self.image_model = self.flux_dev_realism
-        elif model_type == "flux_dev_artistic":
-            self.image_model = self.flux_dev_artistic
         else:
             raise ValueError(f"Unknown model type: {model_type}")

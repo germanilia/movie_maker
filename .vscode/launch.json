@@ -50,7 +50,7 @@
             "type": "chrome",
             "request": "launch",
             "url": "http://localhost:3000",
-            "webRoot": "${workspaceFolder}/src/frontend",
+            "webRoot": "${workspaceFolder}/frontend",
             "runtimeArgs": [
                 "--auto-open-devtools-for-tabs"
             ],
@@ -70,7 +70,7 @@
             "name": "React Dev Server",
             "type": "node",
             "request": "launch",
-            "cwd": "${workspaceFolder}/src/frontend",
+            "cwd": "${workspaceFolder}/frontend",
             "runtimeExecutable": "npm",
             "runtimeArgs": ["start"],
             "console": "internalConsole",

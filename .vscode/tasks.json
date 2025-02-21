@@ -10,6 +10,10 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
             }
         },
         {
@@ -19,15 +23,24 @@
             "isBackground": true,
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
+                "panel": "shared",
+                "clear": true
             },
             "problemMatcher": {
-                "pattern": {
-                    "regexp": "^.*Error.*$",
-                    "file": 1,
-                    "location": 2,
-                    "message": 3
-                },
+                "pattern": [
+                    {
+                        "regexp": "^.*Error.*$",
+                        "file": 1,
+                        "location": 2,
+                        "message": 3
+                    },
+                    {
+                        "regexp": "^.*Exception.*$",
+                        "file": 1,
+                        "location": 2,
+                        "message": 3
+                    }
+                ],
                 "background": {
                     "activeOnStart": true,
                     "beginsPattern": "^INFO:\\s*Started server process",
@@ -38,7 +51,7 @@
         {
             "label": "wait-for-backend",
             "type": "shell",
-            "command": "curl --retry 20 --retry-delay 1 --retry-connrefused http://localhost:8000/docs",
+            "command": "node -e \"const http=require('http'); const checkServer=()=>{http.get('http://localhost:8000/docs',(res)=>{if(res.statusCode===200){process.exit(0)}else{setTimeout(checkServer,1000)}}).on('error',()=>{setTimeout(checkServer,1000)})}; checkServer();\"",
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
@@ -49,20 +62,24 @@
             "type": "npm",
             "script": "start",
             "path": "src/frontend",
-            "group": {
-                "kind": "test",
-                "isDefault": true
-            },
             "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            },
             "problemMatcher": {
                 "owner": "custom",
-                "pattern": {
-                    "regexp": "^$"
-                },
+                "pattern": [
+                    {
+                        "regexp": "^(?=.*?\\b(error|failed)\\b).*$",
+                        "message": 0
+                    }
+                ],
                 "background": {
                     "activeOnStart": true,
-                    "beginsPattern": "Starting the development server",
-                    "endsPattern": "Compiled successfully|Failed to compile"
+                    "beginsPattern": "^Starting the development server",
+                    "endsPattern": "^Compiled successfully|Failed to compile"
                 }
             }
         }
