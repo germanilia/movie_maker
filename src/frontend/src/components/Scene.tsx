@@ -1,24 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   VStack,
   Text,
   Button,
   useToast,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   Heading,
   HStack,
   Badge,
-  Progress,
   Card,
   CardHeader,
-  CardBody,
   useColorModeValue,
-  Divider,
   Modal,
   ModalOverlay,
   ModalContent,
@@ -28,15 +20,11 @@ import {
   ModalFooter,
   Textarea,
   useDisclosure,
+  AspectRatio,
 } from '@chakra-ui/react';
-import { Scene as SceneType, Shot, Script } from '../models/models';
-import { MdAudiotrack, MdVideocam, MdDirections } from 'react-icons/md';
+import { Scene as SceneType, Script } from '../models/models';
 import { FaRedo } from 'react-icons/fa';
-import BackgroundMusic from './BackgroundMusic';
 import NarrationBox from './NarrationBox';
-import DirectorInstructions from './DirectorInstructions';
-import ShotVideo from './ShotVideo';
-import ImageDisplay from './ImageDisplay';
 import { createPortal } from 'react-dom';
 import { ChakraIcon } from './utils/ChakraIcon';
 
@@ -101,6 +89,7 @@ const Scene: React.FC<SceneProps> = ({
 }) => {
   const [regenerateInstructions, setRegenerateInstructions] = useState('');
   const [isRegeneratingScene, setIsRegeneratingScene] = useState(false);
+  const [hasVideo, setHasVideo] = useState(false);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
   const bgColor = useColorModeValue('white', 'gray.800');
@@ -141,6 +130,23 @@ const Scene: React.FC<SceneProps> = ({
       window.removeEventListener('popstate', checkInitialActiveState);
     };
   }, [chapterIndex, sceneIndex]);
+
+  useEffect(() => {
+    const checkVideoExists = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:8000/api/get-scene-video/${projectName}/${chapterNumber}/${scene.scene_number}`
+        );
+        setHasVideo(response.ok);
+      } catch (error) {
+        setHasVideo(false);
+      }
+    };
+    
+    if (isActive) {
+      checkVideoExists();
+    }
+  }, [isActive, projectName, chapterNumber, scene.scene_number]);
 
   const handleRegenerateScene = async () => {
     setIsRegeneratingScene(true);
@@ -257,6 +263,20 @@ const Scene: React.FC<SceneProps> = ({
                 </Button>
               </HStack>
               <Text fontSize="xs" color="gray.600" noOfLines={2}>{scene.main_story}</Text>
+              {isActive && hasVideo && (
+                <Box mt={4}>
+                  <Heading size="xs" mb={2}>Final Scene Video</Heading>
+                  <AspectRatio ratio={16/9}>
+                    <video
+                      controls
+                      src={`http://localhost:8000/api/get-scene-video/${projectName}/${chapterNumber}/${scene.scene_number}`}
+                      style={{ width: '100%', borderRadius: '8px' }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  </AspectRatio>
+                </Box>
+              )}
             </VStack>
           </CardHeader>
         </Card>

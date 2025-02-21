@@ -34,6 +34,7 @@ import {
   ModalFooter,
   Textarea,
   useDisclosure,
+  AspectRatio,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
 import { FaRedo } from 'react-icons/fa';
@@ -1004,6 +1005,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                 <Tab>Visual Preview</Tab>
                 <Tab>Script & Audio</Tab>
                 <Tab>Director Notes</Tab>
+                <Tab>Scene Video</Tab>
               </TabList>
 
               <TabPanels>
@@ -1091,6 +1093,28 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                     ))}
                   </VStack>
                 </TabPanel>
+
+                <TabPanel>
+                  <VStack spacing={6} align="stretch">
+                    <Card variant="outline" bg={bgColor}>
+                      <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
+                        <Heading size="sm">Final Scene Video</Heading>
+                      </CardHeader>
+                      <CardBody>
+                        <AspectRatio ratio={16/9}>
+                          <video
+                            controls
+                            src={`http://localhost:8000/api/get-scene-video/${projectName}/${activeChapterIndex + 1}/${currentChapter.scenes?.[activeSceneIndex]?.scene_number}`}
+                            style={{ width: '100%', borderRadius: '8px' }}
+                          >
+                            Your browser does not support the video tag.
+                          </video>
+                        </AspectRatio>
+                      </CardBody>
+                    </Card>
+                  </VStack>
+                </TabPanel>
+
               </TabPanels>
             </Tabs>
           </Box>
