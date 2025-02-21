@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   Text,
@@ -48,7 +48,7 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
   chapterIndex,
   sceneIndex,
   projectName,
-  narrationText,
+  narrationText: initialNarrationText,
   onNarrationUpdate,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -59,7 +59,8 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [audioError, setAudioError] = useState(false);
   const [regenerateInstructions, setRegenerateInstructions] = useState('');
-  const [editedNarration, setEditedNarration] = useState(narrationText);
+  const [localNarrationText, setLocalNarrationText] = useState(initialNarrationText);
+  const [editedNarration, setEditedNarration] = useState(initialNarrationText);
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressInterval = useRef<NodeJS.Timeout>();
   const toast = useToast();
@@ -70,6 +71,22 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
   const audioPath = `/temp/${projectName}/chapter_${chapterIndex + 1}/scene_${sceneIndex + 1}/narration.wav`;
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
+
+  // Update local state when prop changes
+  useEffect(() => {
+    setLocalNarrationText(initialNarrationText);
+    setEditedNarration(initialNarrationText);
+  }, [initialNarrationText]);
+
+  const resetAudioState = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.load(); // Reload the audio element
+    }
+  };
 
   const handlePlay = async () => {
     if (!audioRef.current || !audioPath) {
@@ -198,6 +215,14 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
       }
 
       const result = await response.json();
+      
+      // Update local state
+      setLocalNarrationText(result.narration);
+      setEditedNarration(result.narration);
+      resetAudioState();
+      setAudioError(false);
+
+      // Notify parent component
       if (onNarrationUpdate) {
         onNarrationUpdate(result.narration);
       }
@@ -248,6 +273,12 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
         throw new Error('Failed to update narration');
       }
 
+      // Update local state
+      setLocalNarrationText(editedNarration);
+      resetAudioState();
+      setAudioError(false);
+
+      // Notify parent component
       if (onNarrationUpdate) {
         onNarrationUpdate(editedNarration);
       }
@@ -333,7 +364,7 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
           borderRadius="md"
           fontSize="sm"
         >
-          <Text>{narrationText}</Text>
+          <Text>{localNarrationText}</Text>
         </Box>
 
         <>

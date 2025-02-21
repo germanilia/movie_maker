@@ -5,6 +5,14 @@ Regenerate narration instructions:
 {regenerate_narration_instructions}
 
 The response must start with a {{ and end with }} nothing is allowed before or after and never use new lines in the response
+In the reasoning explain why the narration text was selected, it the narration should be the the text going to be said during the scene, 
+not the instructions for the narration. 
+This is a bad example:
+{{
+    "reasoning": "The narration text was selected because it is a good example of a narration that fits the instructions",
+    "narration": "The story should be told from my personal perspective, focusing on vivid sensory details and emotional moments ...."
+}}
+
 
 The output format should be a json object with the following fields:
 {{

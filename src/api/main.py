@@ -21,6 +21,9 @@ from pydantic import BaseModel
 import base64
 import cv2
 import json
+from fastapi.responses import Response
+import time
+from starlette.responses import FileResponse as StarletteFileResponse
 
 # Configure logging
 logging.basicConfig(
@@ -352,6 +355,38 @@ class NarrationRequest(BaseModel):
     shot_number: int | None = None
     voice_id: str | None = None
 
+class CustomFileResponse(StarletteFileResponse):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add headers to prevent caching
+        self.headers.update({
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        })
+        
+def get_audio_file_response(file_path: str | Path, media_type: str = "audio/wav") -> CustomFileResponse:
+    """Helper function to create audio file responses with proper cache headers"""
+    if isinstance(file_path, str):
+        file_path = Path(file_path)
+        
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Audio file not found: {file_path}")
+        
+    # Generate ETag based on file modification time
+    mtime = file_path.stat().st_mtime
+    etag = f'"{hash(mtime)}"'
+    
+    return CustomFileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=file_path.name,
+        headers={
+            "ETag": etag,
+            "Last-Modified": time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(mtime))
+        }
+    )
+
 @app.post("/api/generate-narration/{project_name}")
 async def generate_narration(project_name: str, request: NarrationRequest):
     """Generate audio narration for given text"""
@@ -391,11 +426,7 @@ async def generate_narration(project_name: str, request: NarrationRequest):
             for chunk in audio_chunks:
                 audio_file.write(chunk)
 
-        return FileResponse(
-            path=str(local_path),
-            media_type="audio/wav",
-            filename="narration.wav"
-        )
+        return get_audio_file_response(local_path)
 
     except Exception as e:
         logger.error(f"Error generating narration: {str(e)}")
@@ -472,12 +503,8 @@ async def generate_background_music(project_name: str, request: BackgroundMusicR
         if not success or not local_path:
             raise Exception("Failed to generate background music")
 
-        # Return the audio file
-        return FileResponse(
-            path=local_path,
-            media_type="audio/mp3",
-            filename="background_music.mp3"
-        )
+        return get_audio_file_response(local_path, media_type="audio/mp3")
+
     except Exception as e:
         logger.error(f"Error generating background music: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -961,10 +988,17 @@ async def get_scene_video(
                 detail=f"Video not found for chapter {chapter_number}, scene {scene_number}"
             )
 
-        return FileResponse(
+        return CustomFileResponse(
             path=str(video_path),
             media_type="video/mp4",
-            filename=f"final_scene_{chapter_number}_{scene_number}.mp4"
+            filename=f"final_scene_{chapter_number}_{scene_number}.mp4",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+                "ETag": f'"{hash(video_path.stat().st_mtime)}"',
+                "Last-Modified": time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(video_path.stat().st_mtime))
+            }
         )
 
     except Exception as e:

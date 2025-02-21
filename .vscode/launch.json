@@ -31,14 +31,19 @@
                 "--port",
                 "8000",
                 "--log-level",
-                "debug"
+                "debug",
+                "--no-access-log",
+                "--timeout-keep-alive", "0",
+                "--timeout-graceful-shutdown", "1"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
+            "stopOnEntry": false,
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
                 "PYTHONUNBUFFERED": "1",
-                "PYDEVD_DISABLE_FILE_VALIDATION": "1"
+                "PYDEVD_DISABLE_FILE_VALIDATION": "1",
+                "UVICORN_FORCE_EXIT": "1"
             },
             "presentation": {
                 "hidden": false,
