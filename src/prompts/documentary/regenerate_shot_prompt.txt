@@ -1,0 +1,15 @@
+Current script:
+{script}
+
+
+You are required to regenerate shot {shot_number} in scene {scene_number} of chapter {chapter_number}.
+Regenerate shot instructions:
+{regenerate_shot_instructions}
+
+The response must start with a {{ and end with }} nothing is allowed before or after
+
+The output format should be a json object with the following fields:
+{{
+    "reasoning": "Explain in detail why this shot was chosen and how it fits with the script and the regenerate shot instructions",
+    "shot_instructions": "The new shot instructions for the script"
+}}

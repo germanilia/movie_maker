@@ -24,6 +24,8 @@ Based on the story background, chapter description, scene description, and compl
 
 The shot should be unique and avoid repeating visuals that have already been shown in any previous shots in any scene. Make sure the shot logically follows from the previous ones and contributes to the scene's overall message.
 
+The response must start with a {{ and end with }} nothing is allowed before or after
+
 Output Structure:
 {{
   "reasoning": "Explain in detail why this shot was chosen and how it fits with the scene, chapter, and overall story",

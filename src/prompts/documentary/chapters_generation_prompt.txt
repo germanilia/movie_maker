@@ -14,6 +14,8 @@ Previous Generation Error:
 {previous_generation_error}
 ####
 
+The response must start with a {{ and end with }} nothing is allowed before or after
+
 Based on the story background, number of scenes, and complete script context (if regenerating), create detailed chapter descriptions that follow a clear narrative arc.
 
 Output format should be a JSON object containing an array of chapters:

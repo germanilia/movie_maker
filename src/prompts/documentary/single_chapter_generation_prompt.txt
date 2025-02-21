@@ -22,6 +22,8 @@ Pay special attention to the regeneration instructions to address any specific c
 
 As the story progresses, the chapter should become more engaging and interesting than the previous ones.
 
+The response must start with a {{ and end with }} nothing is allowed before or after
+
 Output Structure:
 {{
   "chapter": {{

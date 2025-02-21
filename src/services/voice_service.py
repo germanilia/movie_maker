@@ -2,17 +2,16 @@ import os
 import logging
 import requests
 import mimetypes
+import urllib3  # Import urllib3 directly
 from pyht import Client
 from dotenv import load_dotenv
 from pyht.client import TTSOptions
 from typing import Optional, Dict, List
-from pathlib import Path
-from urllib3.exceptions import InsecureRequestWarning
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-# Suppress only the single warning from urllib3 needed.
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
+# Disable warnings (use urllib3 directly)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +156,10 @@ class VoiceService:
             for voice in cloned_voices:
                 if voice.get('name') == voice_name and voice.get('id'):
                     logger.info(f"Found existing voice with name '{voice_name}' and ID: {voice.get('id')}")
-                    return voice.get('id')
+                    voice_id = voice.get('id')
+                    if not voice_id:
+                        raise ValueError("Voice ID is not present in the response")
+                    return voice_id
             
             # If not found, create new cloned voice
             logger.info(f"No existing voice found with name '{voice_name}'. Creating new clone...")
@@ -199,6 +201,9 @@ class VoiceService:
                 try:
                     if not voice_id.startswith("s3://"):
                         voice_id = f"s3://{voice_id}"
+                    
+                    if not self.user_id or not self.api_key:
+                        raise ValueError("PLAY_HT_USER_ID and PLAY_HT_API_KEY must be set in environment variables")
                     
                     client = Client(
                         user_id=self.user_id,
