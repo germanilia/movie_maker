@@ -260,15 +260,7 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
             onLoadedMetadata={handleLoadedMetadata}
             onEnded={handleEnded}
             onError={(e) => {
-              console.error('Audio loading error:', e);
-              setAudioError(true);
-              toast({
-                title: 'Error',
-                description: 'Failed to load narration audio',
-                status: 'error',
-                duration: 3000,
-                isClosable: true,
-              });
+              console.warn('Audio loading error (file may not yet be generated):', e);
             }}
             style={{ display: 'none' }}
           />

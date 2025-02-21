@@ -32,7 +32,7 @@ import { ChakraIcon } from './utils/ChakraIcon';
 interface BackgroundMusicProps {
   audioData: Record<string, string>;
   isGenerating: boolean;
-  onGenerateMusic: (style?: string) => Promise<void>;  // Updated to accept style parameter
+  onGenerateMusic: (style?: string) => Promise<void>;
   chapterIndex: number;
   sceneIndex: number;
   projectName: string;
@@ -72,7 +72,7 @@ const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
 
   const handlePlay = async () => {
     if (!audioRef.current || !audioPath) {
-      alert('Audio source not available');
+      console.warn('Audio source not available');
       return;
     }
 
@@ -89,16 +89,14 @@ const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
         const playPromise = audioRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch((error) => {
-            console.error('Error playing audio:', error);
+            console.warn('Error playing audio:', error);
             setIsPlaying(false);
-            alert(`Failed to play audio: ${error.message}`);
           });
         }
       }
       setIsPlaying(!isPlaying);
-    } catch (error) {
-      console.error('Error checking audio file:', error);
-      alert('Audio file not found or inaccessible');
+    } catch (error: any) {
+      console.warn('Error checking audio file (it might not yet be generated):', error);
       setAudioError(true);
       setIsPlaying(false);
     }
@@ -215,7 +213,7 @@ const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
               size="sm"
               onClick={() => onGenerateMusic(selectedStyle)}
               isLoading={isGenerating}
-              loadingText={hasExistingMusic ? "Regenerating" : "Generating"}
+              loadingText={hasExistingMusic ? "Regenerating" : "Generating Music"}
               colorScheme="blue"
               variant={hasExistingMusic ? "ghost" : "solid"}
               leftIcon={hasExistingMusic ? <ChakraIcon icon={FaRedo} /> : undefined}
@@ -233,7 +231,7 @@ const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
             onLoadedMetadata={handleLoadedMetadata}
             onEnded={handleEnded}
             onError={(e) => {
-              console.error('Audio loading error:', e);
+              console.warn('Audio loading error (file may not yet be generated):', e);
               setAudioError(true);
               setIsPlaying(false);
             }}
