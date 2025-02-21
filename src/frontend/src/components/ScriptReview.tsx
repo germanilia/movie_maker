@@ -787,7 +787,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     type: 'opening' | 'closing'
   ) => {
     const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
-    const description = shot.opening_frame
+    const description = shot.opening_frame;
+    const videoKey = `${chapterIndex + 1}-${sceneIndex + 1}-${shotIndex + 1}`;
 
     return (
       <ImageDisplay
@@ -817,7 +818,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         chapterIndex={chapterIndex}
         sceneIndex={sceneIndex}
         shotIndex={shotIndex}
-        projectName={projectName}  // Add projectName prop
+        projectName={projectName}
+        videoData={videoData[videoKey]}
       />
     );
   };
@@ -1005,17 +1007,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                               activeSceneIndex,
                               shotIndex,
                               'opening'
-                            )}
-                            {videoData[`${activeChapterIndex + 1}-${activeSceneIndex + 1}-${shotIndex + 1}`] && (
-                              <Box>
-                                <Heading size="xs" mb={2}>Video Preview</Heading>
-                                <ShotVideo
-                                  videoData={videoData[`${activeChapterIndex + 1}-${activeSceneIndex + 1}-${shotIndex + 1}`]}
-                                  chapterIndex={activeChapterIndex}
-                                  sceneIndex={activeSceneIndex}
-                                  shotIndex={shotIndex}
-                                />
-                              </Box>
                             )}
                           </VStack>
                         </CardBody>

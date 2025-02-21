@@ -32,10 +32,16 @@ import {
   MenuList,
   MenuItem,
   Divider,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from '@chakra-ui/react';
 import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon, ChevronDownIcon } from '@chakra-ui/icons';
-import { FaImage, FaUserAlt } from 'react-icons/fa';
+import { FaImage, FaUserAlt, FaVideo } from 'react-icons/fa';
 import { ChakraIcon } from './utils/ChakraIcon';
+import ShotVideo from './ShotVideo';
 
 const dragDropStyles = {
   border: '2px dashed',
@@ -70,7 +76,8 @@ interface ImageDisplayProps {
   chapterIndex: number;
   sceneIndex: number;
   shotIndex: number;
-  projectName: string;  // Add projectName prop
+  projectName: string;
+  videoData?: string;  // Add videoData prop
 }
 
 interface SourceImage {
@@ -93,7 +100,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   chapterIndex,
   sceneIndex,
   shotIndex,
-  projectName,  // Add projectName to destructuring
+  projectName,
+  videoData,
 }) => {
   // Add local modelType state
   const [localModelType, setLocalModelType] = useState(initialModelType);
@@ -130,6 +138,14 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     { value: 'flux_ultra_model', label: 'Flux Ultra Model' },
     { value: 'flux_dev_realism', label: 'Flux Dev Realism' },
   ];
+
+  const [activeTab, setActiveTab] = useState(() => videoData ? 1 : 0);
+
+  useEffect(() => {
+    if (videoData) {
+      setActiveTab(1);
+    }
+  }, [videoData]);
 
   const handleSave = async () => {
     if (!onUpdateDescription) return;
@@ -580,104 +596,144 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           </Box>
         )}
 
-        {/* Image Display Section */}
-        {localImageData && (
+        {/* Media Display Section */}
+        {(localImageData || videoData) && (
           <Box>
-            <Box 
-              position="relative" 
-              borderWidth={1}
-              borderColor={borderColor}
-              borderRadius="md"
-              overflow="hidden"
+            <Tabs 
+              variant="enclosed"
+              colorScheme={buttonColorScheme}
+              index={activeTab}
+              onChange={setActiveTab}
+              isLazy
             >
-              {faceDetectionResult ? (
-                <canvas
-                  ref={canvasRef}
-                  style={{
-                    maxHeight: '400px',
-                    width: '100%',
-                    objectFit: 'contain',
-                  }}
-                />
-              ) : (
-                <Image
-                  src={localImageData.startsWith('data:') ? localImageData : `data:image/png;base64,${localImageData}`}
-                  alt={`${type} frame`}
-                  maxH="400px"
-                  w="100%"
-                  objectFit="contain"
-                />
-              )}
-            </Box>
+              <TabList>
+                <Tab>
+                  <HStack spacing={2}>
+                    <ChakraIcon icon={FaImage} />
+                    <Text>Image</Text>
+                  </HStack>
+                </Tab>
+                {videoData && (
+                  <Tab>
+                    <HStack spacing={2}>
+                      <ChakraIcon icon={FaVideo} />
+                      <Text>Video</Text>
+                    </HStack>
+                  </Tab>
+                )}
+              </TabList>
 
-            {/* Face Tools */}
-            <HStack justify="flex-end" mt={2} spacing={2}>
-              {!showFaceTools ? (
-                <Button
-                  size="sm"
-                  colorScheme={buttonColorScheme}
-                  variant="outline"
-                  leftIcon={<ChakraIcon icon={FaUserAlt} />}
-                  onClick={() => setShowFaceTools(true)}
-                >
-                  Face Tools
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    colorScheme={buttonColorScheme}
-                    onClick={detectFaces}
-                    isLoading={isDetectingFaces}
-                    loadingText="Detecting"
-                    variant="outline"
+              <TabPanels>
+                <TabPanel p={0} pt={4}>
+                  <Box 
+                    position="relative" 
+                    borderWidth={1}
+                    borderColor={borderColor}
+                    borderRadius="md"
+                    overflow="hidden"
                   >
-                    Detect Faces
-                  </Button>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleSourceFileUpload}
-                    style={{ display: 'none' }}
-                    ref={swapFileInputRef}
-                    disabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
-                  />
-                  <Button
-                    size="sm"
-                    colorScheme={buttonColorScheme}
-                    onClick={() => swapFileInputRef.current?.click()}
-                    isDisabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
-                    variant="outline"
-                  >
-                    Upload Faces
-                  </Button>
-                  {sourceImages.length > 0 && faceDetectionResult && (
-                    <Button
-                      size="sm"
-                      colorScheme={buttonColorScheme}
-                      onClick={() => setIsSwapModalOpen(true)}
-                      isDisabled={isSwapping}
-                      variant="outline"
-                    >
-                      Map & Swap
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowFaceTools(false);
-                      setFaceDetectionResult(null);
-                      setSourceImages([]);
-                      setFaceMapping({});
-                    }}
-                  >
-                    Hide Tools
-                  </Button>
-                </>
-              )}
-            </HStack>
+                    {faceDetectionResult ? (
+                      <canvas
+                        ref={canvasRef}
+                        style={{
+                          maxHeight: '400px',
+                          width: '100%',
+                          objectFit: 'contain',
+                        }}
+                      />
+                    ) : (
+                      <Image
+                        src={localImageData?.startsWith('data:') ? localImageData : `data:image/png;base64,${localImageData}`}
+                        alt={`${type} frame`}
+                        maxH="400px"
+                        w="100%"
+                        objectFit="contain"
+                      />
+                    )}
+                  </Box>
+
+                  {/* Face Tools */}
+                  <HStack justify="flex-end" mt={2} spacing={2}>
+                    {!showFaceTools ? (
+                      <Button
+                        size="sm"
+                        colorScheme={buttonColorScheme}
+                        variant="outline"
+                        leftIcon={<ChakraIcon icon={FaUserAlt} />}
+                        onClick={() => setShowFaceTools(true)}
+                      >
+                        Face Tools
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          size="sm"
+                          colorScheme={buttonColorScheme}
+                          onClick={detectFaces}
+                          isLoading={isDetectingFaces}
+                          loadingText="Detecting"
+                          variant="outline"
+                        >
+                          Detect Faces
+                        </Button>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleSourceFileUpload}
+                          style={{ display: 'none' }}
+                          ref={swapFileInputRef}
+                          disabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
+                        />
+                        <Button
+                          size="sm"
+                          colorScheme={buttonColorScheme}
+                          onClick={() => swapFileInputRef.current?.click()}
+                          isDisabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
+                          variant="outline"
+                        >
+                          Upload Faces
+                        </Button>
+                        {sourceImages.length > 0 && faceDetectionResult && (
+                          <Button
+                            size="sm"
+                            colorScheme={buttonColorScheme}
+                            onClick={() => setIsSwapModalOpen(true)}
+                            isDisabled={isSwapping}
+                            variant="outline"
+                          >
+                            Map & Swap
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setShowFaceTools(false);
+                            setFaceDetectionResult(null);
+                            setSourceImages([]);
+                            setFaceMapping({});
+                          }}
+                        >
+                          Hide Tools
+                        </Button>
+                      </>
+                    )}
+                  </HStack>
+                </TabPanel>
+
+                {videoData && (
+                  <TabPanel p={0} pt={4}>
+                    <ShotVideo
+                      videoData={videoData}
+                      chapterIndex={chapterIndex}
+                      sceneIndex={sceneIndex}
+                      shotIndex={shotIndex}
+                    />
+                  </TabPanel>
+                )}
+              </TabPanels>
+            </Tabs>
           </Box>
         )}
       </VStack>
