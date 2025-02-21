@@ -919,6 +919,69 @@ class RegenerateSceneRequest(BaseModel):
     scene_index: int
     instructions: str | None = None  # Optional instructions for scene regeneration
 
+class RegenerateShotRequest(BaseModel):
+    chapter_index: int
+    scene_index: int
+    shot_index: int
+    instructions: str | None = None  # Optional instructions for shot regeneration
+
+@app.post("/api/regenerate-shot/{project_name}")
+async def regenerate_shot(
+    project_name: str,
+    request: RegenerateShotRequest
+) -> Script:
+    """Regenerate a specific shot in the script"""
+    try:
+        director = DirectorService(
+            aws_service=AWSService(project_name=project_name),
+            project_name=project_name,
+        )
+        script = await director.get_script()
+        
+        if not script or not script.chapters:
+            raise HTTPException(status_code=404, detail="Script or chapters not found")
+            
+        # Convert 1-based indices to 0-based
+        chapter_idx = request.chapter_index - 1
+        scene_idx = request.scene_index - 1
+        shot_idx = request.shot_index - 1
+            
+        if chapter_idx >= len(script.chapters) or chapter_idx < 0:
+            raise HTTPException(status_code=400, detail="Invalid chapter index")
+            
+        if not script.chapters[chapter_idx].scenes or scene_idx >= len(script.chapters[chapter_idx].scenes or []) or scene_idx < 0:
+            raise HTTPException(status_code=400, detail="Invalid scene index")
+            
+        chapter = script.chapters[chapter_idx]
+        if not chapter.scenes or not chapter.scenes[scene_idx].shots or shot_idx >= len(chapter.scenes[scene_idx].shots or []) or shot_idx < 0:
+            raise HTTPException(status_code=400, detail="Invalid shot index")
+        
+        try:
+            # Regenerate the shot with custom instructions if provided
+            script = await director.regenerate_shot(
+                script=script,
+                chapter_index=chapter_idx,
+                scene_index=scene_idx,
+                shot_index=shot_idx,
+                custom_instructions=request.instructions
+            )
+            
+            await director.save_script(script)
+            
+            return script
+            
+        except ValueError as ve:
+            raise HTTPException(status_code=500, detail=str(ve))
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to regenerate shot: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"An unexpected error occurred while regenerating the shot: {str(e)}"
+        )
+
 @app.post("/api/regenerate-scene/{project_name}")
 async def regenerate_scene(
     project_name: str,

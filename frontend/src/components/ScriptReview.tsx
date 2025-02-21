@@ -183,7 +183,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   }, [projectName, toast]);
 
-  // Effect to load all data when script changes
+  // First, remove the script update event listener from the useEffect
   React.useEffect(() => {
     let mounted = true;
 
@@ -251,6 +251,34 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       mounted = false;
     };
   }, [script, projectName, toast, loadAllVideos]);
+
+  // Add a handler for shot updates
+  const handleShotRegenerated = (
+    chapterIndex: number,
+    sceneIndex: number,
+    shotIndex: number,
+    newDescription: string,
+    newInstructions: string
+  ) => {
+    if (!script) return;
+
+    // Update local state for the specific shot
+    const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, 'opening');
+    setImageData(prevImageData => {
+      const newImageData = { ...prevImageData };
+      delete newImageData[imageKey];
+      return newImageData;
+    });
+
+    // Update script without triggering a full re-render
+    const updatedScript = JSON.parse(JSON.stringify(script));
+    const shot = updatedScript.chapters[chapterIndex]?.scenes?.[sceneIndex]?.shots?.[shotIndex];
+    if (shot) {
+      shot.opening_frame = newDescription;
+      shot.director_instructions = newInstructions;
+      setScript(updatedScript);
+    }
+  };
 
   // Update onVideoGenerated to use loadAllVideos
   const onVideoGenerated = async () => {
@@ -831,6 +859,10 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         onUpdateDescription={(newDescription) =>
           handleUpdateDescription(chapterIndex, sceneIndex, shotIndex, type, newDescription)
         }
+        onShotRegenerated={(newDescription, newInstructions) => 
+          handleShotRegenerated(chapterIndex, sceneIndex, shotIndex, newDescription, newInstructions)
+        }
+        directorInstructions={shot.director_instructions}
         chapterIndex={chapterIndex}
         sceneIndex={sceneIndex}
         shotIndex={shotIndex}

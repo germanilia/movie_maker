@@ -37,9 +37,10 @@ import {
   TabPanels,
   Tab,
   TabPanel,
+  useDisclosure,
 } from '@chakra-ui/react';
-import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon, ChevronDownIcon } from '@chakra-ui/icons';
-import { FaImage, FaUserAlt, FaVideo } from 'react-icons/fa';
+import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon, ChevronDownIcon, Icon } from '@chakra-ui/icons';
+import { FaImage, FaUserAlt, FaVideo, FaRedo } from 'react-icons/fa';
 import { ChakraIcon } from './utils/ChakraIcon';
 import ShotVideo from './ShotVideo';
 
@@ -77,7 +78,9 @@ interface ImageDisplayProps {
   sceneIndex: number;
   shotIndex: number;
   projectName: string;
-  videoData?: string;  // Add videoData prop
+  videoData?: string;
+  directorInstructions?: string;
+  onShotRegenerated?: (newDescription: string, newInstructions: string) => void;
 }
 
 interface SourceImage {
@@ -102,7 +105,22 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   shotIndex,
   projectName,
   videoData,
+  directorInstructions = '',
+  onShotRegenerated,
 }) => {
+  // Add local state for description and instructions
+  const [localDescription, setLocalDescription] = useState(description);
+  const [localDirectorInstructions, setLocalDirectorInstructions] = useState(directorInstructions);
+  
+  // Update local state when props change
+  useEffect(() => {
+    setLocalDescription(description);
+  }, [description]);
+
+  useEffect(() => {
+    setLocalDirectorInstructions(directorInstructions);
+  }, [directorInstructions]);
+
   // Add local modelType state
   const [localModelType, setLocalModelType] = useState(initialModelType);
   
@@ -123,6 +141,9 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const [faceMapping, setFaceMapping] = useState<Record<number, string>>({});
   const [localImageData, setLocalImageData] = useState<string | undefined>(imageData);
+  const [isRegeneratingShot, setIsRegeneratingShot] = useState(false);
+  const [regenerateInstructions, setRegenerateInstructions] = useState('');
+  const { isOpen: isRegenerateModalOpen, onOpen: onRegenerateModalOpen, onClose: onRegenerateModalClose } = useDisclosure();
 
   // Add new loading states
   const [isDetectingFaces, setIsDetectingFaces] = useState(false);
@@ -415,6 +436,66 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     setEditedDescription(description);
   }, [description]);
 
+  const handleRegenerateShot = async () => {
+    setIsRegeneratingShot(true);
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/regenerate-shot/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_index: chapterIndex + 1,
+            scene_index: sceneIndex + 1,
+            shot_index: shotIndex + 1,
+            instructions: regenerateInstructions,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to regenerate shot');
+      }
+
+      const updatedScript = await response.json();
+      
+      // Get the updated shot from the response
+      const updatedShot = updatedScript.chapters[chapterIndex]?.scenes?.[sceneIndex]?.shots?.[shotIndex];
+      if (updatedShot) {
+        // Update local state
+        setLocalDescription(updatedShot.opening_frame);
+        setLocalDirectorInstructions(updatedShot.director_instructions);
+        
+        // Notify parent component
+        if (onShotRegenerated) {
+          onShotRegenerated(updatedShot.opening_frame, updatedShot.director_instructions);
+        }
+      }
+
+      onRegenerateModalClose();
+      setRegenerateInstructions('');
+      toast({
+        title: 'Success',
+        description: 'Shot regenerated successfully',
+        status: 'success',
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Error regenerating shot:', error);
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to regenerate shot',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setIsRegeneratingShot(false);
+    }
+  };
+
   return (
     <Box 
       bg={bgColor} 
@@ -460,6 +541,17 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                 />
               </Tooltip>
             )}
+            
+            <Tooltip label="Regenerate shot">
+              <IconButton
+                aria-label="Regenerate shot"
+                icon={<Icon as={FaRedo} />}
+                size="sm"
+                colorScheme={buttonColorScheme}
+                variant="ghost"
+                onClick={onRegenerateModalOpen}
+              />
+            </Tooltip>
             
             <Menu>
               <MenuButton
@@ -518,8 +610,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         {isEditing ? (
           <Box>
             <Textarea
-              value={editedDescription}
-              onChange={(e) => setEditedDescription(e.target.value)}
+              value={localDescription}
+              onChange={(e) => setLocalDescription(e.target.value)}
               color={accentTextColor}
               mb={2}
               bg={accentBgColor}
@@ -530,7 +622,10 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={handleCancel}
+                onClick={() => {
+                  setLocalDescription(description);
+                  setIsEditing(false);
+                }}
                 leftIcon={<CloseIcon />}
               >
                 Cancel
@@ -538,7 +633,28 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
               <Button
                 size="sm"
                 colorScheme={buttonColorScheme}
-                onClick={handleSave}
+                onClick={async () => {
+                  if (onUpdateDescription) {
+                    setIsSaving(true);
+                    try {
+                      await onUpdateDescription(localDescription);
+                      setIsEditing(false);
+                      toast({
+                        title: "Description updated",
+                        status: "success",
+                        duration: 3000,
+                      });
+                    } catch (error) {
+                      toast({
+                        title: "Failed to update description",
+                        status: "error",
+                        duration: 3000,
+                      });
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }
+                }}
                 isLoading={isSaving}
                 leftIcon={<CheckIcon />}
               >
@@ -547,7 +663,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
             </HStack>
           </Box>
         ) : (
-          <Text color={accentTextColor}>{editedDescription}</Text>
+          <Text color={accentTextColor}>{localDescription}</Text>
         )}
 
         {/* Reference Image Upload Section */}
@@ -811,6 +927,47 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
               loadingText="Swapping Faces"
             >
               Swap Faces
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Shot Regeneration Modal */}
+      <Modal 
+        isOpen={isRegenerateModalOpen} 
+        onClose={() => {
+          setRegenerateInstructions('');
+          onRegenerateModalClose();
+        }}
+        size="xl"
+      >
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Shot Regeneration Instructions</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <Text mb={4}>
+              Enter any specific instructions for regenerating this shot. These instructions will help guide the AI in creating a new version of the shot.
+            </Text>
+            <Textarea
+              value={regenerateInstructions}
+              onChange={(e) => setRegenerateInstructions(e.target.value)}
+              placeholder="Enter instructions for shot regeneration..."
+              size="lg"
+              rows={6}
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onRegenerateModalClose}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme={buttonColorScheme}
+              onClick={handleRegenerateShot}
+              isLoading={isRegeneratingShot}
+              loadingText="Regenerating Shot"
+            >
+              Regenerate
             </Button>
           </ModalFooter>
         </ModalContent>

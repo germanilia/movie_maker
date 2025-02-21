@@ -491,6 +491,76 @@ class DirectorService:
             logger.error(error_msg)
             raise ValueError(error_msg)
 
+    async def regenerate_shot(
+        self,
+        script: Script,
+        chapter_index: int,
+        scene_index: int,
+        shot_index: int,
+        custom_instructions: str | None = None,
+        max_retries: int = 10,
+    ) -> Script:
+        """Regenerate a specific shot while maintaining context."""
+        chapter = script.chapters[chapter_index]
+        if not chapter.scenes:
+            raise ValueError("No scenes found in chapter")
+            
+        scene = chapter.scenes[scene_index]
+        if not scene.shots:
+            raise ValueError("No shots found in scene")
+            
+        shot = scene.shots[shot_index]
+        prev_error = "N/A"
+
+        prompt_template = await self._load_prompt("regenerate_shot_prompt.txt")
+
+        try:
+            logger.info(
+                f"Regenerating shot {shot_index + 1} in scene {scene_index + 1} in chapter {chapter_index + 1}"
+            )
+
+            prompt = await self._format_prompt(
+                prompt_template,
+                chapter_number=chapter_index + 1,
+                scene_number=scene_index + 1,
+                shot_number=shot_index + 1,
+                regenerate_shot_instructions=custom_instructions or "N/A",
+                script=script,
+            )
+
+            response = await self.aws_service.invoke_llm(prompt, prev_errors=prev_error)
+
+            try:
+                shot_data = json.loads(response)
+                if not isinstance(shot_data, dict):
+                    raise ValueError("Response is not a valid JSON object")
+
+                # Create new shot with updated instructions and description
+                new_shot = Shot(
+                    shot_number=shot_index + 1,
+                    director_instructions=shot_data["shot_instructions"],
+                    opening_frame=shot_data["shot_instructions"],  # Use the same instructions for the frame description
+                )
+
+                # Update the shot in the script
+                if not scene.shots:
+                    scene.shots = []
+                scene.shots[shot_index] = new_shot
+
+                return script
+
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing error: {str(e)}\nResponse: {response}")
+                raise ValueError(f"Invalid JSON response: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error processing shot data: {str(e)}")
+                raise ValueError(f"Failed to process shot data: {str(e)}")
+
+        except Exception as e:
+            error_msg = f"Error regenerating shot: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
     async def regenerate_chapter(
         self,
         script: Script,
