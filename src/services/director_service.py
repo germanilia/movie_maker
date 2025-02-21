@@ -1,7 +1,7 @@
 import json
 import logging
 import sys
-from typing import List
+from typing import List, Optional
 from pathlib import Path
 from src.models.models import (
     ProjectDetails,
@@ -11,6 +11,7 @@ from src.models.models import (
     Shot,
 )
 from src.services.aws_service import AWSService
+import re
 
 # Configure logging
 
@@ -23,13 +24,22 @@ logging.basicConfig(
 # Get the logger for this module
 logger = logging.getLogger(__name__)
 
+def to_snake_case(name: str) -> str:
+    """Convert a string to snake case."""
+    # Replace spaces and special characters with underscores
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
+    # Convert to lowercase and replace spaces/special chars with underscores
+    return re.sub(r'[^a-z0-9]+', '_', s2.lower()).strip('_')
 
 class DirectorService:
     def __init__(self, aws_service: AWSService, project_name: str):
         self.aws_service = aws_service
         self.prompts_base_path = Path("src/prompts")
         self.temp_base_path = Path("temp")
-        self.project_name = project_name
+        self.project_name = to_snake_case(project_name)
+        self.temp_dir = self.temp_base_path / self.project_name
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
 
     async def _load_prompt(self, genre: str, prompt_name: str) -> str:
         """Load a prompt file based on genre and name."""
@@ -357,7 +367,7 @@ class DirectorService:
         # s3_path = f"{self.aws_service.s3_base_uri}/script.json"
         # await self.aws_service.upload_file(str(script_path), s3_path)
 
-    async def get_script(self) -> Script:
+    async def get_script(self) -> Optional[Script]:
         """Get the current script for the project."""
         try:
             script = await self._try_load_script(

@@ -206,7 +206,6 @@ const Scene: React.FC<SceneProps> = ({
   return (
     <>
       <Box 
-        as="button" 
         width="100%" 
         cursor="pointer"
         transition="all 0.2s"

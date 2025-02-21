@@ -15,6 +15,7 @@ from src.services.aws_service import AWSService
 from src.services.background_music_service import BackgroundMusicService
 from src.services.video_service_factory import VideoServiceFactory, VideoProvider
 from src.services.face_detection_service import FaceDetectionService
+from src.backend.app.api.project_routes import router as project_router
 
 import os
 from pydantic import BaseModel
@@ -36,8 +37,8 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 # Get the logger for this module
 logger = logging.getLogger(__name__)
 
-
 app = FastAPI(title="Video Creator API")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -46,6 +47,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Get the workspace root directory
+workspace_root = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+logger.info(f"Workspace root: {workspace_root}")
+
+# Mount the temp directory for serving files
+temp_dir = workspace_root / "temp"
+logger.info(f"Temp directory: {temp_dir}")
+
+if not temp_dir.exists():
+    logger.warning(f"Creating temp directory: {temp_dir}")
+    temp_dir.mkdir(parents=True)
+
+# Include project routes
+logger.info("Mounting project routes at /api")
+app.include_router(project_router, prefix="/api", tags=["projects"])
+
+# Mount static directories
+app.mount("/temp", StaticFiles(directory=str(temp_dir)), name="temp")
 
 # Mount the static frontend files
 frontend_dir = os.path.join(
@@ -56,9 +76,6 @@ frontend_dir = os.path.join(
 )
 if os.path.exists(frontend_dir):
     app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
-
-# Mount the temp directory for serving video files
-app.mount("/temp", StaticFiles(directory="temp"), name="temp")
 
 
 @app.post("/api/generate-script")
