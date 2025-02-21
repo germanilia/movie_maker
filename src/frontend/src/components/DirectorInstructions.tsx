@@ -1,53 +1,67 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Text, 
-  IconButton, 
+import {
+  Box,
+  VStack,
+  Heading,
   Textarea,
-  HStack,
   Button,
   useToast,
+  HStack,
+  Badge,
+  IconButton,
+  Collapse,
+  useColorModeValue,
+  Text,
+  Tooltip,
 } from '@chakra-ui/react';
-import { EditIcon } from '@chakra-ui/icons';
+import { EditIcon, CheckIcon, CloseIcon, InfoIcon } from '@chakra-ui/icons';
 
 interface DirectorInstructionsProps {
-  instructions?: string;
-  projectName: string;
-  chapterIndex: number;
-  sceneIndex: number;
-  shotIndex: number;
-  onInstructionsUpdated: (newInstructions: string) => Promise<void>;
+  instructions: string;
+  handleUpdate: (newInstructions: string) => Promise<void>;
 }
 
-const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({ 
-  instructions, 
-  projectName,
-  chapterIndex,
-  sceneIndex,
-  shotIndex,
-  onInstructionsUpdated
+const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
+  instructions,
+  handleUpdate
 }) => {
+  const [editedInstructions, setEditedInstructions] = useState(instructions);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedInstructions, setEditedInstructions] = useState(instructions || '');
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [localInstructions, setLocalInstructions] = useState(instructions || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
   const toast = useToast();
 
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const textColor = useColorModeValue('gray.600', 'gray.300');
+
   useEffect(() => {
-    if (instructions !== undefined) {
-      setLocalInstructions(instructions);
-      setEditedInstructions(instructions);
-    }
+    setEditedInstructions(instructions);
   }, [instructions]);
 
-  const handleSave = async () => {
+  useEffect(() => {
+    setHasChanges(editedInstructions !== instructions);
+  }, [editedInstructions, instructions]);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setEditedInstructions(instructions);
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setEditedInstructions(instructions);
+    setHasChanges(false);
+  };
+
+  const onSave = async () => {
+    if (!hasChanges) return;
+    
+    setIsSaving(true);
     try {
-      setIsUpdating(true);
-      
-      await onInstructionsUpdated(editedInstructions);
-      setLocalInstructions(editedInstructions);
+      await handleUpdate(editedInstructions);
       setIsEditing(false);
-      
+      setHasChanges(false);
       toast({
         title: 'Success',
         description: 'Director instructions updated',
@@ -56,7 +70,6 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
         isClosable: true,
       });
     } catch (error) {
-      console.error('Failed to save director instructions:', error);
       toast({
         title: 'Error',
         description: 'Failed to update director instructions',
@@ -65,58 +78,92 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
         isClosable: true,
       });
     } finally {
-      setIsUpdating(false);
+      setIsSaving(false);
     }
   };
 
-  if (!localInstructions && !isEditing) {
-    return null;
-  }
-
   return (
-    <Box bg="blue.50" p={3} borderRadius="md">
-      <HStack justify="space-between" mb={2}>
-        <Text fontWeight="bold">Director Instructions:</Text>
-        {!isEditing && (
-          <IconButton
-            aria-label="Edit instructions"
-            icon={<EditIcon />}
-            size="sm"
-            onClick={() => setIsEditing(true)}
-          />
-        )}
-      </HStack>
-      
-      {isEditing ? (
-        <>
-          <Textarea
-            value={editedInstructions}
-            onChange={(e) => setEditedInstructions(e.target.value)}
-            mb={2}
-          />
-          <HStack justify="flex-end" spacing={2}>
-            <Button
-              size="sm"
-              onClick={() => {
-                setEditedInstructions(localInstructions);
-                setIsEditing(false);
-              }}
+    <Box 
+      p={4} 
+      borderWidth={1} 
+      borderRadius="md" 
+      bg={bgColor} 
+      borderColor={borderColor}
+    >
+      <VStack align="stretch" spacing={4}>
+        <HStack justify="space-between" align="center">
+          <HStack>
+            <Heading size="sm">Director Instructions</Heading>
+            <Tooltip 
+              label="Provide detailed instructions for directing this shot" 
+              placement="top"
             >
-              Cancel
-            </Button>
-            <Button
+              <InfoIcon color="blue.500" />
+            </Tooltip>
+          </HStack>
+          {!isEditing ? (
+            <IconButton
+              aria-label="Edit instructions"
+              icon={<EditIcon />}
               size="sm"
               colorScheme="blue"
-              onClick={handleSave}
-              isLoading={isUpdating}
+              variant="ghost"
+              onClick={handleEdit}
+            />
+          ) : (
+            <Badge 
+              colorScheme={hasChanges ? "yellow" : "green"}
             >
-              Save
-            </Button>
-          </HStack>
-        </>
-      ) : (
-        <Text color="blue.800">{localInstructions}</Text>
-      )}
+              {hasChanges ? "Unsaved Changes" : "No Changes"}
+            </Badge>
+          )}
+        </HStack>
+
+        {isEditing ? (
+          <VStack align="stretch" spacing={3}>
+            <Textarea
+              value={editedInstructions}
+              onChange={(e) => setEditedInstructions(e.target.value)}
+              minHeight="200px"
+              placeholder="Enter director instructions here..."
+              size="sm"
+              resize="vertical"
+            />
+            <HStack justify="flex-end" spacing={2}>
+              <Button
+                size="sm"
+                variant="ghost"
+                leftIcon={<CloseIcon />}
+                onClick={handleCancel}
+                isDisabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                colorScheme="blue"
+                leftIcon={<CheckIcon />}
+                onClick={onSave}
+                isLoading={isSaving}
+                loadingText="Saving"
+                isDisabled={!hasChanges}
+              >
+                Save Changes
+              </Button>
+            </HStack>
+          </VStack>
+        ) : (
+          <Box>
+            <Text 
+              color={textColor}
+              whiteSpace="pre-wrap"
+              fontSize="sm"
+            >
+              {instructions || "No instructions provided yet."}
+            </Text>
+          </Box>
+        )}
+      </VStack>
     </Box>
   );
 };

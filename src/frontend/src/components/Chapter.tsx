@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import {
   Box,
   Text,
@@ -18,9 +19,14 @@ import {
   ModalCloseButton,
   Textarea,
   useDisclosure,
+  HStack,
+  Icon,
+  Badge,
 } from '@chakra-ui/react';
-import { Chapter as ChapterType, Script } from '../models/models';
+import { Chapter as ChapterType, Script, Scene as SceneType } from '../models/models';
 import Scene from './Scene';
+import { FaRedo } from 'react-icons/fa';
+import { ChakraIcon } from './utils/ChakraIcon';
 
 interface ChapterProps {
   chapter: ChapterType;
@@ -45,7 +51,7 @@ interface ChapterProps {
     modelType?: string,
     seed?: number
   ) => Promise<void>;
-  handleGenerateBackgroundMusic: (chapterNumber: number, sceneNumber: number) => Promise<void>;
+  handleGenerateBackgroundMusic: (chapterNumber: number, sceneNumber: number, style?: string) => Promise<void>;
   handleUpdateDescription: (
     chapterIndex: number,
     sceneIndex: number,
@@ -81,6 +87,8 @@ const Chapter: React.FC<ChapterProps> = ({
   const [isRegeneratingChapter, setIsRegeneratingChapter] = React.useState(false);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
+  const initialFocusRef = React.useRef(null);
+  const finalFocusRef = React.useRef(null);
 
   const handleRegenerateChapter = async () => {
     setIsRegeneratingChapter(true);
@@ -130,94 +138,145 @@ const Chapter: React.FC<ChapterProps> = ({
     }
   };
 
+  const handleModalClose = () => {
+    setRegenerateInstructions('');
+    onClose();
+  };
+
   return (
-    <AccordionItem>
-      <AccordionButton>
-        <Box flex="1" textAlign="left">
-          <Text fontWeight="bold">
-            Chapter {chapter.chapter_number}: {chapter.title}
-          </Text>
-        </Box>
-        <AccordionIcon />
-      </AccordionButton>
-      <AccordionPanel pb={4}>
-        <VStack spacing={4} align="stretch">
-          {/* Modal for regeneration instructions */}
-          <Modal isOpen={isOpen} onClose={onClose}>
-            <ModalOverlay />
-            <ModalContent>
-              <ModalHeader>Chapter Regeneration Instructions</ModalHeader>
-              <ModalCloseButton />
-              <ModalBody>
-                <Text mb={4}>
-                  Enter any specific instructions for regenerating this chapter. These instructions will help guide the AI in creating a new version of the chapter.
+    <>
+      <Box mb={8} pb={4} borderBottomWidth="1px" borderColor="gray.200" _last={{ borderBottom: 'none' }}>
+        <VStack align="stretch" spacing={3}>
+          <Box p={3} bg="blue.50" borderRadius="md" borderWidth="1px" borderColor="blue.100">
+            <VStack align="stretch" spacing={1}>
+              <HStack justify="space-between">
+                <Text fontSize="md" fontWeight="bold" color="blue.700">
+                  Chapter {chapter.chapter_number}
                 </Text>
-                <Textarea
-                  value={regenerateInstructions}
-                  onChange={(e) => setRegenerateInstructions(e.target.value)}
-                  placeholder="Enter instructions for chapter regeneration..."
-                  size="lg"
-                  rows={6}
-                />
-              </ModalBody>
-              <ModalFooter>
-                <Button variant="ghost" mr={3} onClick={onClose}>
-                  Cancel
-                </Button>
                 <Button
+                  leftIcon={<ChakraIcon icon={FaRedo} />}
                   colorScheme="blue"
-                  onClick={handleRegenerateChapter}
+                  size="xs"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onOpen();
+                  }}
                   isLoading={isRegeneratingChapter}
-                  loadingText="Regenerating Chapter"
+                  zIndex={1}
                 >
                   Regenerate
                 </Button>
-              </ModalFooter>
-            </ModalContent>
-          </Modal>
-
-          <Box display="flex" alignItems="center" gap={4}>
-            <Button
-              colorScheme="blue"
-              onClick={onOpen}
-              isLoading={isRegeneratingChapter}
-              loadingText="Regenerating Chapter"
-            >
-              Regenerate Chapter
-            </Button>
+              </HStack>
+              <Text fontSize="sm" color="blue.600" noOfLines={1}>{chapter.title}</Text>
+            </VStack>
           </Box>
 
-          <Box bg="gray.50" p={3} borderRadius="md">
-            <Text>{chapter.description}</Text>
-          </Box>
-
-          {(chapter.scenes || []).map((scene, sceneIndex) => (
-            <Scene
-              key={sceneIndex}
-              scene={scene}
-              chapterIndex={chapterIndex}
-              sceneIndex={sceneIndex}
-              chapterNumber={chapter.chapter_number}
-              projectName={projectName}
-              script={script}
-              setScript={setScript}
-              imageData={imageData}
-              narrationData={narrationData}
-              backgroundMusicData={backgroundMusicData}
-              videoData={videoData}
-              generatingImages={generatingImages}
-              generatingMusic={generatingMusic}
-              handleGenerateImage={handleGenerateImage}
-              handleGenerateBackgroundMusic={handleGenerateBackgroundMusic}
-              handleUpdateDescription={handleUpdateDescription}
-              getImageKey={getImageKey}
-              onVideoGenerated={onVideoGenerated}
-              onScriptUpdate={onScriptUpdate}
-            />
-          ))}
+          <VStack spacing={2} align="stretch" pl={2}>
+            {(chapter.scenes || []).map((scene: SceneType, sceneIndex: number) => (
+              <Scene
+                key={sceneIndex}
+                scene={scene}
+                chapterIndex={chapterIndex}
+                sceneIndex={sceneIndex}
+                chapterNumber={chapter.chapter_number}
+                projectName={projectName}
+                script={script}
+                setScript={setScript}
+                imageData={imageData}
+                narrationData={narrationData}
+                backgroundMusicData={backgroundMusicData}
+                videoData={videoData}
+                generatingImages={generatingImages}
+                generatingMusic={generatingMusic}
+                handleGenerateImage={handleGenerateImage}
+                handleGenerateBackgroundMusic={handleGenerateBackgroundMusic}
+                handleUpdateDescription={handleUpdateDescription}
+                getImageKey={getImageKey}
+                onVideoGenerated={onVideoGenerated}
+                onScriptUpdate={onScriptUpdate}
+              />
+            ))}
+          </VStack>
         </VStack>
-      </AccordionPanel>
-    </AccordionItem>
+      </Box>
+
+      {createPortal(
+        <Modal 
+          isOpen={isOpen} 
+          onClose={handleModalClose}
+          initialFocusRef={initialFocusRef}
+          finalFocusRef={finalFocusRef}
+          size="xl"
+          closeOnEsc={true}
+          closeOnOverlayClick={true}
+          isCentered
+          blockScrollOnMount={true}
+          trapFocus={true}
+          returnFocusOnClose={true}
+          useInert={true}
+          autoFocus={true}
+        >
+          <ModalOverlay 
+            bg="blackAlpha.800"
+            backdropFilter="blur(3px)"
+            backdropInvert="5%"
+          />
+          <ModalContent 
+            position="relative"
+            mx={4}
+            my={3}
+            maxHeight="calc(100vh - 80px)"
+            overflow="auto"
+            borderRadius="md"
+            boxShadow="dark-lg"
+          >
+            <ModalHeader>Chapter Regeneration Instructions</ModalHeader>
+            <ModalCloseButton tabIndex={0} />
+            <ModalBody>
+              <Text mb={4}>
+                Enter any specific instructions for regenerating this chapter. These instructions will help guide the AI in creating a new version of the chapter.
+              </Text>
+              <Textarea
+                ref={initialFocusRef}
+                value={regenerateInstructions}
+                onChange={(e) => setRegenerateInstructions(e.target.value)}
+                placeholder="Enter instructions for chapter regeneration..."
+                size="lg"
+                rows={6}
+                tabIndex={0}
+                _focus={{
+                  borderColor: "blue.400",
+                  boxShadow: "0 0 0 1px blue.400",
+                  zIndex: 1
+                }}
+              />
+            </ModalBody>
+            <ModalFooter>
+              <Button 
+                variant="ghost" 
+                mr={3} 
+                onClick={handleModalClose}
+                tabIndex={0}
+                ref={finalFocusRef}
+              >
+                Cancel
+              </Button>
+              <Button
+                colorScheme="blue"
+                onClick={handleRegenerateChapter}
+                isLoading={isRegeneratingChapter}
+                loadingText="Regenerating Chapter"
+                tabIndex={0}
+              >
+                Regenerate
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>,
+        document.body
+      )}
+    </>
   );
 };
 

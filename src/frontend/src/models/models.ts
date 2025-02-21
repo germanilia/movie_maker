@@ -16,7 +16,7 @@ export interface Shot {
 
 export interface Scene {
   scene_number: number;
-  description: string;
+  main_story: string;
   narration_text: string;
   background_music?: string | string[];
   shots?: Shot[];
@@ -25,7 +25,7 @@ export interface Scene {
 export interface Chapter {
   chapter_number: number;
   title: string;
-  description: string;
+  chapter_description: string;
   scenes?: Scene[];
 }
 

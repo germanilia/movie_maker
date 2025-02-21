@@ -7,15 +7,36 @@ import {
   HStack,
   Text,
   Heading,
-  Accordion,
-  AccordionItem,
-  AccordionButton,
-  AccordionPanel,
-  AccordionIcon,
   useToast,
   Spinner,
   Center,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
+  Flex,
+  Badge,
+  Progress,
+  IconButton,
+  Divider,
+  useColorModeValue,
+  Card,
+  CardHeader,
+  CardBody,
+  Icon,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  ModalFooter,
+  Textarea,
+  useDisclosure,
 } from '@chakra-ui/react';
+import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
+import { FaRedo } from 'react-icons/fa';
 import ImageDisplay from './ImageDisplay';
 import NarrationBox from './NarrationBox';
 import BackgroundMusic from './BackgroundMusic';
@@ -47,6 +68,34 @@ interface VideoApiResponse {
   videos: Record<string, string>;
 }
 
+interface ShotVideoProps {
+  videoData: string;
+  chapterIndex: number;
+  sceneIndex: number;
+  shotIndex: number;
+}
+
+interface NarrationBoxProps {
+  audioData: Record<string, string>;
+  chapterIndex: number;
+  sceneIndex: number;
+  projectName: string;
+}
+
+interface BackgroundMusicProps {
+  audioData: Record<string, string>;
+  isGenerating: boolean;
+  onGenerateMusic: (style?: string) => Promise<void>;
+  chapterIndex: number;
+  sceneIndex: number;
+  projectName: string;
+}
+
+interface DirectorInstructionsProps {
+  instructions: string;
+  handleUpdate: (newInstructions: string) => Promise<void>;
+}
+
 const ScriptReview: React.FC<ScriptReviewProps> = ({
   script,
   setScript,
@@ -64,14 +113,32 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [generatingMusic, setGeneratingMusic] = useState<Set<string>>(new Set());
   const [isGeneratingAllMusic, setIsGeneratingAllMusic] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeChapterIndex, setActiveChapterIndex] = useState(0);
+  const [activeSceneIndex, setActiveSceneIndex] = useState(0);
+  const [activeChapterForRegeneration, setActiveChapterForRegeneration] = useState<number | null>(null);
+  const [activeSceneForRegeneration, setActiveSceneForRegeneration] = useState<{chapter: number, scene: number} | null>(null);
+  const [regenerateInstructions, setRegenerateInstructions] = useState('');
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const { isOpen: isChapterModalOpen, onOpen: onChapterModalOpen, onClose: onChapterModalClose } = useDisclosure();
+  const { isOpen: isSceneModalOpen, onOpen: onSceneModalOpen, onClose: onSceneModalClose } = useDisclosure();
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const timelineBg = useColorModeValue('gray.50', 'gray.700');
+  const cardBg = useColorModeValue('gray.100', 'gray.900');
   const toast = useToast();
   const isMounted = useRef(true);
+  const leftPanelRef = React.useRef<HTMLDivElement>(null);
+  const containerRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
     };
+  }, []);
+
+  React.useEffect(() => {
+    containerRef.current = document.body;
   }, []);
 
   const getImageKey = React.useCallback((chapterIndex: number, sceneIndex: number, shotIndex: number, type: string) =>
@@ -113,7 +180,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
     const fetchAllData = async () => {
       if (!script) return;
-      
+
       setIsLoading(true);
       try {
         const endpoints = [
@@ -123,7 +190,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         ];
 
         const responses = await Promise.all(
-          endpoints.map(endpoint => 
+          endpoints.map(endpoint =>
             fetch(`http://localhost:8000/api/${endpoint}/${projectName}`, { cache: 'no-store' })
           )
         );
@@ -263,7 +330,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
-  const handleGenerateBackgroundMusic = async (chapterNumber: number, sceneNumber: number) => {
+  const handleGenerateBackgroundMusic = async (chapterNumber: number, sceneNumber: number, style?: string) => {
     const musicKey = `${chapterNumber}-${sceneNumber}`;
     setGeneratingMusic(prev => {
       const newSet = new Set(Array.from(prev));
@@ -282,6 +349,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           body: JSON.stringify({
             chapter_number: chapterNumber,
             scene_number: sceneNumber,
+            style: style || 'Cinematic',  // Include the selected style
+            overwrite: true  // Always overwrite when regenerating
           }),
         }
       );
@@ -335,7 +404,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     try {
       for (const chapter of script.chapters || []) {
         for (const scene of chapter.scenes || []) {
-          await handleGenerateBackgroundMusic(chapter.chapter_number, scene.scene_number);
+          await handleGenerateBackgroundMusic(chapter.chapter_number, scene.scene_number, 'Cinematic');
         }
       }
 
@@ -383,7 +452,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               description: shot.opening_frame
             });
           }
-          
+
         });
       });
     });
@@ -394,7 +463,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const handleGenerateAll = async () => {
     const pendingImages = getAllPendingImages();
     console.log(`Found ${pendingImages.length} pending images to generate`);
-    
+
     if (pendingImages.length === 0) {
       toast({
         title: 'Info',
@@ -418,7 +487,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           img.shotIndex,
           img.type
         );
-        
+
         console.log(`Generating image for key: ${imageKey}`, {
           chapter: img.chapterIndex + 1,
           scene: img.sceneIndex + 1,
@@ -436,13 +505,13 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             img.description,
             true // Set to true to ensure generation
           );
-          
+
           successCount++;
           console.log(`Successfully generated image ${successCount}/${pendingImages.length}`);
-          
+
           // Add a small delay between generations
           await new Promise(resolve => setTimeout(resolve, 1000));
-          
+
         } catch (error) {
           errorCount++;
           console.error(`Failed to generate image ${imageKey}:`, error);
@@ -562,6 +631,140 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
+  const handleRegenerateChapter = async () => {
+    if (activeChapterForRegeneration === null) return;
+    setIsRegenerating(true);
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/regenerate-chapter/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_index: activeChapterForRegeneration + 1,
+            instructions: regenerateInstructions,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to regenerate chapter');
+      }
+
+      const updatedScript = await response.json();
+      setScript(updatedScript);
+      onChapterModalClose();
+      setRegenerateInstructions('');
+      toast({
+        title: 'Success',
+        description: 'Chapter regenerated successfully',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error regenerating chapter:', error);
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to regenerate chapter',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsRegenerating(false);
+      setActiveChapterForRegeneration(null);
+    }
+  };
+
+  const handleRegenerateScene = async () => {
+    if (!activeSceneForRegeneration) return;
+    setIsRegenerating(true);
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/regenerate-scene/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_index: activeSceneForRegeneration.chapter + 1,
+            scene_index: activeSceneForRegeneration.scene + 1,
+            instructions: regenerateInstructions,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to regenerate scene');
+      }
+
+      const updatedScript = await response.json();
+      setScript(updatedScript);
+      onSceneModalClose();
+      setRegenerateInstructions('');
+      toast({
+        title: 'Success',
+        description: 'Scene regenerated successfully',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error regenerating scene:', error);
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to regenerate scene',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsRegenerating(false);
+      setActiveSceneForRegeneration(null);
+    }
+  };
+
+  const onScriptUpdate = React.useCallback((updatedScript: Script) => {
+    setScript(updatedScript);
+    toast({
+      title: 'Success',
+      description: 'Script updated successfully',
+      status: 'success',
+      duration: 3000,
+      isClosable: true,
+    });
+  }, [setScript, toast]);
+
+  // Add event listener for scene selection
+  React.useEffect(() => {
+    const handleSceneSelection = (event: CustomEvent<{ chapterIndex: number; sceneIndex: number }>) => {
+      setActiveChapterIndex(event.detail.chapterIndex);
+      setActiveSceneIndex(event.detail.sceneIndex);
+      
+      // Find the selected scene element and scroll it into view
+      setTimeout(() => {
+        const sceneElement = document.querySelector(
+          `[data-chapter-index="${event.detail.chapterIndex}"][data-scene-index="${event.detail.sceneIndex}"]`
+        );
+        if (sceneElement && leftPanelRef.current) {
+          sceneElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+    };
+
+    window.addEventListener('scene-selected', handleSceneSelection as EventListener);
+
+    return () => {
+      window.removeEventListener('scene-selected', handleSceneSelection as EventListener);
+    };
+  }, []);
+
   if (!script) {
     return (
       <Box p={4}>
@@ -592,7 +795,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   ) => {
     const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
     const description = shot.opening_frame
-  
+
     return (
       <ImageDisplay
         imageKey={imageKey}
@@ -626,20 +829,29 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     );
   };
 
+  const totalChapters = script.chapters.length;
+  const currentChapter = script.chapters[activeChapterIndex];
+  const progress = ((activeChapterIndex + 1) / totalChapters) * 100;
+
   return (
-    <Box height="100vh" overflow="hidden" position="relative">
-      {/* Top Navigation Bar */}
-      <Box
-        p={4}
-        borderBottomWidth={1}
-        bg="white"
-        position="sticky"
-        top={0}
-        zIndex={3}
-        height="72px"
-      >
-        <HStack justify="space-between" align="center">
-          <Heading size="lg">Script Review</Heading>
+    <Box height="100vh" overflow="hidden" bg={bgColor}>
+      {/* Header */}
+      <Box position="fixed" top={0} left={0} right={0} zIndex={100}>
+        <Flex
+          p={4}
+          borderBottomWidth={1}
+          borderColor={borderColor}
+          height="72px"
+          align="center"
+          justify="space-between"
+          bg={bgColor}
+        >
+          <HStack spacing={4}>
+            <Heading size="lg">Story Overview</Heading>
+            <Badge colorScheme="blue" fontSize="md" px={3} py={1}>
+              Chapter {activeChapterIndex + 1} of {totalChapters}
+            </Badge>
+          </HStack>
           <HStack spacing={4}>
             <Button
               colorScheme="teal"
@@ -647,6 +859,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               isLoading={isGeneratingAll}
               loadingText="Generating All"
               isDisabled={generatingImages.size > 0}
+              size="sm"
             >
               Generate All Images
             </Button>
@@ -656,44 +869,329 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               isLoading={isGeneratingAllMusic}
               loadingText="Generating All Music"
               isDisabled={generatingMusic.size > 0}
+              size="sm"
             >
               Generate All Music
             </Button>
-            <Button onClick={onBack}>Back</Button>
-            <Button colorScheme="blue" onClick={onNext}>
-              Next
-            </Button>
+            <Button onClick={onBack} size="sm">Back</Button>
+            <Button colorScheme="blue" onClick={onNext} size="sm">Next</Button>
           </HStack>
-        </HStack>
+        </Flex>
+
+        {/* Story Timeline */}
+        <Box
+          p={4}
+          bg={timelineBg}
+          borderBottomWidth={1}
+          borderColor={borderColor}
+        >
+          <VStack spacing={4} align="stretch">
+            <Progress
+              value={progress}
+              size="sm"
+              colorScheme="blue"
+              borderRadius="full"
+            />
+            <Flex justify="space-between" align="center">
+              <IconButton
+                aria-label="Previous chapter"
+                icon={<ChevronLeftIcon />}
+                onClick={() => setActiveChapterIndex(Math.max(0, activeChapterIndex - 1))}
+                isDisabled={activeChapterIndex === 0}
+                size="sm"
+              />
+              <HStack spacing={2} overflow="auto" p={2} flex={1} justify="center">
+                {script.chapters.map((chapter, index) => (
+                  <Button
+                    key={index}
+                    size="sm"
+                    variant={index === activeChapterIndex ? "solid" : "outline"}
+                    colorScheme={index === activeChapterIndex ? "blue" : "gray"}
+                    onClick={() => setActiveChapterIndex(index)}
+                  >
+                    Chapter {index + 1}
+                  </Button>
+                ))}
+              </HStack>
+              <IconButton
+                aria-label="Next chapter"
+                icon={<ChevronRightIcon />}
+                onClick={() => setActiveChapterIndex(Math.min(totalChapters - 1, activeChapterIndex + 1))}
+                isDisabled={activeChapterIndex === totalChapters - 1}
+                size="sm"
+              />
+            </Flex>
+          </VStack>
+        </Box>
       </Box>
 
       {/* Main Content */}
-      <Box height="calc(100vh - 72px)" overflow="auto" p={4}>
-        <Accordion defaultIndex={[0]} allowMultiple>
-          {(script?.chapters || []).map((chapter, chapterIndex) => (
-            <Chapter
-              key={chapterIndex}
-              chapter={chapter}
-              chapterIndex={chapterIndex}
-              projectName={projectName}
-              script={script}
-              setScript={setScript}
-              imageData={imageData}
-              narrationData={narrationData}
-              backgroundMusicData={backgroundMusicData}
-              videoData={videoData}
-              generatingImages={generatingImages}
-              generatingMusic={generatingMusic}
-              handleGenerateImage={handleGenerateImage}
-              handleGenerateBackgroundMusic={handleGenerateBackgroundMusic}
-              handleUpdateDescription={handleUpdateDescription}
-              getImageKey={getImageKey}
-              onVideoGenerated={onVideoGenerated}
-              onScriptUpdate={setScript}
-            />
-          ))}
-        </Accordion>
+      <Box 
+        pt="180px" 
+        height="100vh" 
+        overflow="hidden"
+        position="relative"
+      >
+        <Flex height="calc(100vh - 180px)">
+          {/* Left Panel */}
+          <Box
+            ref={leftPanelRef}
+            width="350px"
+            borderRightWidth={1}
+            borderColor={borderColor}
+            p={4}
+            overflowY="auto"
+            bg={bgColor}
+            css={{
+              '&::-webkit-scrollbar': {
+                width: '4px',
+              },
+              '&::-webkit-scrollbar-track': {
+                background: 'transparent',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                background: 'rgba(0, 0, 0, 0.1)',
+                borderRadius: '2px',
+              },
+            }}
+          >
+            {script.chapters.map((chapter, chapterIndex) => (
+              <Box key={chapterIndex} mb={6}>
+                <Chapter
+                  chapter={chapter}
+                  chapterIndex={chapterIndex}
+                  projectName={projectName}
+                  script={script}
+                  setScript={setScript}
+                  imageData={imageData}
+                  narrationData={narrationData}
+                  backgroundMusicData={backgroundMusicData}
+                  videoData={videoData}
+                  generatingImages={generatingImages}
+                  generatingMusic={generatingMusic}
+                  handleGenerateImage={handleGenerateImage}
+                  handleGenerateBackgroundMusic={handleGenerateBackgroundMusic}
+                  handleUpdateDescription={handleUpdateDescription}
+                  getImageKey={getImageKey}
+                  onVideoGenerated={onVideoGenerated}
+                  onScriptUpdate={onScriptUpdate}
+                />
+              </Box>
+            ))}
+          </Box>
+
+          {/* Main Content Area */}
+          <Box flex={1} p={4} overflowY="auto" bg={bgColor}>
+            <Tabs variant="enclosed" colorScheme="blue">
+              <TabList>
+                <Tab>Visual Preview</Tab>
+                <Tab>Script & Audio</Tab>
+                <Tab>Director Notes</Tab>
+              </TabList>
+
+              <TabPanels>
+                <TabPanel>
+                  <VStack spacing={6} align="stretch">
+                    {currentChapter.scenes?.[activeSceneIndex]?.shots?.map((shot, shotIndex) => (
+                      <Card key={shotIndex} variant="outline" bg={bgColor}>
+                        <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
+                          <HStack justify="space-between">
+                            <Heading size="sm">Shot {shotIndex + 1}</Heading>
+                            <Badge
+                              colorScheme={videoData[`${activeChapterIndex + 1}-${activeSceneIndex + 1}-${shotIndex + 1}`] ? 'green' : 'gray'}
+                            >
+                              {videoData[`${activeChapterIndex + 1}-${activeSceneIndex + 1}-${shotIndex + 1}`] ? 'Rendered' : 'Pending'}
+                            </Badge>
+                          </HStack>
+                        </CardHeader>
+                        <CardBody>
+                          <VStack spacing={4} align="stretch">
+                            {renderSceneDescription(
+                              shot,
+                              activeChapterIndex,
+                              activeSceneIndex,
+                              shotIndex,
+                              'opening'
+                            )}
+                            {videoData[`${activeChapterIndex + 1}-${activeSceneIndex + 1}-${shotIndex + 1}`] && (
+                              <Box>
+                                <Heading size="xs" mb={2}>Video Preview</Heading>
+                                <ShotVideo
+                                  videoData={videoData[`${activeChapterIndex + 1}-${activeSceneIndex + 1}-${shotIndex + 1}`]}
+                                  chapterIndex={activeChapterIndex}
+                                  sceneIndex={activeSceneIndex}
+                                  shotIndex={shotIndex}
+                                />
+                              </Box>
+                            )}
+                          </VStack>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </VStack>
+                </TabPanel>
+
+                <TabPanel>
+                  <VStack spacing={6} align="stretch">
+                    <Card variant="outline" bg={bgColor}>
+                      <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
+                        <Heading size="sm">Scene Audio</Heading>
+                      </CardHeader>
+                      <CardBody>
+                        <VStack spacing={6}>
+                          <Box width="100%">
+                            <Heading size="xs" mb={4}>Background Music</Heading>
+                            <BackgroundMusic
+                              audioData={backgroundMusicData}
+                              isGenerating={generatingMusic.has(`${activeChapterIndex + 1}-${activeSceneIndex + 1}`)}
+                              onGenerateMusic={(style) => handleGenerateBackgroundMusic(activeChapterIndex + 1, activeSceneIndex + 1, style)}
+                              chapterIndex={activeChapterIndex}
+                              sceneIndex={activeSceneIndex}
+                              projectName={projectName}
+                            />
+                          </Box>
+                          <Box width="100%">
+                            <Heading size="xs" mb={4}>Narration</Heading>
+                            <NarrationBox
+                              audioData={narrationData}
+                              chapterIndex={activeChapterIndex}
+                              sceneIndex={activeSceneIndex}
+                              projectName={projectName}
+                            />
+                          </Box>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  </VStack>
+                </TabPanel>
+
+                <TabPanel>
+                  <VStack spacing={6} align="stretch">
+                    {currentChapter.scenes?.[activeSceneIndex]?.shots?.map((shot, index) => (
+                      <Card key={index} variant="outline" bg={bgColor}>
+                        <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
+                          <Heading size="sm">Shot {index + 1} Instructions</Heading>
+                        </CardHeader>
+                        <CardBody>
+                          <DirectorInstructions
+                            instructions={shot.director_instructions || ''}
+                            handleUpdate={(newInstructions) =>
+                              handleUpdateDirectorInstructions(activeChapterIndex, activeSceneIndex, index, newInstructions)
+                            }
+                          />
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </VStack>
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
+          </Box>
+        </Flex>
       </Box>
+
+      {/* Modals */}
+      <Modal 
+        isOpen={isChapterModalOpen} 
+        onClose={() => {
+          setRegenerateInstructions('');
+          onChapterModalClose();
+        }}
+        size="xl"
+        preserveScrollBarGap
+        blockScrollOnMount={false}
+        closeOnEsc={true}
+        closeOnOverlayClick={true}
+        isCentered
+      >
+        <ModalOverlay />
+        <ModalContent 
+          mx={4}
+          my={3}
+          maxHeight="calc(100vh - 80px)"
+          overflowY="auto"
+        >
+          <ModalHeader>Chapter Regeneration Instructions</ModalHeader>
+          <ModalCloseButton _focus={{ boxShadow: 'outline' }} />
+          <ModalBody>
+            <Text mb={4}>
+              Enter any specific instructions for regenerating this chapter. These instructions will help guide the AI in creating a new version of the chapter.
+            </Text>
+            <Textarea
+              value={regenerateInstructions}
+              onChange={(e) => setRegenerateInstructions(e.target.value)}
+              placeholder="Enter instructions for chapter regeneration..."
+              size="lg"
+              rows={6}
+              autoFocus
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onChapterModalClose}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={handleRegenerateChapter}
+              isLoading={isRegenerating}
+              loadingText="Regenerating Chapter"
+            >
+              Regenerate
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal 
+        isOpen={isSceneModalOpen} 
+        onClose={() => {
+          setRegenerateInstructions('');
+          onSceneModalClose();
+        }}
+        size="xl"
+        preserveScrollBarGap
+        blockScrollOnMount={false}
+        closeOnEsc={true}
+        closeOnOverlayClick={true}
+        isCentered
+      >
+        <ModalOverlay />
+        <ModalContent 
+          mx={4}
+          my={3}
+          maxHeight="calc(100vh - 80px)"
+          overflowY="auto"
+        >
+          <ModalHeader>Scene Regeneration Instructions</ModalHeader>
+          <ModalCloseButton _focus={{ boxShadow: 'outline' }} />
+          <ModalBody>
+            <Text mb={4}>
+              Enter any specific instructions for regenerating this scene. These instructions will help guide the AI in creating a new version of the scene.
+            </Text>
+            <Textarea
+              value={regenerateInstructions}
+              onChange={(e) => setRegenerateInstructions(e.target.value)}
+              placeholder="Enter instructions for scene regeneration..."
+              size="lg"
+              rows={6}
+              autoFocus
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onSceneModalClose}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={handleRegenerateScene}
+              isLoading={isRegenerating}
+              loadingText="Regenerating Scene"
+            >
+              Regenerate
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };

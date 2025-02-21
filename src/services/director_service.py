@@ -429,10 +429,16 @@ class DirectorService:
                 # Initialize empty shots list to maintain consistency
                 new_scene.shots = []
                 
-                # Update the scene in the script
-                if not script.chapters[chapter_index].scenes:
-                    script.chapters[chapter_index].scenes = []
-                script.chapters[chapter_index].scenes[scene_index] = new_scene
+                # Initialize scenes if None and ensure proper typing
+                chapter = script.chapters[chapter_index]
+                if chapter.scenes is None:
+                    chapter.scenes = []
+                
+                scenes = chapter.scenes
+                if scenes is not None:  # Type guard for the list operations
+                    while len(scenes) <= scene_index:
+                        scenes.append(Scene(main_story="", narration_text="", scene_number=len(scenes) + 1))
+                    scenes[scene_index] = new_scene
                 
                 # Generate shots only for this specific scene
                 script = await self.generate_shots(

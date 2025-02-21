@@ -1,123 +1,301 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, UnorderedList, ListItem, Button, HStack, useToast } from '@chakra-ui/react';
+import React, { useState, useRef } from 'react';
+import {
+  Box,
+  VStack,
+  HStack,
+  IconButton,
+  Button,
+  Text,
+  Badge,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
+  useColorModeValue,
+  Progress,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+} from '@chakra-ui/react';
+import { 
+  FaPlay, 
+  FaPause, 
+  FaVolumeUp, 
+  FaVolumeMute,
+  FaMusic,
+  FaChevronDown,
+  FaRedo
+} from 'react-icons/fa';
+import { ChakraIcon } from './utils/ChakraIcon';
 
 interface BackgroundMusicProps {
-  backgroundMusic: string | string[] | undefined;  // Made undefined explicit
+  audioData: Record<string, string>;
+  isGenerating: boolean;
+  onGenerateMusic: (style?: string) => Promise<void>;  // Updated to accept style parameter
+  chapterIndex: number;
+  sceneIndex: number;
   projectName: string;
-  chapterNumber: number;
-  sceneNumber: number;
-  isGenerating?: boolean;
-  onGenerate?: () => void;
-  existingMusic?: string;
 }
 
-const BackgroundMusic: React.FC<BackgroundMusicProps> = ({ 
-  backgroundMusic, 
-  projectName, 
-  chapterNumber, 
-  sceneNumber,
+const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
+  audioData,
   isGenerating,
-  onGenerate,
-  existingMusic 
+  onGenerateMusic,
+  chapterIndex,
+  sceneIndex,
+  projectName
 }) => {
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const toast = useToast();
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState<string>('Cinematic');
+  const [audioError, setAudioError] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  
+  const audioKey = `${chapterIndex + 1}-${sceneIndex + 1}`;
+  const audioPath = `/temp/${projectName}/chapter_${chapterIndex + 1}/scene_${sceneIndex + 1}/background_music.mp3`;
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const hasExistingMusic = !audioError;
 
-  useEffect(() => {
-    if (existingMusic) {
-      const audioBlob = new Blob(
-        [Uint8Array.from(atob(existingMusic), c => c.charCodeAt(0))],
-        { type: 'audio/mp3' }
-      );
-      const url = URL.createObjectURL(audioBlob);
-      setAudioUrl(url);
-    }
-  }, [existingMusic]);
+  const musicStyles = [
+    'Cinematic',
+    'Ambient',
+    'Dramatic',
+    'Uplifting',
+    'Mysterious',
+    'Emotional'
+  ];
 
-  const handleGenerateMusic = async () => {
-    if (onGenerate) {
-      onGenerate();
+  const handlePlay = async () => {
+    if (!audioRef.current || !audioPath) {
+      alert('Audio source not available');
       return;
     }
 
-    setIsLoading(true);
+    // Check if the file exists first
     try {
-      const response = await fetch(
-        `http://localhost:8000/api/generate-background-music/${projectName}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chapter_number: chapterNumber,
-            scene_number: sceneNumber,
-          }),
-        }
-      );
-
+      const response = await fetch(audioPath);
       if (!response.ok) {
-        throw new Error('Failed to generate background music');
+        throw new Error(`Audio file not found at ${audioPath}`);
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setAudioUrl(url);
-
-      toast({
-        title: 'Success',
-        description: 'Background music generated successfully',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((error) => {
+            console.error('Error playing audio:', error);
+            setIsPlaying(false);
+            alert(`Failed to play audio: ${error.message}`);
+          });
+        }
+      }
+      setIsPlaying(!isPlaying);
     } catch (error) {
-      console.error('Error generating background music:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate background music',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setIsLoading(false);
+      console.error('Error checking audio file:', error);
+      alert('Audio file not found or inaccessible');
+      setAudioError(true);
+      setIsPlaying(false);
     }
   };
 
-  if (!backgroundMusic) return null;
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration);
+    }
+  };
+
+  const handleSeek = (value: number) => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = value;
+      setCurrentTime(value);
+    }
+  };
+
+  const handleVolumeChange = (value: number) => {
+    if (audioRef.current) {
+      audioRef.current.volume = value;
+      setVolume(value);
+      setIsMuted(value === 0);
+    }
+  };
+
+  const toggleMute = () => {
+    if (audioRef.current) {
+      if (isMuted) {
+        audioRef.current.volume = volume;
+        setIsMuted(false);
+      } else {
+        audioRef.current.volume = 0;
+        setIsMuted(true);
+      }
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  const formatTime = (timeInSeconds: number) => {
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   return (
-    <Box bg="orange.50" p={3} borderRadius="md">
-      <HStack justify="space-between" mb={2}>
-        <Text fontWeight="bold">Background Music:</Text>
-        <Button
-          size="sm"
-          colorScheme="orange"
-          onClick={handleGenerateMusic}
-          isLoading={isGenerating || isLoading}
-          loadingText="Generating"
-        >
-          Generate Music
-        </Button>
-      </HStack>
+    <Box 
+      p={4} 
+      borderWidth={1} 
+      borderRadius="md" 
+      bg={bgColor}
+      borderColor={borderColor}
+      position="relative"
+    >
+      {isGenerating && (
+        <Progress 
+          size="xs" 
+          isIndeterminate 
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+        />
+      )}
       
-      {Array.isArray(backgroundMusic) ? (
-        <UnorderedList>
-          {backgroundMusic.map((music, idx) => (
-            <ListItem key={idx} color="orange.800">{music}</ListItem>
-          ))}
-        </UnorderedList>
-      ) : (
-        <Text color="orange.800">{backgroundMusic}</Text>
-      )}
+      <VStack spacing={4} align="stretch">
+        <HStack justify="space-between">
+          <Badge 
+            colorScheme={!audioError ? 'green' : 'gray'}
+            variant="subtle"
+            px={2}
+            py={1}
+          >
+            {!audioError ? 'Music Ready' : 'No Music'}
+          </Badge>
+          
+          <HStack spacing={2}>
+            <Menu>
+              <MenuButton 
+                as={Button} 
+                size="sm" 
+                rightIcon={<ChakraIcon icon={FaChevronDown} />}
+                leftIcon={<ChakraIcon icon={FaMusic} />}
+                variant="outline"
+              >
+                {selectedStyle}
+              </MenuButton>
+              <MenuList>
+                {musicStyles.map((style) => (
+                  <MenuItem 
+                    key={style}
+                    onClick={() => setSelectedStyle(style)}
+                  >
+                    {style}
+                  </MenuItem>
+                ))}
+              </MenuList>
+            </Menu>
+            
+            <Button
+              size="sm"
+              onClick={() => onGenerateMusic(selectedStyle)}
+              isLoading={isGenerating}
+              loadingText={hasExistingMusic ? "Regenerating" : "Generating"}
+              colorScheme="blue"
+              variant={hasExistingMusic ? "ghost" : "solid"}
+              leftIcon={hasExistingMusic ? <ChakraIcon icon={FaRedo} /> : undefined}
+            >
+              {hasExistingMusic ? "Regenerate" : "Generate Music"}
+            </Button>
+          </HStack>
+        </HStack>
 
-      {audioUrl && (
-        <Box mt={2}>
-          <audio controls src={audioUrl} style={{ width: '100%' }} />
-        </Box>
-      )}
+        <>
+          <audio
+            ref={audioRef}
+            src={audioPath}
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={handleLoadedMetadata}
+            onEnded={handleEnded}
+            onError={(e) => {
+              console.error('Audio loading error:', e);
+              setAudioError(true);
+              setIsPlaying(false);
+            }}
+            style={{ display: 'none' }}
+          />
+
+          <VStack spacing={2} align="stretch">
+            <HStack spacing={4}>
+              <IconButton
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+                icon={isPlaying ? <ChakraIcon icon={FaPause} /> : <ChakraIcon icon={FaPlay} />}
+                onClick={handlePlay}
+                isRound
+                colorScheme="blue"
+                size="sm"
+              />
+              
+              <Text fontSize="sm" flex={1}>
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </Text>
+
+              <HStack width="120px" spacing={2}>
+                <IconButton
+                  aria-label={isMuted ? 'Unmute' : 'Mute'}
+                  icon={isMuted ? <ChakraIcon icon={FaVolumeMute} /> : <ChakraIcon icon={FaVolumeUp} />}
+                  onClick={toggleMute}
+                  size="sm"
+                  variant="ghost"
+                />
+                <Slider
+                  aria-label="Volume slider"
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  width="80px"
+                >
+                  <SliderTrack>
+                    <SliderFilledTrack />
+                  </SliderTrack>
+                  <SliderThumb />
+                </Slider>
+              </HStack>
+            </HStack>
+
+            <Slider
+              aria-label="Audio progress"
+              value={currentTime}
+              onChange={handleSeek}
+              min={0}
+              max={duration}
+              step={0.1}
+            >
+              <SliderTrack>
+                <SliderFilledTrack />
+              </SliderTrack>
+              <SliderThumb />
+            </Slider>
+          </VStack>
+        </>
+      </VStack>
     </Box>
   );
 };
