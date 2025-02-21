@@ -75,13 +75,6 @@ interface ShotVideoProps {
   shotIndex: number;
 }
 
-interface NarrationBoxProps {
-  audioData: Record<string, string>;
-  chapterIndex: number;
-  sceneIndex: number;
-  projectName: string;
-}
-
 interface BackgroundMusicProps {
   audioData: Record<string, string>;
   isGenerating: boolean;
@@ -1057,6 +1050,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                               chapterIndex={activeChapterIndex}
                               sceneIndex={activeSceneIndex}
                               projectName={projectName}
+                              narrationText={currentChapter.scenes?.[activeSceneIndex]?.narration_text || ''}
                             />
                           </Box>
                         </VStack>

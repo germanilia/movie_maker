@@ -313,6 +313,16 @@ const Scene: React.FC<SceneProps> = ({
                   zIndex: 1
                 }}
               />
+              <Box width="100%">
+                <Heading size="xs" mb={4}>Narration</Heading>
+                <NarrationBox
+                  audioData={narrationData}
+                  chapterIndex={chapterIndex}
+                  sceneIndex={sceneIndex}
+                  projectName={projectName}
+                  narrationText={scene.narration_text}
+                />
+              </Box>
             </ModalBody>
             <ModalFooter>
               <Button 

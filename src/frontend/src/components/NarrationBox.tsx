@@ -29,13 +29,15 @@ interface NarrationBoxProps {
   chapterIndex: number;
   sceneIndex: number;
   projectName: string;
+  narrationText: string;
 }
 
 const NarrationBox: React.FC<NarrationBoxProps> = ({
   audioData,
   chapterIndex,
   sceneIndex,
-  projectName
+  projectName,
+  narrationText
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -240,6 +242,15 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
             Regenerate
           </Button>
         </HStack>
+
+        <Box 
+          p={3} 
+          bg={useColorModeValue('gray.50', 'gray.700')} 
+          borderRadius="md"
+          fontSize="sm"
+        >
+          <Text>{narrationText}</Text>
+        </Box>
 
         <>
           <audio
