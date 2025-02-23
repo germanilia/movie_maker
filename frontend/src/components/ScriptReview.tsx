@@ -634,14 +634,13 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
-  const handleUpdateDirectorInstructions = async (
+  const handleUpdateShotInstructions = async (
     chapterIndex: number,
     sceneIndex: number,
     shotIndex: number,
     newInstructions: string
   ) => {
     try {
-      // Create a deep copy of the script
       const updatedScript = JSON.parse(JSON.stringify(script));
 
       // Update the instructions in the script
@@ -657,13 +656,12 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update director instructions');
+        throw new Error('Failed to update shot instructions');
       }
 
-      // Update the local script state
       setScript(updatedScript);
     } catch (error) {
-      console.error('Error updating director instructions:', error);
+      console.error('Error updating shot instructions:', error);
       throw error;
     }
   };
@@ -1034,13 +1032,33 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           <Box flex={1} p={4} overflowY="auto" bg={bgColor}>
             <Tabs variant="enclosed" colorScheme="blue">
               <TabList>
+                <Tab>Scene Overview</Tab>
                 <Tab>Visual Preview</Tab>
                 <Tab>Script & Audio</Tab>
-                <Tab>Director Notes</Tab>
+                <Tab>Shot Instructions</Tab>
                 <Tab>Scene Video</Tab>
               </TabList>
 
               <TabPanels>
+                <TabPanel>
+                  <VStack spacing={6} align="stretch">
+                    <Card variant="outline" bg={bgColor}>
+                      <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
+                        <Heading size="sm">Scene Details</Heading>
+                      </CardHeader>
+                      <CardBody>
+                        <VStack spacing={4} align="stretch">
+                          <Box>
+                            <Heading size="xs" mb={2}>Main Story</Heading>
+                            <Text>{currentChapter.scenes?.[activeSceneIndex]?.main_story}</Text>
+                          </Box>
+                          
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  </VStack>
+                </TabPanel>
+
                 <TabPanel>
                   <VStack spacing={6} align="stretch">
                     {currentChapter.scenes?.[activeSceneIndex]?.shots?.map((shot, shotIndex) => (
@@ -1117,8 +1135,9 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                           <DirectorInstructions
                             instructions={shot.director_instructions || ''}
                             handleUpdate={(newInstructions) =>
-                              handleUpdateDirectorInstructions(activeChapterIndex, activeSceneIndex, index, newInstructions)
+                              handleUpdateShotInstructions(activeChapterIndex, activeSceneIndex, index, newInstructions)
                             }
+                            reasoning={shot.reasoning || ''}
                           />
                         </CardBody>
                       </Card>

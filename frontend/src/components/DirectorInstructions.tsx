@@ -9,20 +9,22 @@ import {
   HStack,
   Badge,
   IconButton,
-  Collapse,
   useColorModeValue,
   Text,
   Tooltip,
+  useDisclosure,
 } from '@chakra-ui/react';
-import { EditIcon, CheckIcon, CloseIcon, InfoIcon } from '@chakra-ui/icons';
+import { EditIcon, CheckIcon, CloseIcon, InfoIcon, ChevronDownIcon, ChevronUpIcon } from '@chakra-ui/icons';
 
 interface DirectorInstructionsProps {
   instructions: string;
+  reasoning?: string;
   handleUpdate: (newInstructions: string) => Promise<void>;
 }
 
 const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
   instructions,
+  reasoning,
   handleUpdate
 }) => {
   const [editedInstructions, setEditedInstructions] = useState(instructions);
@@ -30,10 +32,12 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const toast = useToast();
+  const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: false });
 
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const textColor = useColorModeValue('gray.600', 'gray.300');
+  const reasoningBgColor = useColorModeValue('gray.50', 'gray.700');
 
   useEffect(() => {
     setEditedInstructions(instructions);
@@ -119,6 +123,34 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
           )}
         </HStack>
 
+        {reasoning && (
+          <Box>
+            <Button
+              variant="ghost"
+              size="sm"
+              width="100%"
+              onClick={onToggle}
+              rightIcon={isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+              justifyContent="space-between"
+              fontWeight="medium"
+              color="gray.500"
+            >
+              AI Reasoning
+            </Button>
+            {isOpen && (
+              <Box mt={2} p={3} bg={reasoningBgColor} borderRadius="md">
+                <Text
+                  color={textColor}
+                  whiteSpace="pre-wrap"
+                  fontSize="sm"
+                >
+                  {reasoning}
+                </Text>
+              </Box>
+            )}
+          </Box>
+        )}
+
         {isEditing ? (
           <VStack align="stretch" spacing={3}>
             <Textarea
@@ -154,6 +186,9 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
           </VStack>
         ) : (
           <Box>
+            <Text fontWeight="medium" fontSize="sm" color="gray.500" mb={2}>
+              Instructions
+            </Text>
             <Text 
               color={textColor}
               whiteSpace="pre-wrap"
