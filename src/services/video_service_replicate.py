@@ -1,10 +1,9 @@
 import os
 import logging
 import time
-from typing import Tuple, Any
+from typing import Tuple
 import aiohttp
 import replicate
-import json
 from pathlib import Path
 
 from src.services.aws_service import AWSService
@@ -65,15 +64,18 @@ class ReplicateVideoService(BaseVideoService):
             reference_image = self._encode_image_to_base64(str(frame_path))
             
             # Call Replicate API with proper type handling
+            if not self.video_model.parameters:
+                raise ValueError("Video model parameters are not set")
+
             output = replicate.run(
                 self.video_model.model_name,
                 input={
                     "prompt": str(prompt),
                     "start_image": reference_image,
-                    "duration": float(self.video_model.parameters["duration"]),
-                    "cfg_scale": float(self.video_model.parameters["cfg_scale"]),
-                    "aspect_ratio": str(self.video_model.parameters["aspect_ratio"]),
-                    "negative_prompt": str(self.video_model.parameters["negative_prompt"])
+                    "duration": float(self.video_model.parameters.get("duration", 10)),
+                    "cfg_scale": float(self.video_model.parameters.get("cfg_scale", 1)), 
+                    "aspect_ratio": str(self.video_model.parameters.get("aspect_ratio", "16:9")),
+                    "negative_prompt": str(self.video_model.parameters.get("negative_prompt", ""))
                 }
             )
 
@@ -84,9 +86,9 @@ class ReplicateVideoService(BaseVideoService):
             # Download the completed video
             save_path = self.get_download_path(video_path)
             downloaded_path = save_path / f"{Path(video_path).stem}.mp4"
-
             # Extract video URL from response
-            video_url = output.url
+            # output is an iterator, get the first (and only) URL
+            video_url = next(output)
             logger.info(f"Got video URL from Replicate: {video_url}")
 
             # Download video from URL

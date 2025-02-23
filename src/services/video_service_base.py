@@ -105,13 +105,12 @@ class BaseVideoService(ABC):
     @abstractmethod
     async def generate_video(
         self,
-        prompt: str,
         chapter: str,
         scene: str,
         shot: str,
         overwrite: bool = False,
         poll_interval: int = 10,
-        frame_mode: str = "both"
+        prompt: str = "",
     ) -> Tuple[bool, str | None]:
         """Generate video for a specific shot using the implemented service"""
         pass

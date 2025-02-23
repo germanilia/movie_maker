@@ -4,9 +4,8 @@ import logging
 import base64
 from pathlib import Path
 import time
-from typing import Any, Tuple, Optional, Union, List
+from typing import Tuple
 import aiohttp
-from pydantic import BaseModel
 from PIL import Image
 import io
 from runwayml import RunwayML
@@ -49,13 +48,12 @@ class RunwayMLVideoService(BaseVideoService):
     
     async def generate_video(
         self,
-        prompt: str,
         chapter: str,
         scene: str,
         shot: str,
         overwrite: bool = False,
         poll_interval: int = 10,
-        frame_mode: str = "both",
+        prompt: str = "",
     ) -> Tuple[bool, str | None]:
         """Generate video for a specific shot using RunwayML"""
         video_path = self.get_shot_path(chapter, scene, shot)
@@ -94,11 +92,11 @@ class RunwayMLVideoService(BaseVideoService):
 
             images = f"data:image/jpeg;base64,{prompt_images[0]['uri']}"
             image_to_video = self.client.image_to_video.create(
-                model=self.video_model.model_name,
+                model="gen3a_turbo",  # Using the correct literal type
                 prompt_image=images,
                 prompt_text=prompt,
                 seed=1,
-                **self.video_model.parameters,
+                **dict(self.video_model.parameters or {}),
             )
 
             if not image_to_video:
@@ -114,7 +112,7 @@ class RunwayMLVideoService(BaseVideoService):
                 if task.status == "SUCCEEDED":
                     break
                 elif task.status == "FAILED":
-                    raise Exception(f"Video generation task failed: {task.error}")
+                    raise Exception(f"Video generation task failed: {task}")
 
                 logger.debug(
                     f"Task status: {task.status}, waiting {poll_interval} seconds..."
@@ -126,7 +124,11 @@ class RunwayMLVideoService(BaseVideoService):
             downloaded_path = save_path / f"{Path(video_path).stem}.mp4"
 
             # Download video from task output URL
+            if not task or not task.output:
+                raise Exception("No task output found")
             video_url = task.output[0]
+            if not video_url:
+                raise Exception("No video URL found in task output")
             async with aiohttp.ClientSession() as session:
                 async with session.get(video_url) as response:
                     response.raise_for_status()

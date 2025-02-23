@@ -113,6 +113,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const containerRef = React.useRef<HTMLElement | null>(null);
   const [generatingVideoFor, setGeneratingVideoFor] = useState<{chapter: number, scene: number} | null>(null);
   const [videoKey, setVideoKey] = useState<number>(0);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState<boolean>(false);
 
   React.useEffect(() => {
     isMounted.current = true;
@@ -828,6 +829,74 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
+  const handleGenerateVideo = async (provider: 'replicate' | 'runwayml', shot: Shot) => {
+    setIsGeneratingVideo(true);
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/generate-shot-video/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chapter_number: activeChapterIndex + 1,
+            scene_number: activeSceneIndex + 1,
+            shot_number: activeSceneIndex + 1,
+            provider: provider.toUpperCase(),
+            overwrite: true
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to generate video');
+      }
+
+      // Reload the video data
+      await loadVideoData(activeChapterIndex + 1, activeSceneIndex + 1, activeSceneIndex + 1);
+
+      toast({
+        title: 'Success',
+        description: 'Video generated successfully',
+        status: 'success',
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Error generating video:', error);
+      toast({
+        title: 'Error',
+        description: (error as Error).message || 'Failed to generate video',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setIsGeneratingVideo(false);
+    }
+  };
+
+  const loadVideoData = async (chapterNum: number, sceneNum: number, shotNum: number) => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/get-video/${projectName}?` +
+        `chapter_number=${chapterNum}&scene_number=${sceneNum}&shot_number=${shotNum}`
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const videoUrl = URL.createObjectURL(blob);
+        const videoKey = `${chapterNum}-${sceneNum}-${shotNum}`;
+        setVideoData(prevData => ({
+          ...prevData,
+          [videoKey]: videoUrl
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading video:', error);
+    }
+  };
+
   if (!script) {
     return (
       <Box p={4}>
@@ -894,6 +963,10 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         shotIndex={shotIndex}
         projectName={projectName}
         videoData={videoData[videoKey]}
+        onGenerateVideo={async (provider) => {
+          await handleGenerateVideo(provider, shot);
+        }}
+        isGeneratingVideo={isGeneratingVideo}
       />
     );
   };

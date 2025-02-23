@@ -541,30 +541,49 @@ async def get_all_background_music(project_name: str):
 
 
 class VideoGenerationRequest(BaseModel):
-    prompt: str
     chapter_number: int
     scene_number: int
     shot_number: int
     overwrite: bool = False
-    provider: VideoProvider = VideoProvider.REPLICATE  # Default to Replicate
-    frame_mode: str = "both"  # Default to using both frames
+    provider: str = 'runwayml'
 
 @app.post("/api/generate-shot-video/{project_name}")
-async def generate_shot_video(project_name: str, request: VideoGenerationRequest):
+async def generate_shot_video(project_name: str, request: VideoGenerationRequest) -> FileResponse:
     """Generate video for a specific shot"""
     try:
         aws_service = AWSService(project_name=project_name)
-        video_service = VideoServiceFactory.create_video_service(request.provider, aws_service)
-
+        video_service = VideoServiceFactory.create_video_service(VideoProvider(request.provider.lower()), aws_service)
+        director = DirectorService(aws_service=aws_service, project_name=project_name)
+        script = await director.get_script()
+        if not script or not script.chapters:
+            raise HTTPException(status_code=404, detail="Script or chapters not found")
+        scenes = script.chapters[request.chapter_number - 1].scenes or []
+        if request.scene_number > len(scenes):
+            raise HTTPException(status_code=400, detail="Invalid scene number")
+        
+        scene = scenes[request.scene_number - 1]
+        if not scene.shots:
+            raise HTTPException(status_code=400, detail="No shots found in scene")
+            
+        if request.shot_number > len(scene.shots):
+            raise HTTPException(status_code=400, detail="Invalid shot number")
+            
+        shot = scene.shots[request.shot_number - 1]
+        if not shot:
+            raise HTTPException(status_code=400, detail="Shot not found")
+            
+        prompt = shot.director_instructions
+        if not prompt:
+            raise HTTPException(status_code=400, detail="No director instructions found for shot")
+            
         try:
             # Generate video
             success, video_path = await video_service.generate_video(
-                prompt=request.prompt,
                 chapter=str(request.chapter_number),
                 scene=str(request.scene_number),
                 shot=str(request.shot_number),
                 overwrite=request.overwrite,
-                frame_mode=request.frame_mode
+                prompt=prompt
             )
 
             if not success or not video_path:
@@ -677,6 +696,7 @@ async def get_all_videos(project_name: str) -> dict:
 class SceneVideoRequest(BaseModel):
     chapter_number: int
     scene_number: int
+    provider: VideoProvider = VideoProvider.REPLICATE
     black_and_white: bool = True
 
 @app.post("/api/generate-scene-video/{project_name}")

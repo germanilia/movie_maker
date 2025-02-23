@@ -43,6 +43,7 @@ import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon, ChevronDown
 import { FaImage, FaUserAlt, FaVideo, FaRedo } from 'react-icons/fa';
 import { ChakraIcon } from './utils/ChakraIcon';
 import ShotVideo from './ShotVideo';
+import { BiMoviePlay } from 'react-icons/bi';
 
 const dragDropStyles = {
   border: '2px dashed',
@@ -81,6 +82,8 @@ interface ImageDisplayProps {
   videoData?: string;
   directorInstructions?: string;
   onShotRegenerated?: (newDescription: string, newInstructions: string) => void;
+  onGenerateVideo?: (provider: 'replicate' | 'runwayml') => Promise<void>;
+  isGeneratingVideo?: boolean;
 }
 
 interface SourceImage {
@@ -107,6 +110,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   videoData,
   directorInstructions = '',
   onShotRegenerated,
+  onGenerateVideo,
+  isGeneratingVideo,
 }) => {
   // Add local state for description and instructions
   const [localDescription, setLocalDescription] = useState(description);
@@ -496,6 +501,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     }
   };
 
+  const [videoProvider, setVideoProvider] = useState<'replicate' | 'runwayml'>('runwayml');
+
   return (
     <Box 
       bg={bgColor} 
@@ -850,6 +857,51 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                 )}
               </TabPanels>
             </Tabs>
+          </Box>
+        )}
+
+        {/* Video Generation Controls */}
+        <HStack justify="flex-end" mt={2} spacing={2}>
+          <Menu>
+            <MenuButton
+              as={Button}
+              size="sm"
+              rightIcon={<ChevronDownIcon />}
+              variant="outline"
+              colorScheme={buttonColorScheme}
+            >
+              {videoProvider === 'runwayml' ? 'Runway ML' : 'Kling (Replicate)'}
+            </MenuButton>
+            <MenuList>
+              <MenuItem onClick={() => setVideoProvider('runwayml')}>
+                Runway ML
+              </MenuItem>
+              <MenuItem onClick={() => setVideoProvider('replicate')}>
+                Kling (Replicate)
+              </MenuItem>
+            </MenuList>
+          </Menu>
+
+          <Button
+            size="sm"
+            colorScheme={buttonColorScheme}
+            leftIcon={<Icon as={BiMoviePlay} />}
+            onClick={() => onGenerateVideo?.(videoProvider)}
+            isLoading={isGeneratingVideo}
+            loadingText="Generating Video"
+            isDisabled={!imageData || isGeneratingVideo}
+          >
+            {videoData ? 'Regenerate Video' : 'Generate Video'}
+          </Button>
+        </HStack>
+
+        {/* Video Generation Progress */}
+        {isGeneratingVideo && (
+          <Box mt={2}>
+            <Progress size="xs" isIndeterminate colorScheme={buttonColorScheme} />
+            <Text fontSize="sm" color="gray.600" mt={1} textAlign="center">
+              Generating video... This may take a few minutes
+            </Text>
           </Box>
         )}
       </VStack>
