@@ -194,7 +194,7 @@ class BaseVideoService(ABC):
                     total_video_duration += duration
 
                 duration_diff = abs(narration_duration - total_video_duration)
-                use_black_screens = duration_diff >= 5 and narration_duration > total_video_duration
+                use_black_screens = duration_diff >= 1 and narration_duration > total_video_duration
 
                 # Process videos with transitions
                 processed_videos = []

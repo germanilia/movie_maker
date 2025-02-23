@@ -19,7 +19,6 @@ import {
   Badge,
   Progress,
   IconButton,
-  Divider,
   useColorModeValue,
   Card,
   CardHeader,
@@ -38,13 +37,10 @@ import {
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
 import { FaRedo } from 'react-icons/fa';
-import { MdHome } from 'react-icons/md';
 import ImageDisplay from './ImageDisplay';
 import NarrationBox from './NarrationBox';
 import BackgroundMusic from './BackgroundMusic';
-import ShotVideo from './ShotVideo';
 import DirectorInstructions from './DirectorInstructions';
-import Scene from './Scene';
 import Chapter from './Chapter';
 import { createIcon } from '@chakra-ui/react';
 
@@ -57,41 +53,13 @@ interface ScriptReviewProps {
   onHome: () => void;
 }
 
-interface ImageApiResponse {
-  status: string;
-  images: Record<string, string>;
-}
-
-interface NarrationApiResponse {
-  status: string;
-  narrations: Record<string, string>; // key is chapter-scene, value is base64 audio
-}
 
 interface VideoApiResponse {
   status: string;
   videos: Record<string, string>;
 }
 
-interface ShotVideoProps {
-  videoData: string;
-  chapterIndex: number;
-  sceneIndex: number;
-  shotIndex: number;
-}
 
-interface BackgroundMusicProps {
-  audioData: Record<string, string>;
-  isGenerating: boolean;
-  onGenerateMusic: (style?: string) => Promise<void>;
-  chapterIndex: number;
-  sceneIndex: number;
-  projectName: string;
-}
-
-interface DirectorInstructionsProps {
-  instructions: string;
-  handleUpdate: (newInstructions: string) => Promise<void>;
-}
 
 interface GenerateSceneVideoRequest {
   chapter_number: number;
@@ -123,7 +91,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [narrationData, setNarrationData] = useState<Record<string, string>>({});
   const [backgroundMusicData, setBackgroundMusicData] = useState<Record<string, string>>({});
   const [videoData, setVideoData] = useState<Record<string, string>>({});
-  const [existingNarrations, setExistingNarrations] = useState<Record<string, boolean>>({});
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingMusic, setGeneratingMusic] = useState<Set<string>>(new Set());
   const [isGeneratingAllMusic, setIsGeneratingAllMusic] = useState(false);
@@ -134,8 +101,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [activeSceneForRegeneration, setActiveSceneForRegeneration] = useState<{chapter: number, scene: number} | null>(null);
   const [regenerateInstructions, setRegenerateInstructions] = useState('');
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const { isOpen: isChapterModalOpen, onOpen: onChapterModalOpen, onClose: onChapterModalClose } = useDisclosure();
-  const { isOpen: isSceneModalOpen, onOpen: onSceneModalOpen, onClose: onSceneModalClose } = useDisclosure();
+  const { isOpen: isChapterModalOpen, onClose: onChapterModalClose } = useDisclosure();
+  const { isOpen: isSceneModalOpen, onClose: onSceneModalClose } = useDisclosure();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const timelineBg = useColorModeValue('gray.50', 'gray.700');

@@ -31,6 +31,7 @@ class ReplicateVideoService(BaseVideoService):
                 "negative_prompt": "extra characters, moving through walls, people sliding on the floor"
             }
         )
+        logger.info("Initialized ReplicateVideoService")
 
     async def generate_video(
         self,
