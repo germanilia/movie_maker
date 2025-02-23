@@ -145,6 +145,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const leftPanelRef = React.useRef<HTMLDivElement>(null);
   const containerRef = React.useRef<HTMLElement | null>(null);
   const [generatingVideoFor, setGeneratingVideoFor] = useState<{chapter: number, scene: number} | null>(null);
+  const [videoKey, setVideoKey] = useState<number>(0);
 
   React.useEffect(() => {
     isMounted.current = true;
@@ -808,7 +809,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   }, []);
 
   const handleGenerateSceneVideo = async (chapterIndex: number, sceneIndex: number) => {
-    // Prevent multiple clicks
     if (generatingVideoFor) return;
 
     setGeneratingVideoFor({ chapter: chapterIndex, scene: sceneIndex });
@@ -835,16 +835,17 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         throw new Error('Failed to generate scene video');
       }
 
+      // Update video data and force video reload
+      await loadAllVideos();
+      setVideoKey(prev => prev + 1);
+
       toast({
         title: 'Success',
-        description: 'Scene video generation started',
+        description: 'Scene video generation completed',
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
-
-      // Reload all videos to update the UI
-      await loadAllVideos();
 
     } catch (error) {
       console.error('Error generating scene video:', error);
@@ -1236,8 +1237,9 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                         <AspectRatio ratio={16/9}>
                           <Box position="relative">
                             <video
+                              key={videoKey}
                               controls
-                              src={`http://localhost:8000/api/get-scene-video/${projectName}/${activeChapterIndex + 1}/${currentChapter.scenes?.[activeSceneIndex]?.scene_number}`}
+                              src={`http://localhost:8000/api/get-scene-video/${projectName}/${activeChapterIndex + 1}/${currentChapter.scenes?.[activeSceneIndex]?.scene_number}?v=${videoKey}`}
                               style={{ width: '100%', borderRadius: '8px' }}
                             >
                               Your browser does not support the video tag.

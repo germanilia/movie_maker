@@ -199,55 +199,109 @@ class BaseVideoService(ABC):
                 # Process videos with transitions
                 processed_videos = []
                 if use_black_screens:
-                    # Calculate black screen duration between videos
-                    total_transition_time = narration_duration - total_video_duration
-                    black_screen_duration = total_transition_time / (len(normalized_videos) - 1)
+                    # Calculate total black screen duration needed
+                    total_black_screen_duration = narration_duration - total_video_duration
+                    # Number of black screens needed (between videos)
+                    num_black_screens = len(normalized_videos) - 1
+                    individual_black_screen_duration = total_black_screen_duration / num_black_screens if num_black_screens > 0 else 0
                     
-                    for i, video in enumerate(normalized_videos):
+                    final_videos = []  # List to store all video segments in order
+                    
+                    # Process first video
+                    first_video = normalized_videos[0]
+                    processed_path = scene_path / f"processed_shot_0.mp4"
+                    final_videos.append(processed_path)
+                    
+                    subprocess.run([
+                        "ffmpeg", "-y",
+                        "-i", str(first_video),
+                        "-vf", f"fade=t=in:st=0:d=1,fade=t=out:st={video_durations[0]-1}:d=1",
+                        "-c:v", "libx264",
+                        "-preset", "medium",
+                        "-crf", "23",
+                        str(processed_path)
+                    ], check=True, capture_output=True)
+
+                    # Process remaining videos with black screens before them
+                    for i in range(1, len(normalized_videos)):
+                        black_screen = scene_path / f"black_screen_{i}.mp4"
                         processed_path = scene_path / f"processed_shot_{i}.mp4"
-                        processed_videos.append(processed_path)
-
-                        if i < len(normalized_videos) - 1:  # Don't add black screen after last video
-                            # Create video with fade out to black and hold black frame
-                            filter_complex = (
-                                f"[0:v]fade=t=out:st={video_durations[i]-1}:d=1,"
-                                f"tpad=stop_duration={black_screen_duration}:stop_mode=clone[v]"
-                            )
-                        else:
-                            # Last video just needs a fade out
-                            filter_complex = f"[0:v]fade=t=out:st={video_durations[i]-1}:d=1[v]"
-
+                        
+                        # Create black screen
                         subprocess.run([
                             "ffmpeg", "-y",
-                            "-i", str(video),
-                            "-filter_complex", filter_complex,
-                            "-map", "[v]",
+                            "-f", "lavfi",
+                            "-i", f"color=c=black:s=1280x768:d={individual_black_screen_duration}",
+                            "-c:v", "libx264",
+                            "-preset", "medium",
+                            "-crf", "23",
+                            str(black_screen)
+                        ], check=True, capture_output=True)
+
+                        # Process video with fades
+                        subprocess.run([
+                            "ffmpeg", "-y",
+                            "-i", str(normalized_videos[i]),
+                            "-vf", f"fade=t=in:st=0:d=1,fade=t=out:st={video_durations[i]-1}:d=1",
                             "-c:v", "libx264",
                             "-preset", "medium",
                             "-crf", "23",
                             str(processed_path)
                         ], check=True, capture_output=True)
-                else:
-                    # Regular fade transitions
-                    for i, video in enumerate(normalized_videos):
-                        processed_path = scene_path / f"processed_shot_{i}.mp4"
-                        processed_videos.append(processed_path)
 
-                        filter_complex = (
-                            f"[0:v]fade=t=in:st=0:d=1,"
-                            f"fade=t=out:st={video_durations[i]-1}:d=1[v]"
-                        )
+                        final_videos.append(black_screen)
+                        final_videos.append(processed_path)
 
-                        subprocess.run([
-                            "ffmpeg", "-y",
-                            "-i", str(video),
-                            "-filter_complex", filter_complex,
-                            "-map", "[v]",
-                            "-c:v", "libx264",
-                            "-preset", "medium",
-                            "-crf", "23",
-                            str(processed_path)
-                        ], check=True, capture_output=True)
+                    # Create concat file
+                    concat_file = scene_path / "concat.txt"
+                    with open(concat_file, "w") as f:
+                        for video in final_videos:
+                            f.write(f"file '{video.name}'\n")
+
+                    # Concatenate all videos into temp file first
+                    temp_concat_video = scene_path / "temp_concat.mp4"
+                    subprocess.run([
+                        "ffmpeg", "-y",
+                        "-f", "concat",
+                        "-safe", "0",
+                        "-i", str(concat_file),
+                        "-c", "copy",
+                        str(temp_concat_video)
+                    ], check=True, capture_output=True)
+
+                    # Now add audio tracks to the final output
+                    output_path = scene_path / "final_scene.mp4"
+                    subprocess.run([
+                        "ffmpeg", "-y",
+                        "-i", str(temp_concat_video),
+                        "-i", str(narration_path),
+                        "-i", str(bg_music_path),
+                        "-filter_complex",
+                        "[1:a]aformat=sample_fmts=fltp:sample_rates=44100[narr];"
+                        "[2:a]aformat=sample_fmts=fltp:sample_rates=44100,volume=0.1,"
+                        "afade=t=in:st=0:d=2,"
+                        f"afade=t=out:st={narration_duration-1.5}:d=1.5[music];"
+                        "[narr][music]amix=inputs=2:duration=longest:weights=1 0.8[aout]",
+                        "-map", "0:v",
+                        "-map", "[aout]",
+                        "-c:v", "copy",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        str(output_path)
+                    ], check=True, capture_output=True)
+
+                    # Cleanup temporary files
+                    concat_file.unlink(missing_ok=True)
+                    temp_concat_video.unlink(missing_ok=True)
+                    for video in final_videos:
+                        if video.exists():
+                            video.unlink()
+
+                    if output_path.exists():
+                        logger.info("Successfully created scene video with audio")
+                        return True, str(output_path)
+                    else:
+                        raise ValueError("Output file was not created")
 
                 # Create concat file for final merge
                 concat_file = scene_path / "concat.txt"
@@ -270,7 +324,9 @@ class BaseVideoService(ABC):
                 if total_video_duration > narration_duration:
                     audio_delay = (total_video_duration - narration_duration) / 2
 
-                # Add audio with calculated delay
+                # Trim the video to end shortly after narration ends
+                total_video_duration = min(total_video_duration, narration_duration + 1)  # Add 1 second buffer after narration
+                
                 subprocess.run([
                     "ffmpeg", "-y",
                     "-i", str(temp_concat_video),
@@ -278,12 +334,14 @@ class BaseVideoService(ABC):
                     "-i", str(bg_music_path),
                     "-filter_complex",
                     f"[1:a]adelay={int(audio_delay*1000)}|{int(audio_delay*1000)}[delayed_narr];"
-                    "[delayed_narr]aformat=sample_fmts=fltp:sample_rates=44100,"
-                    f"afade=t=out:st={narration_duration-1}:d=1[narr];"  # Changed to 1-second fade starting 1 second from end
-                    "[2:a]aformat=sample_fmts=fltp:sample_rates=44100,volume=0.1[music];"
-                    "[narr][music]amix=inputs=2:duration=first:weights=1 1[aout]",
+                    "[delayed_narr]aformat=sample_fmts=fltp:sample_rates=44100[narr];"  # Removed narration fade out
+                    "[2:a]aformat=sample_fmts=fltp:sample_rates=44100,volume=0.1,"
+                    f"afade=t=in:st=0:d=2,"
+                    f"afade=t=out:st={total_video_duration-1.5}:d=1.5[music];"
+                    "[narr][music]amix=inputs=2:duration=longest:weights=1 0.8[aout]",
                     "-map", "0:v",
                     "-map", "[aout]",
+                    "-t", str(total_video_duration),
                     "-c:v", "copy",
                     "-c:a", "aac",
                     "-b:a", "192k",
