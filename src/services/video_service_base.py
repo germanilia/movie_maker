@@ -303,64 +303,82 @@ class BaseVideoService(ABC):
                     else:
                         raise ValueError("Output file was not created")
 
-                # Create concat file for final merge
-                concat_file = scene_path / "concat.txt"
-                with open(concat_file, "w") as f:
-                    for video in processed_videos:
-                        f.write(f"file '{video.name}'\n")
+                else:  # When no black screens are needed
+                    # Process videos with transitions
+                    processed_videos = []
+                    for i, video in enumerate(normalized_videos):
+                        processed_path = scene_path / f"processed_shot_{i}.mp4"
+                        processed_videos.append(processed_path)
+                        
+                        subprocess.run([
+                            "ffmpeg", "-y",
+                            "-i", str(video),
+                            "-vf", f"fade=t=in:st=0:d=1,fade=t=out:st={video_durations[i]-1}:d=1",
+                            "-c:v", "libx264",
+                            "-preset", "medium",
+                            "-crf", "23",
+                            str(processed_path)
+                        ], check=True, capture_output=True)
 
-                # Merge all processed videos
-                subprocess.run([
-                    "ffmpeg", "-y",
-                    "-f", "concat",
-                    "-safe", "0",
-                    "-i", str(concat_file),
-                    "-c", "copy",
-                    str(temp_concat_video)
-                ], check=True, capture_output=True)
+                    # Create concat file only if we have processed videos
+                    if processed_videos:
+                        # Create concat file for final merge
+                        concat_file = scene_path / "concat.txt"
+                        with open(concat_file, "w") as f:
+                            for video in processed_videos:
+                                f.write(f"file '{video.name}'\n")
 
-                # Calculate audio delay if video is longer than narration
-                audio_delay = 0
-                if total_video_duration > narration_duration:
-                    audio_delay = (total_video_duration - narration_duration) / 2
+                        # Merge all processed videos
+                        temp_concat_video = scene_path / "temp_concat.mp4"
+                        subprocess.run([
+                            "ffmpeg", "-y",
+                            "-f", "concat",
+                            "-safe", "0",
+                            "-i", str(concat_file),
+                            "-c", "copy",
+                            str(temp_concat_video)
+                        ], check=True, capture_output=True)
 
-                # Trim the video to end shortly after narration ends
-                total_video_duration = min(total_video_duration, narration_duration + 1)  # Add 1 second buffer after narration
-                
-                subprocess.run([
-                    "ffmpeg", "-y",
-                    "-i", str(temp_concat_video),
-                    "-i", str(narration_path),
-                    "-i", str(bg_music_path),
-                    "-filter_complex",
-                    f"[1:a]adelay={int(audio_delay*1000)}|{int(audio_delay*1000)}[delayed_narr];"
-                    "[delayed_narr]aformat=sample_fmts=fltp:sample_rates=44100[narr];"  # Removed narration fade out
-                    "[2:a]aformat=sample_fmts=fltp:sample_rates=44100,volume=0.1,"
-                    f"afade=t=in:st=0:d=2,"
-                    f"afade=t=out:st={total_video_duration-1.5}:d=1.5[music];"
-                    "[narr][music]amix=inputs=2:duration=longest:weights=1 0.8[aout]",
-                    "-map", "0:v",
-                    "-map", "[aout]",
-                    "-t", str(total_video_duration),
-                    "-c:v", "copy",
-                    "-c:a", "aac",
-                    "-b:a", "192k",
-                    str(output_path)
-                ], check=True, capture_output=True)
+                        # Calculate audio delay if video is longer than narration
+                        audio_delay = 0
+                        if total_video_duration > narration_duration:
+                            audio_delay = (total_video_duration - narration_duration) / 2
 
-                # Cleanup temporary files
-                concat_file.unlink(missing_ok=True)
-                if temp_concat_video.exists():
-                    temp_concat_video.unlink()
-                for video in normalized_videos + processed_videos:
-                    if video.exists():
-                        video.unlink()
+                        # Add audio tracks to the final output
+                        output_path = scene_path / "final_scene.mp4"
+                        subprocess.run([
+                            "ffmpeg", "-y",
+                            "-i", str(temp_concat_video),
+                            "-i", str(narration_path),
+                            "-i", str(bg_music_path),
+                            "-filter_complex",
+                            f"[1:a]adelay={int(audio_delay*1000)}|{int(audio_delay*1000)}[delayed_narr];"
+                            "[delayed_narr]aformat=sample_fmts=fltp:sample_rates=44100[narr];"
+                            "[2:a]aformat=sample_fmts=fltp:sample_rates=44100,volume=0.1,"
+                            "afade=t=in:st=0:d=2,"
+                            f"afade=t=out:st={total_video_duration-1.5}:d=1.5[music];"
+                            "[narr][music]amix=inputs=2:duration=longest:weights=1 0.8[aout]",
+                            "-map", "0:v",
+                            "-map", "[aout]",
+                            "-t", str(total_video_duration),
+                            "-c:v", "copy",
+                            "-c:a", "aac",
+                            "-b:a", "192k",
+                            str(output_path)
+                        ], check=True, capture_output=True)
 
-                if output_path.exists():
-                    logger.info("Successfully created scene video with audio")
-                    return True, str(output_path)
-                else:
-                    raise ValueError("Output file was not created")
+                        # Cleanup temporary files
+                        concat_file.unlink(missing_ok=True)
+                        temp_concat_video.unlink(missing_ok=True)
+                        for video in processed_videos:
+                            if video.exists():
+                                video.unlink()
+
+                        if output_path.exists():
+                            logger.info("Successfully created scene video with audio")
+                            return True, str(output_path)
+                    
+                    raise ValueError("No videos were processed")
 
             except subprocess.CalledProcessError as e:
                 logger.error("FFmpeg error: %s", str(e))
