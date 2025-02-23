@@ -93,6 +93,12 @@ interface DirectorInstructionsProps {
   handleUpdate: (newInstructions: string) => Promise<void>;
 }
 
+interface GenerateSceneVideoRequest {
+  chapter_number: number;
+  scene_number: number;
+  black_and_white: boolean;
+}
+
 const HomeIcon = createIcon({
   displayName: 'HomeIcon',
   viewBox: '0 0 24 24',
@@ -138,6 +144,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const isMounted = useRef(true);
   const leftPanelRef = React.useRef<HTMLDivElement>(null);
   const containerRef = React.useRef<HTMLElement | null>(null);
+  const [generatingVideoFor, setGeneratingVideoFor] = useState<{chapter: number, scene: number} | null>(null);
 
   React.useEffect(() => {
     isMounted.current = true;
@@ -800,6 +807,59 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     };
   }, []);
 
+  const handleGenerateSceneVideo = async (chapterIndex: number, sceneIndex: number) => {
+    // Prevent multiple clicks
+    if (generatingVideoFor) return;
+
+    setGeneratingVideoFor({ chapter: chapterIndex, scene: sceneIndex });
+
+    try {
+      const request: GenerateSceneVideoRequest = {
+        chapter_number: chapterIndex + 1,
+        scene_number: sceneIndex + 1,
+        black_and_white: script?.project_details?.black_and_white || false
+      };
+
+      const response = await fetch(
+        `http://localhost:8000/api/generate-scene-video/${projectName}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to generate scene video');
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Scene video generation started',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      // Reload all videos to update the UI
+      await loadAllVideos();
+
+    } catch (error) {
+      console.error('Error generating scene video:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate scene video',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setGeneratingVideoFor(null);
+    }
+  };
+
   if (!script) {
     return (
       <Box p={4}>
@@ -1149,17 +1209,50 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                   <VStack spacing={6} align="stretch">
                     <Card variant="outline" bg={bgColor}>
                       <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
-                        <Heading size="sm">Final Scene Video</Heading>
+                        <HStack justify="space-between">
+                          <Heading size="sm">Final Scene Video</Heading>
+                          <Button
+                            colorScheme="blue"
+                            size="sm"
+                            leftIcon={
+                              generatingVideoFor?.chapter === activeChapterIndex && 
+                              generatingVideoFor?.scene === activeSceneIndex ? 
+                                <Spinner size="sm" /> : 
+                                <Icon as={FaRedo} />
+                            }
+                            onClick={() => handleGenerateSceneVideo(activeChapterIndex, activeSceneIndex)}
+                            isLoading={
+                              generatingVideoFor?.chapter === activeChapterIndex && 
+                              generatingVideoFor?.scene === activeSceneIndex
+                            }
+                            loadingText="Generating"
+                            isDisabled={generatingVideoFor !== null}
+                          >
+                            Generate Video
+                          </Button>
+                        </HStack>
                       </CardHeader>
                       <CardBody>
                         <AspectRatio ratio={16/9}>
-                          <video
-                            controls
-                            src={`http://localhost:8000/api/get-scene-video/${projectName}/${activeChapterIndex + 1}/${currentChapter.scenes?.[activeSceneIndex]?.scene_number}`}
-                            style={{ width: '100%', borderRadius: '8px' }}
-                          >
-                            Your browser does not support the video tag.
-                          </video>
+                          <Box position="relative">
+                            <video
+                              controls
+                              src={`http://localhost:8000/api/get-scene-video/${projectName}/${activeChapterIndex + 1}/${currentChapter.scenes?.[activeSceneIndex]?.scene_number}`}
+                              style={{ width: '100%', borderRadius: '8px' }}
+                            >
+                              Your browser does not support the video tag.
+                            </video>
+                            <Text
+                              position="absolute"
+                              top="50%"
+                              left="50%"
+                              transform="translate(-50%, -50%)"
+                              color="gray.500"
+                              display={videoData[`final_scene_${activeChapterIndex + 1}_${activeSceneIndex + 1}`] ? 'none' : 'block'}
+                            >
+                              No video generated yet
+                            </Text>
+                          </Box>
                         </AspectRatio>
                       </CardBody>
                     </Card>
