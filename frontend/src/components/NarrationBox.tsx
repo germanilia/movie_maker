@@ -33,6 +33,7 @@ import {
   FaEdit,
 } from 'react-icons/fa';
 import { ChakraIcon } from './utils/ChakraIcon';
+import { fetchSceneData } from '../services/sceneDataService';
 
 interface NarrationBoxProps {
   audioData: Record<string, string>;
@@ -192,6 +193,29 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const refreshAudioData = async () => {
+    try {
+      const sceneData = await fetchSceneData(projectName, chapterIndex, sceneIndex);
+      if (audioRef.current) {
+        const timestamp = new Date().getTime();
+        // Use the fresh audio data from the service
+        audioRef.current.src = `${audioPath}?t=${timestamp}`;
+        audioRef.current.load();
+      }
+      setAudioError(false);
+    } catch (error) {
+      console.error('Error refreshing audio data:', error);
+      setAudioError(true);
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh audio data',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   const regenerateNarration = async () => {
     setIsLoading(true);
     try {
@@ -219,8 +243,12 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
       // Update local state
       setLocalNarrationText(result.narration);
       setEditedNarration(result.narration);
+      
+      // Reset audio state
       resetAudioState();
-      setAudioError(false);
+      
+      // Fetch fresh audio data
+      await refreshAudioData();
 
       // Notify parent component
       if (onNarrationUpdate) {
@@ -275,8 +303,12 @@ const NarrationBox: React.FC<NarrationBoxProps> = ({
 
       // Update local state
       setLocalNarrationText(editedNarration);
+      
+      // Reset audio state
       resetAudioState();
-      setAudioError(false);
+      
+      // Fetch fresh audio data
+      await refreshAudioData();
 
       // Notify parent component
       if (onNarrationUpdate) {

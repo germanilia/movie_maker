@@ -18,20 +18,22 @@ export const fetchSceneData = async (
     const timestamp = Date.now();
     const baseUrl = `http://localhost:8000/api`;
 
+    const requestInit: RequestInit = {
+      signal: controller.signal,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      },
+      cache: 'no-store'
+    };
+
     // Fetch all data in parallel using the existing endpoints
     const [imagesResponse, videosResponse, narrationsResponse, musicResponse] = await Promise.all([
-      fetch(`${baseUrl}/get-scene-images/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, { 
-        signal: controller.signal 
-      }),
-      fetch(`${baseUrl}/get-scene-videos/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, { 
-        signal: controller.signal 
-      }),
-      fetch(`${baseUrl}/get-scene-narrations/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, { 
-        signal: controller.signal 
-      }),
-      fetch(`${baseUrl}/get-scene-background-music/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, { 
-        signal: controller.signal 
-      })
+      fetch(`${baseUrl}/get-scene-images/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit),
+      fetch(`${baseUrl}/get-scene-videos/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit),
+      fetch(`${baseUrl}/get-scene-narrations/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit),
+      fetch(`${baseUrl}/get-scene-background-music/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit)
     ]).finally(() => clearTimeout(timeoutId));
 
     // Check if any request failed

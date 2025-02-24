@@ -1169,13 +1169,13 @@ async def regenerate_narration(project_name: str, request: RegenerateNarrationRe
         chapter = script.chapters[chapter_idx]
         if not chapter.scenes or scene_idx >= len(chapter.scenes) or scene_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid scene index")
-
+        instructions = f"You are regenerating the narrations for chapter {request.chapter_number} and scene {request.scene_number}. The instructions are: {request.instructions or 'N/A'}"
         # Load and format the regenerate narration prompt
         prompt_template = await director._load_prompt("regenerate_narration_prompt.txt")
         prompt = await director._format_prompt(
             prompt_template,
             script=script,
-            regenerate_narration_instructions=request.instructions or "N/A"
+            regenerate_narration_instructions=instructions
         )
 
         # Get LLM response

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Script } from '../models/models';
+import { fetchSceneData } from '../services/sceneDataService';
 import {
   Box,
   Button,
@@ -48,14 +49,15 @@ interface ScriptReviewProps {
   onHome: () => void;
 }
 
-
 interface VideoApiResponse {
   status: string;
   videos: Record<string, string>;
 }
 
-
-
+interface SceneSelectionEvent {
+  chapterIndex: number;
+  sceneIndex: number;
+}
 
 const HomeIcon = createIcon({
   displayName: 'HomeIcon',
@@ -146,28 +148,88 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   }, [projectName, toast]);
 
-  // First, remove the script update event listener from the useEffect
+  const fetchFreshSceneData = React.useCallback(async (chapterIdx: number, sceneIdx: number) => {
+    try {
+      const sceneData = await fetchSceneData(projectName, chapterIdx, sceneIdx);
+      setImageData(prev => ({ ...prev, ...sceneData.images }));
+      setNarrationData(prev => ({ ...prev, ...sceneData.narration }));
+      setBackgroundMusicData(prev => ({ ...prev, ...sceneData.backgroundMusic }));
+      setVideoData(prev => ({ ...prev, ...sceneData.videos }));
+    } catch (error) {
+      console.error('Error fetching fresh scene data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch fresh scene data',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  }, [projectName, toast]);
+
+  React.useEffect(() => {
+    const handleSceneSelection = async (event: CustomEvent<SceneSelectionEvent>) => {
+      setActiveChapterIndex(event.detail.chapterIndex);
+      setActiveSceneIndex(event.detail.sceneIndex);
+      
+      await fetchFreshSceneData(event.detail.chapterIndex, event.detail.sceneIndex);
+      
+      setTimeout(() => {
+        const sceneElement = document.querySelector(
+          `[data-chapter-index="${event.detail.chapterIndex}"][data-scene-index="${event.detail.sceneIndex}"]`
+        );
+        if (sceneElement && leftPanelRef.current) {
+          sceneElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+    };
+
+    window.addEventListener('scene-selected', handleSceneSelection as unknown as EventListener);
+
+    return () => {
+      window.removeEventListener('scene-selected', handleSceneSelection as unknown as EventListener);
+    };
+  }, [fetchFreshSceneData]);
+
+  React.useEffect(() => {
+    if (script) {
+      fetchFreshSceneData(activeChapterIndex, activeSceneIndex);
+    }
+  }, [activeChapterIndex, activeSceneIndex, script, fetchFreshSceneData]);
+
   React.useEffect(() => {
     let mounted = true;
 
-    const fetchScript = async () => {
+    const fetchInitialData = async () => {
       setIsLoading(true);
       try {
-        // Only fetch the script data here
-        const scriptResponse = await fetch(`http://localhost:8000/api/script/${projectName}`);
+        const scriptResponse = await fetch(
+          `http://localhost:8000/api/script/${projectName}`,
+          {
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            },
+            cache: 'no-store'
+          }
+        );
+        
         if (!scriptResponse.ok) {
           throw new Error(`Failed to fetch script: ${scriptResponse.status} ${scriptResponse.statusText}`);
         }
+        
         const scriptData = await scriptResponse.json();
         if (mounted) {
           setScript(scriptData);
+          await fetchFreshSceneData(0, 0);
         }
       } catch (error) {
-        console.error('Error fetching script:', error);
+        console.error('Error fetching initial data:', error);
         if (mounted) {
           toast({
             title: 'Error',
-            description: error instanceof Error ? error.message : 'Failed to fetch script data',
+            description: error instanceof Error ? error.message : 'Failed to fetch initial data',
             status: 'error',
             duration: 5000,
             isClosable: true,
@@ -180,13 +242,12 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       }
     };
 
-    fetchScript();
+    fetchInitialData();
 
     return () => {
       mounted = false;
     };
-  }, [projectName, toast, setScript]);
-
+  }, [projectName, toast, setScript, fetchFreshSceneData]);
 
   const onVideoGenerated = async () => {
     await loadAllVideos();
@@ -293,8 +354,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           body: JSON.stringify({
             chapter_number: chapterNumber,
             scene_number: sceneNumber,
-            style: style || 'Cinematic',  // Include the selected style
-            overwrite: true  // Always overwrite when regenerating
+            style: style || 'Cinematic',
+            overwrite: true
           }),
         }
       );
@@ -303,7 +364,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         throw new Error('Failed to generate background music');
       }
 
-      // After successful generation, fetch all background music data
       const allMusicResponse = await fetch(
         `http://localhost:8000/api/get-all-background-music/${projectName}`,
         { cache: 'no-store' }
@@ -447,13 +507,12 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             img.shotIndex,
             img.type,
             img.description,
-            true // Set to true to ensure generation
+            true
           );
 
           successCount++;
           console.log(`Successfully generated image ${successCount}/${pendingImages.length}`);
 
-          // Add a small delay between generations
           await new Promise(resolve => setTimeout(resolve, 1000));
 
         } catch (error) {
@@ -511,7 +570,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     newDescription: string
   ) => {
     try {
-      // Call the API to update the script
       const response = await fetch(`http://localhost:8000/api/update-shot-description/${projectName}`, {
         method: 'PUT',
         headers: {
@@ -530,7 +588,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         throw new Error('Failed to update description');
       }
 
-      // Update only the specific shot's description in the script
       if (script?.chapters?.[chapterIndex]?.scenes?.[sceneIndex]?.shots?.[shotIndex]) {
         const shot = script!.chapters![chapterIndex]!.scenes![sceneIndex]!.shots![shotIndex]!;
         shot['opening_frame'] = newDescription;
@@ -540,7 +597,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       throw error;
     }
   };
-
 
   const handleRegenerateChapter = async () => {
     if (activeChapterForRegeneration === null) return;
@@ -652,31 +708,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     });
   }, [setScript, toast]);
 
-  // Add event listener for scene selection
-  React.useEffect(() => {
-    const handleSceneSelection = (event: CustomEvent<{ chapterIndex: number; sceneIndex: number }>) => {
-      setActiveChapterIndex(event.detail.chapterIndex);
-      setActiveSceneIndex(event.detail.sceneIndex);
-      
-      // Find the selected scene element and scroll it into view
-      setTimeout(() => {
-        const sceneElement = document.querySelector(
-          `[data-chapter-index="${event.detail.chapterIndex}"][data-scene-index="${event.detail.sceneIndex}"]`
-        );
-        if (sceneElement && leftPanelRef.current) {
-          sceneElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      }, 100);
-    };
-
-    window.addEventListener('scene-selected', handleSceneSelection as EventListener);
-
-    return () => {
-      window.removeEventListener('scene-selected', handleSceneSelection as EventListener);
-    };
-  }, []);
-
-
   if (!script) {
     return (
       <Box p={4}>
@@ -703,7 +734,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
   return (
     <Box height="100vh" overflow="hidden" bg={bgColor}>
-      {/* Header */}
       <Box position="fixed" top={0} left={0} right={0} zIndex={100}>
         <Flex
           p={4}
@@ -753,7 +783,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           </HStack>
         </Flex>
 
-        {/* Story Timeline */}
         <Box
           p={4}
           bg={timelineBg}
@@ -800,7 +829,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         </Box>
       </Box>
 
-      {/* Main Content */}
       <Box 
         pt="180px" 
         height="100vh" 
@@ -808,7 +836,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         position="relative"
       >
         <Flex height="calc(100vh - 180px)">
-          {/* Left Panel */}
           <ScriptTimeline
             script={script}
             projectName={projectName}
@@ -828,7 +855,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             timelineRef={leftPanelRef}
           />
 
-          {/* Main Content Area */}
           <Box flex={1} display="flex" flexDirection="column" height="100%">
             <Tabs variant="enclosed" colorScheme="blue" display="flex" flexDirection="column" height="100%">
               <TabList position="sticky" top={0} bg={bgColor} zIndex={1} borderBottomWidth={1} borderColor={borderColor}>
@@ -906,7 +932,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
         </Flex>
       </Box>
 
-      {/* Modals */}
       <Modal 
         isOpen={isChapterModalOpen} 
         onClose={() => {

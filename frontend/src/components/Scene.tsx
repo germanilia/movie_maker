@@ -253,9 +253,7 @@ const Scene: React.FC<SceneProps> = ({
               <HStack justify="space-between" width="100%">
                 <HStack spacing={2}>
                   <Text fontSize="sm" color="gray.700">Scene {scene.scene_number}</Text>
-                  <Badge variant="outline" colorScheme="blue" fontSize="xs">
-                    {completedShots}/{totalShots}
-                  </Badge>
+                  
                 </HStack>
                 <Button
                   leftIcon={<ChakraIcon icon={FaRedo} />}
