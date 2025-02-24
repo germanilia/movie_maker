@@ -66,13 +66,6 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
       await handleUpdate(editedInstructions);
       setIsEditing(false);
       setHasChanges(false);
-      toast({
-        title: 'Success',
-        description: 'Director instructions updated',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
     } catch (error) {
       toast({
         title: 'Error',
@@ -81,6 +74,8 @@ const DirectorInstructions: React.FC<DirectorInstructionsProps> = ({
         duration: 5000,
         isClosable: true,
       });
+      // Revert changes on error
+      setEditedInstructions(instructions);
     } finally {
       setIsSaving(false);
     }

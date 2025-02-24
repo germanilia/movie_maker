@@ -20,8 +20,19 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class VoiceService:
+    _instance: Optional['VoiceService'] = None
+    _initialized: bool = False
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(VoiceService, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self, verify_ssl: bool = False):
         """Initialize the Play.HT voice service with credentials from environment variables."""
+        if self._initialized:
+            return
+            
         self.user_id = os.getenv('PLAY_HT_USER_ID')
         self.api_key = os.getenv('PLAY_HT_API_KEY')
         self.verify_ssl = verify_ssl
@@ -46,6 +57,13 @@ class VoiceService:
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("https://", adapter)
         self.session.headers.update(self.headers)
+        self._initialized = True
+
+    @classmethod
+    def get_instance(cls, verify_ssl: bool = False) -> 'VoiceService':
+        if not cls._instance:
+            cls._instance = cls(verify_ssl)
+        return cls._instance
 
     def list_cloned_voices(self) -> List[Dict]:
         """List all cloned voices in the account."""

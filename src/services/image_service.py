@@ -6,7 +6,7 @@ import replicate
 from src.services.aws_service import AWSService
 from pathlib import Path
 import base64
-from typing import Any, Tuple
+from typing import Any, Tuple, Optional
 import time
 
 logger = logging.getLogger(__name__)
@@ -18,12 +18,23 @@ class ImageModels(BaseModel):
 
 
 class ImageService:
+    _instance: Optional['ImageService'] = None
+    _initialized: bool = False
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(ImageService, cls).__new__(cls)
+        return cls._instance
+
     def __init__(
         self,
-        aws_service: AWSService,
+        aws_service: Optional[AWSService] = None,
         black_and_white: bool = False,
         genre: str = "documentary",
     ):
+        if self._initialized:
+            return
+            
         logger.info(
             f"Initializing ImageService with black_and_white={black_and_white}, genre={genre}"
         )
@@ -37,7 +48,7 @@ class ImageService:
         self.aws_service = aws_service
         self.black_and_white = black_and_white
         self.genre = genre
-        self.temp_dir = Path(aws_service.temp_dir)
+        self.temp_dir = Path(aws_service.temp_dir) if aws_service else Path("temp")
         logger.info(f"ImageService initialized. Using temp directory: {self.temp_dir}")
 
         self.upscale_model = ImageModels(
@@ -77,6 +88,33 @@ class ImageService:
         )
 
         self.image_model = self.flux_dev_realism
+        self._initialized = True
+
+    @classmethod
+    def get_instance(
+        cls,
+        aws_service: Optional[AWSService] = None,
+        black_and_white: bool = False,
+        genre: str = "documentary"
+    ) -> 'ImageService':
+        if not cls._instance:
+            cls._instance = cls(aws_service, black_and_white, genre)
+        return cls._instance
+
+    def update_config(
+        self,
+        aws_service: Optional[AWSService] = None,
+        black_and_white: Optional[bool] = None,
+        genre: Optional[str] = None
+    ):
+        """Update the service configuration after initialization"""
+        if aws_service:
+            self.aws_service = aws_service
+            self.temp_dir = Path(aws_service.temp_dir)
+        if black_and_white is not None:
+            self.black_and_white = black_and_white
+        if genre:
+            self.genre = genre
 
     def get_local_path(self, image_path: str) -> Path:
         """

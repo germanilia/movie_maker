@@ -18,6 +18,7 @@ interface ShotInstructionsTabProps {
   cardBg: string;
   bgColor: string;
   borderColor: string;
+  onScriptUpdate?: (updatedScript: any) => void;
 }
 
 const ShotInstructionsTab: React.FC<ShotInstructionsTabProps> = ({
@@ -28,6 +29,7 @@ const ShotInstructionsTab: React.FC<ShotInstructionsTabProps> = ({
   cardBg,
   bgColor,
   borderColor,
+  onScriptUpdate,
 }) => {
   const toast = useToast();
 
@@ -37,7 +39,7 @@ const ShotInstructionsTab: React.FC<ShotInstructionsTabProps> = ({
   ) => {
     try {
       const response = await fetch(
-        `http://localhost:8000/api/update-shot-instructions/${projectName}`,
+        `http://localhost:8000/api/update-shot-description/${projectName}`,
         {
           method: 'PUT',
           headers: {
@@ -47,13 +49,19 @@ const ShotInstructionsTab: React.FC<ShotInstructionsTabProps> = ({
             chapter_index: activeChapterIndex + 1,
             scene_index: activeSceneIndex + 1,
             shot_index: shotIndex + 1,
-            instructions: newInstructions,
+            action: 'director_instructions',
+            description: newInstructions,
           }),
         }
       );
 
       if (!response.ok) {
         throw new Error('Failed to update shot instructions');
+      }
+
+      const updatedScript = await response.json();
+      if (onScriptUpdate) {
+        onScriptUpdate(updatedScript);
       }
 
       toast({

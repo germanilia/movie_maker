@@ -5,6 +5,28 @@ interface SceneData {
   backgroundMusic: Record<string, string>;
 }
 
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const fetchWithRetry = async (url: string, options: RequestInit, retries = MAX_RETRIES, delay = INITIAL_RETRY_DELAY): Promise<Response> => {
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response;
+  } catch (error) {
+    if (retries > 0) {
+      console.log(`Retrying fetch (${retries} attempts left) after ${delay}ms...`);
+      await sleep(delay);
+      return fetchWithRetry(url, options, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+};
+
 export const fetchSceneData = async (
   projectName: string,
   chapterIndex: number,
@@ -12,7 +34,7 @@ export const fetchSceneData = async (
 ): Promise<SceneData> => {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // Increased to 60 second timeout
 
     // Add timestamp to URLs to prevent caching
     const timestamp = Date.now();
@@ -28,44 +50,54 @@ export const fetchSceneData = async (
       cache: 'no-store'
     };
 
-    // Fetch all data in parallel using the existing endpoints
-    const [imagesResponse, videosResponse, narrationsResponse, musicResponse] = await Promise.all([
-      fetch(`${baseUrl}/get-scene-images/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit),
-      fetch(`${baseUrl}/get-scene-videos/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit),
-      fetch(`${baseUrl}/get-scene-narrations/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit),
-      fetch(`${baseUrl}/get-scene-background-music/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit)
-    ]).finally(() => clearTimeout(timeoutId));
+    try {
+      // Fetch all data in parallel using retry logic
+      const [imagesResponse, videosResponse, narrationsResponse, musicResponse] = await Promise.all([
+        fetchWithRetry(`${baseUrl}/get-scene-images/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit),
+        fetchWithRetry(`${baseUrl}/get-scene-videos/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit),
+        fetchWithRetry(`${baseUrl}/get-scene-narrations/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit),
+        fetchWithRetry(`${baseUrl}/get-scene-background-music/${projectName}/${chapterIndex + 1}/${sceneIndex + 1}?t=${timestamp}`, requestInit)
+      ]).finally(() => clearTimeout(timeoutId));
 
-    // Check if any request failed
-    if (!imagesResponse.ok || !videosResponse.ok || !narrationsResponse.ok || !musicResponse.ok) {
-      const failedEndpoints = [];
-      if (!imagesResponse.ok) failedEndpoints.push('images');
-      if (!videosResponse.ok) failedEndpoints.push('videos');
-      if (!narrationsResponse.ok) failedEndpoints.push('narrations');
-      if (!musicResponse.ok) failedEndpoints.push('background music');
-      
-      throw new Error(`Failed to fetch: ${failedEndpoints.join(', ')}`);
+      // Parse all responses
+      const [imagesData, videosData, narrationsData, musicData] = await Promise.all([
+        imagesResponse.json(),
+        videosResponse.json(),
+        narrationsResponse.json(),
+        musicResponse.json()
+      ]);
+
+      // Check for error status in responses
+      const responses = [
+        { name: 'images', data: imagesData },
+        { name: 'videos', data: videosData },
+        { name: 'narrations', data: narrationsData },
+        { name: 'background music', data: musicData }
+      ];
+
+      const failedResponses = responses.filter(r => r.data.status === 'error');
+      if (failedResponses.length > 0) {
+        const errors = failedResponses.map(r => `${r.name}: ${r.data.message}`).join(', ');
+        throw new Error(`Failed to fetch data: ${errors}`);
+      }
+
+      return {
+        images: imagesData.images || {},
+        videos: videosData.videos || {},
+        narration: narrationsData.narrations || {},
+        backgroundMusic: musicData.background_music || {},
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.error('Request timeout fetching scene data');
+          throw new Error('Request timeout fetching scene data');
+        }
+        throw error;
+      }
+      throw new Error('An unknown error occurred while fetching scene data');
     }
-
-    // Parse all responses
-    const [imagesData, videosData, narrationsData, musicData] = await Promise.all([
-      imagesResponse.json(),
-      videosResponse.json(),
-      narrationsResponse.json(),
-      musicResponse.json()
-    ]);
-
-    return {
-      images: imagesData.images || {},
-      videos: videosData.videos || {},
-      narration: narrationsData.narrations || {},
-      backgroundMusic: musicData.background_music || {},
-    };
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.error('Request timeout fetching scene data');
-      throw new Error('Request timeout fetching scene data');
-    }
     console.error('Error fetching scene data:', error);
     throw error;
   }

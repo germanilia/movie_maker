@@ -4,7 +4,7 @@ from pydantic import BaseModel
 import replicate
 from pathlib import Path
 import time
-from typing import Any, Tuple
+from typing import Any, Tuple, Optional, Union, BinaryIO, Iterator
 
 from src.services.aws_service import AWSService
 
@@ -15,14 +15,25 @@ class MusicModel(BaseModel):
     parameters: Any
 
 class BackgroundMusicService:
-    def __init__(self, aws_service: AWSService):
+    _instance: Optional['BackgroundMusicService'] = None
+    _initialized: bool = False
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(BackgroundMusicService, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self, aws_service: Optional[AWSService] = None):
+        if self._initialized:
+            return
+            
         logger.info("Initializing BackgroundMusicService")
         self.replicate_token = os.getenv("REPLICATE_API_TOKEN")
         if not self.replicate_token:
             logger.error("Missing Replicate API token. Required: REPLICATE_API_TOKEN")
             raise ValueError("Missing required Replicate API token in environment variables")
 
-        self.temp_dir = Path(aws_service.temp_dir)
+        self.temp_dir = Path(aws_service.temp_dir) if aws_service else Path("temp")
         logger.info(f"BackgroundMusicService initialized. Using temp directory: {self.temp_dir}")
 
         self.music_model = MusicModel(
@@ -42,16 +53,28 @@ class BackgroundMusicService:
                 "classifier_free_guidance": 3
             }
         )
+        self._initialized = True
 
-    def get_local_path(self, music_path: str) -> Path:
+    @classmethod
+    def get_instance(cls, aws_service: Optional[AWSService] = None) -> 'BackgroundMusicService':
+        if not cls._instance:
+            cls._instance = cls(aws_service)
+        return cls._instance
+
+    def update_config(self, aws_service: Optional[AWSService] = None):
+        """Update the service configuration after initialization"""
+        if aws_service:
+            self.temp_dir = Path(aws_service.temp_dir)
+
+    def get_local_path(self, music_path: Union[str, Path]) -> Path:
         """Get the local path for a music file"""
-        path = self.temp_dir / music_path
+        path = self.temp_dir / str(music_path)
         logger.debug(f"Resolved local path: {path}")
         return path
 
-    def get_download_path(self, music_path: str) -> Path:
+    def get_download_path(self, music_path: Union[str, Path]) -> Path:
         """Get the download path for music files"""
-        downloads_folder = Path(self.temp_dir / music_path).parent
+        downloads_folder = Path(self.temp_dir / str(music_path)).parent
         downloads_folder.mkdir(parents=True, exist_ok=True)
         logger.debug(f"Created download directory: {downloads_folder}")
         return downloads_folder
@@ -59,7 +82,7 @@ class BackgroundMusicService:
     async def generate_music(
         self,
         prompt: str,
-        music_path: str,
+        music_path: Union[str, Path],
         duration: int = 35,
         overwrite: bool = False,
     ) -> Tuple[bool, str | None]:
@@ -69,14 +92,14 @@ class BackgroundMusicService:
         logger.debug(f"Generation parameters - Prompt: {prompt}, Duration: {duration}, Overwrite: {overwrite}")
 
         try:
-            local_path = self.get_local_path(self.temp_dir / music_path)
+            local_path = self.get_local_path(music_path)
 
             if not overwrite and local_path.exists():
                 logger.info(f"Music file already exists at {music_path}, skipping generation")
                 return True, str(local_path)
 
             # Extract numeric values from music_path to use as seed
-            seed = int("".join(filter(str.isdigit, music_path))) if any(c.isdigit() for c in music_path) else 11
+            seed = int("".join(filter(str.isdigit, str(music_path)))) if any(c.isdigit() for c in str(music_path)) else 11
 
             logger.info("Calling Replicate API for music generation")
             self.music_model.parameters.update({
@@ -95,11 +118,21 @@ class BackgroundMusicService:
                 raise Exception("Failed to generate music with Replicate")
 
             save_path = self.get_download_path(music_path)
-            downloaded_path = save_path / f"{Path(music_path).stem}.mp3"
+            downloaded_path = save_path / f"{Path(str(music_path)).stem}.mp3"
 
             # Save the music file
             with open(downloaded_path, "wb") as file:
-                file.write(output.read())
+                # Handle different types of output from replicate.run
+                if isinstance(output, (bytes, bytearray)):
+                    file.write(output)
+                elif isinstance(output, BinaryIO):
+                    file.write(output.read())
+                elif isinstance(output, Iterator):
+                    for chunk in output:
+                        if isinstance(chunk, (bytes, bytearray)):
+                            file.write(chunk)
+                else:
+                    raise ValueError(f"Unexpected output type from Replicate: {type(output)}")
 
             generation_time = time.time() - start_time
             logger.info(f"Successfully generated and saved music to {downloaded_path} in {generation_time:.2f} seconds")

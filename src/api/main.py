@@ -392,7 +392,7 @@ async def generate_narration(project_name: str, request: NarrationRequest):
     """Generate audio narration for given text"""
     try:
         aws_service = AWSService(project_name=project_name)
-        voice_service = VoiceService()
+        voice_service = VoiceService.get_instance()
         
         # Get or create cloned voice using the voice sample
         voice_sample_path = f"temp/{project_name}/voice_sample.m4a"
@@ -474,7 +474,7 @@ async def generate_background_music(project_name: str, request: BackgroundMusicR
     """Generate background music for a specific scene"""
     try:
         aws_service = AWSService(project_name=project_name)
-        music_service = BackgroundMusicService(aws_service=aws_service)
+        music_service = BackgroundMusicService.get_instance(aws_service=aws_service)
 
         # Generate a unique filename for this background music
         music_path = f"chapter_{request.chapter_number}/scene_{request.scene_number}/background_music.mp3"
@@ -1169,6 +1169,7 @@ async def regenerate_narration(project_name: str, request: RegenerateNarrationRe
         chapter = script.chapters[chapter_idx]
         if not chapter.scenes or scene_idx >= len(chapter.scenes) or scene_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid scene index")
+
         instructions = f"You are regenerating the narrations for chapter {request.chapter_number} and scene {request.scene_number}. The instructions are: {request.instructions or 'N/A'}"
         # Load and format the regenerate narration prompt
         prompt_template = await director._load_prompt("regenerate_narration_prompt.txt")
@@ -1191,7 +1192,7 @@ async def regenerate_narration(project_name: str, request: RegenerateNarrationRe
             await director.save_script(script)
 
             # Generate audio using voice service
-            voice_service = VoiceService()
+            voice_service = VoiceService.get_instance()
             success, result = await voice_service.regenerate_narration(
                 text=narration_data["narration"],
                 project_name=project_name,
@@ -1247,7 +1248,7 @@ async def update_narration(project_name: str, request: UpdateNarrationRequest):
         await director.save_script(script)
 
         # Generate new audio using voice service
-        voice_service = VoiceService()
+        voice_service = VoiceService.get_instance()
         success, result = await voice_service.update_narration(
             text=request.narration_text,
             project_name=project_name,
@@ -1284,17 +1285,32 @@ async def get_scene_images(project_name: str, chapter_number: int, scene_number:
         image_data = {}
         scene_dir = image_service.temp_dir / f"chapter_{chapter_number}" / f"scene_{scene_number}"
         
-        if scene_dir.exists():
+        if not scene_dir.exists():
+            return {"status": "success", "images": {}}
+
+        try:
             for image_file in scene_dir.glob("shot_*.png"):
+                if not image_file.exists() or image_file.stat().st_size == 0:
+                    logger.warning(f"Skipping invalid image file: {image_file}")
+                    continue
+                    
                 # Parse shot number and type from filename
                 filename_parts = image_file.stem.split("_")
                 shot_num = int(filename_parts[1])
                 shot_type = filename_parts[2]  # 'opening' or 'closing'
 
-                image_key = f"{chapter_number}-{scene_number}-{shot_num}-{shot_type}"
-                image_data[image_key] = image_service.encode_image_to_base64(image_file)
+                try:
+                    image_key = f"{chapter_number}-{scene_number}-{shot_num}-{shot_type}"
+                    image_data[image_key] = image_service.encode_image_to_base64(image_file)
+                except Exception as e:
+                    logger.error(f"Error encoding image {image_file}: {str(e)}")
+                    continue
 
-        return {"status": "success", "images": image_data}
+            return {"status": "success", "images": image_data}
+        except Exception as e:
+            logger.error(f"Error processing scene directory {scene_dir}: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
     except Exception as e:
         logger.error(f"Error getting scene images: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1310,20 +1326,30 @@ async def get_scene_videos(project_name: str, chapter_number: int, scene_number:
         videos = {}
         scene_dir = Path("temp") / project_name / f"chapter_{chapter_number}" / f"scene_{scene_number}"
         
-        if scene_dir.exists():
+        if not scene_dir.exists():
+            return {"status": "success", "videos": {}}
+
+        try:
             # Get individual shot videos
             for video_file in scene_dir.glob("shot_*.mp4"):
+                if not video_file.exists() or video_file.stat().st_size == 0:
+                    logger.warning(f"Skipping invalid video file: {video_file}")
+                    continue
+
                 shot_num = int(video_file.stem.split("_")[1])
-                # Return URL instead of base64
+                # Return URL instead of base64 for better performance
                 videos[f"{chapter_number}-{scene_number}-{shot_num}"] = f"/temp/{project_name}/chapter_{chapter_number}/scene_{scene_number}/{video_file.name}"
             
             # Get final scene video if it exists
             final_scene_path = scene_dir / "final_scene.mp4"
-            if final_scene_path.exists():
-                # Return URL for final scene video
+            if final_scene_path.exists() and final_scene_path.stat().st_size > 0:
                 videos[f"final_scene_{chapter_number}_{scene_number}"] = f"/temp/{project_name}/chapter_{chapter_number}/scene_{scene_number}/final_scene.mp4"
 
-        return {"status": "success", "videos": videos}
+            return {"status": "success", "videos": videos}
+        except Exception as e:
+            logger.error(f"Error processing scene directory {scene_dir}: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
     except Exception as e:
         logger.error(f"Error getting scene videos: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1338,13 +1364,21 @@ async def get_scene_narrations(project_name: str, chapter_number: int, scene_num
             f"scene_{scene_number}" / "narration.wav"
         )
         
-        narrations = {}
-        if narration_path.exists():
-            with open(narration_path, "rb") as f:
-                audio_data = base64.b64encode(f.read()).decode("utf-8")
-                narrations[f"{chapter_number}-{scene_number}"] = audio_data
+        if not narration_path.exists():
+            return {"status": "success", "narrations": {}}
 
-        return {"status": "success", "narrations": narrations}
+        try:
+            narrations = {}
+            if narration_path.stat().st_size > 0:
+                with open(narration_path, "rb") as f:
+                    audio_data = base64.b64encode(f.read()).decode("utf-8")
+                    narrations[f"{chapter_number}-{scene_number}"] = audio_data
+
+            return {"status": "success", "narrations": narrations}
+        except Exception as e:
+            logger.error(f"Error processing narration file {narration_path}: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
     except Exception as e:
         logger.error(f"Error getting scene narrations: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1359,13 +1393,21 @@ async def get_scene_background_music(project_name: str, chapter_number: int, sce
             f"scene_{scene_number}" / "background_music.mp3"
         )
         
-        background_music = {}
-        if music_path.exists():
-            with open(music_path, "rb") as f:
-                audio_data = base64.b64encode(f.read()).decode("utf-8")
-                background_music[f"{chapter_number}-{scene_number}"] = audio_data
+        if not music_path.exists():
+            return {"status": "success", "background_music": {}}
 
-        return {"status": "success", "background_music": background_music}
+        try:
+            background_music = {}
+            if music_path.stat().st_size > 0:
+                with open(music_path, "rb") as f:
+                    audio_data = base64.b64encode(f.read()).decode("utf-8")
+                    background_music[f"{chapter_number}-{scene_number}"] = audio_data
+
+            return {"status": "success", "background_music": background_music}
+        except Exception as e:
+            logger.error(f"Error processing background music file {music_path}: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
     except Exception as e:
         logger.error(f"Error getting scene background music: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

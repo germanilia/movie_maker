@@ -909,6 +909,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                     cardBg={cardBg}
                     bgColor={bgColor}
                     borderColor={borderColor}
+                    onScriptUpdate={setScript}
                   />
                 </TabPanel>
 

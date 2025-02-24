@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -22,16 +22,13 @@ import {
   Radio,
   RadioGroup,
   Stack,
-  Spinner,
   Badge,
   Progress,
   useColorModeValue,
-  Tooltip,
   Menu,
   MenuButton,
   MenuList,
   MenuItem,
-  Divider,
   Tabs,
   TabList,
   TabPanels,
@@ -39,24 +36,12 @@ import {
   TabPanel,
   useDisclosure,
   AspectRatio,
-  Input,
 } from '@chakra-ui/react';
-import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon, ChevronDownIcon, Icon } from '@chakra-ui/icons';
-import { FaImage, FaUserAlt, FaVideo, FaRedo } from 'react-icons/fa';
+import { RepeatIcon, CheckIcon, CloseIcon, AttachmentIcon, ChevronDownIcon, Icon } from '@chakra-ui/icons';
+import { FaImage, FaUserAlt, FaVideo } from 'react-icons/fa';
 import { ChakraIcon } from './utils/ChakraIcon';
-import { BiMoviePlay } from 'react-icons/bi';
+import debounce from 'lodash/debounce';
 
-const dragDropStyles = {
-  border: '2px dashed',
-  borderRadius: 'md',
-  p: 4,
-  textAlign: 'center' as const,
-  cursor: 'pointer',
-  transition: 'all 0.2s',
-  _hover: {
-    bg: 'gray.50',
-  },
-};
 
 // Update the FaceDetectionResult interface to match the new response structure
 interface FaceDetectionResult {
@@ -180,10 +165,45 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   selectedModel,
   onModelChange,
 }) => {
-  // Add local state for description and instructions
+  // State declarations
   const [localDescription, setLocalDescription] = useState(description);
   const [localDirectorInstructions, setLocalDirectorInstructions] = useState(directorInstructions);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [localModelType, setLocalModelType] = useState('flux_ultra_model');
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [seed, setSeed] = useState(333);
+  const [isDragging, setIsDragging] = useState(false);
+  const [faceDetectionResult, setFaceDetectionResult] = useState<FaceDetectionResult | null>(null);
+  const [isDetectingFaces, setIsDetectingFaces] = useState(false);
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [localImageData, setLocalImageData] = useState<string | undefined>(imageData);
+  const [activeTab, setActiveTab] = useState(0);
+  const [regenerateInstructions, setRegenerateInstructions] = useState('');
+  const [isRegeneratingShot, setIsRegeneratingShot] = useState(false);
+  const [showFaceTools, setShowFaceTools] = useState(false);
+  const [sourceImages, setSourceImages] = useState<SourceImage[]>([]);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [faceMapping, setFaceMapping] = useState<Record<number, string>>({});
+
+  const modelOptions = [
+    { value: 'flux_ultra_model', label: 'Flux Ultra Model' },
+    { value: 'flux_dev_realism', label: 'Flux Dev Realism' },
+  ];
   
+  const toast = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const swapFileInputRef = useRef<HTMLInputElement>(null);
+  const { isOpen: isRegenerateModalOpen, onOpen: onRegenerateModalOpen, onClose: onRegenerateModalClose } = useDisclosure();
+
+  const bgColor = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const buttonColorScheme = type === 'opening' ? 'teal' : 'pink';
+  const accentBgColor = useColorModeValue(`${buttonColorScheme}.50`, `${buttonColorScheme}.900`);
+  const accentTextColor = useColorModeValue(`${buttonColorScheme}.700`, `${buttonColorScheme}.100`);
+  const placeholderBgColor = useColorModeValue('gray.50', 'gray.900');
+
   // Update local state when props change
   useEffect(() => {
     setLocalDescription(description);
@@ -193,79 +213,50 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     setLocalDirectorInstructions(directorInstructions);
   }, [directorInstructions]);
 
-  // Add local modelType state
-  const [localModelType, setLocalModelType] = useState('flux_ultra_model');
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedDescription, setEditedDescription] = useState(description);
-  const [isSaving, setIsSaving] = useState(false);
-  const toast = useToast();
-  const [isDragging, setIsDragging] = useState(false);
-  const [seed, setSeed] = useState(333);
-  const [faceDetectionResult, setFaceDetectionResult] = useState<FaceDetectionResult | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [swapSourceImage, setSwapSourceImage] = useState<string | null>(null);
-  const swapFileInputRef = useRef<HTMLInputElement>(null);
-  const [showFaceTools, setShowFaceTools] = useState(false);
-  const [sourceImages, setSourceImages] = useState<SourceImage[]>([]);
-  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
-  const [faceMapping, setFaceMapping] = useState<Record<number, string>>({});
-  const [localImageData, setLocalImageData] = useState<string | undefined>(imageData);
-  const [isRegeneratingShot, setIsRegeneratingShot] = useState(false);
-  const [regenerateInstructions, setRegenerateInstructions] = useState('');
-  const { isOpen: isRegenerateModalOpen, onOpen: onRegenerateModalOpen, onClose: onRegenerateModalClose } = useDisclosure();
-
-  // Add new loading states
-  const [isDetectingFaces, setIsDetectingFaces] = useState(false);
-  const [isSwapping, setIsSwapping] = useState(false);
-
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-  const buttonColorScheme = type === 'opening' ? 'teal' : 'pink';
-  const accentBgColor = useColorModeValue(`${buttonColorScheme}.50`, `${buttonColorScheme}.900`);
-  const accentTextColor = useColorModeValue(`${buttonColorScheme}.700`, `${buttonColorScheme}.100`);
-
-  const modelOptions = [
-    { value: 'flux_ultra_model', label: 'Flux Ultra Model' },
-    { value: 'flux_dev_realism', label: 'Flux Dev Realism' },
-  ];
-
-  const [activeTab, setActiveTab] = useState(0);
-
   useEffect(() => {
     if (videoData) {
       setActiveTab(1);
     }
   }, [videoData]);
 
-  const handleSave = async () => {
-    if (!onUpdateDescription) return;
-    
-    setIsSaving(true);
-    try {
-      await onUpdateDescription(editedDescription);
-      setIsEditing(false);
-      setEditedDescription(editedDescription);
-      toast({
-        title: "Description updated",
-        status: "success",
-        duration: 3000,
-      });
-    } catch (error) {
-      toast({
-        title: "Failed to update description",
-        status: "error",
-        duration: 3000,
-      });
-    } finally {
-      setIsSaving(false);
-    }
+  useEffect(() => {
+    setLocalImageData(imageData);
+  }, [imageData]);
+
+  const handleDescriptionChange = (newValue: string) => {
+    setLocalDescription(newValue);
   };
 
-  const handleCancel = () => {
-    setEditedDescription(description);
+  const handleDoneEditing = async () => {
+    if (localDescription !== description) {
+      setIsSaving(true);
+      try {
+        await onUpdateDescription(localDescription);
+        toast({
+          title: "Description updated",
+          status: "success",
+          duration: 2000,
+          isClosable: true,
+        });
+      } catch (error) {
+        toast({
+          title: "Failed to update",
+          description: "Please try again",
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+        // Revert to original description on error
+        setLocalDescription(description);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEditing = () => {
+    setLocalDescription(description);
     setIsEditing(false);
   };
 
@@ -504,10 +495,6 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     }
   }, [imageData]);
 
-  useEffect(() => {
-    setEditedDescription(description);
-  }, [description]);
-
   const handleRegenerateShot = async () => {
     setIsRegeneratingShot(true);
     try {
@@ -568,10 +555,6 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     }
   };
 
-  const handleImageClick = () => {
-    // Image click handler implementation
-  };
-
   return (
     <Box 
       bg={bgColor} 
@@ -581,7 +564,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       borderColor={borderColor}
       position="relative"
     >
-      {(isGenerating || isDetectingFaces || isSwapping) && (
+      {(isGenerating || isDetectingFaces || isSwapping || isSaving) && (
         <Progress 
           size="xs" 
           isIndeterminate 
@@ -603,67 +586,78 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           >
             {type === 'opening' ? 'Opening Shot' : 'Closing Shot'}
           </Badge>
-        </HStack>
-
-        {/* Description Section */}
-        {isEditing ? (
-          <Box>
-            <Textarea
-              value={localDescription}
-              onChange={(e) => setLocalDescription(e.target.value)}
-              color={accentTextColor}
-              mb={2}
-              bg={accentBgColor}
-              _hover={{ borderColor: `${buttonColorScheme}.300` }}
-              _focus={{ borderColor: `${buttonColorScheme}.500`, boxShadow: `0 0 0 1px ${buttonColorScheme}.500` }}
-            />
-            <HStack justify="flex-end" spacing={2}>
+          {isEditing ? (
+            <HStack spacing={2}>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => {
-                  setLocalDescription(description);
-                  setIsEditing(false);
-                }}
-                leftIcon={<CloseIcon />}
+                onClick={handleCancelEditing}
+                isDisabled={isSaving}
               >
                 Cancel
               </Button>
               <Button
                 size="sm"
                 colorScheme={buttonColorScheme}
-                onClick={async () => {
-                  if (onUpdateDescription) {
-                    setIsSaving(true);
-                    try {
-                      await onUpdateDescription(localDescription);
-                      setIsEditing(false);
-                      toast({
-                        title: "Description updated",
-                        status: "success",
-                        duration: 3000,
-                      });
-                    } catch (error) {
-                      toast({
-                        title: "Failed to update description",
-                        status: "error",
-                        duration: 3000,
-                      });
-                    } finally {
-                      setIsSaving(false);
-                    }
-                  }
-                }}
+                onClick={handleDoneEditing}
                 isLoading={isSaving}
-                leftIcon={<CheckIcon />}
               >
-                Save
+                Done
               </Button>
             </HStack>
-          </Box>
-        ) : (
-          <Text color={accentTextColor}>{localDescription}</Text>
-        )}
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsEditing(true)}
+            >
+              Edit
+            </Button>
+          )}
+        </HStack>
+
+        {/* Description Section */}
+        <Box>
+          {isEditing ? (
+            <Textarea
+              value={localDescription}
+              onChange={(e) => handleDescriptionChange(e.target.value)}
+              color={accentTextColor}
+              bg={accentBgColor}
+              _hover={{ borderColor: `${buttonColorScheme}.300` }}
+              _focus={{ borderColor: `${buttonColorScheme}.500`, boxShadow: `0 0 0 1px ${buttonColorScheme}.500` }}
+              placeholder="Enter shot description..."
+              resize="vertical"
+              minH="100px"
+              isDisabled={isSaving}
+            />
+          ) : (
+            <VStack align="stretch" spacing={2}>
+              <Text 
+                color={accentTextColor} 
+                onClick={() => setIsEditing(true)}
+                cursor="pointer"
+                p={2}
+                borderRadius="md"
+                _hover={{ bg: accentBgColor }}
+                transition="background-color 0.2s"
+              >
+                {localDescription || 'Click to add description'}
+              </Text>
+              <Button
+                size="sm"
+                variant="outline"
+                colorScheme={buttonColorScheme}
+                onClick={onRegenerateModalOpen}
+                leftIcon={<RepeatIcon />}
+                alignSelf="flex-end"
+              >
+                Regenerate Shot
+              </Button>
+            </VStack>
+          )}
+        </Box>
+
 
         {/* Media Display Section */}
         {(localImageData || videoData) && (
@@ -682,14 +676,12 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                     <Text>Image</Text>
                   </HStack>
                 </Tab>
-                {videoData && (
-                  <Tab>
-                    <HStack spacing={2}>
-                      <ChakraIcon icon={FaVideo} />
-                      <Text>Video</Text>
-                    </HStack>
-                  </Tab>
-                )}
+                <Tab>
+                  <HStack spacing={2}>
+                    <ChakraIcon icon={FaVideo} />
+                    <Text>Video</Text>
+                  </HStack>
+                </Tab>
               </TabList>
 
               <TabPanels>
@@ -894,52 +886,70 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                   )}
                 </TabPanel>
 
-                {videoData && (
-                  <TabPanel p={0} pt={4}>
-                    {/* Video Controls */}
-                    <HStack spacing={2} mb={4}>
-                      <Select
-                        size="sm"
-                        value={selectedModel}
-                        onChange={(e) => onModelChange?.(e.target.value)}
-                        variant="outline"
-                        width="auto"
-                      >
-                        <option value="replicate">Replicate</option>
-                        <option value="runwayml">Runway ML</option>
-                      </Select>
-                      <Button
-                        size="sm"
-                        colorScheme={buttonColorScheme}
-                        leftIcon={<Icon as={FaVideo} />}
-                        onClick={onGenerateVideo}
-                        isLoading={isGeneratingVideo}
-                        loadingText="Generating"
-                        isDisabled={!imageData}
-                      >
-                        {videoData ? 'Regenerate' : 'Generate'}
-                      </Button>
-                    </HStack>
+                <TabPanel p={0} pt={4}>
+                  {/* Video Controls */}
+                  <HStack spacing={2} mb={4}>
+                    <Select
+                      size="sm"
+                      value={selectedModel}
+                      onChange={(e) => onModelChange?.(e.target.value)}
+                      variant="outline"
+                      width="auto"
+                    >
+                      <option value="replicate">Replicate</option>
+                      <option value="runwayml">Runway ML</option>
+                    </Select>
+                    <Button
+                      size="sm"
+                      colorScheme={buttonColorScheme}
+                      leftIcon={<Icon as={FaVideo} />}
+                      onClick={onGenerateVideo}
+                      isLoading={isGeneratingVideo}
+                      loadingText="Generating"
+                      isDisabled={!imageData}
+                    >
+                      {videoData ? 'Regenerate' : 'Generate'}
+                    </Button>
+                  </HStack>
 
-                    {/* Video Player */}
+                  {/* Video Player or Placeholder */}
+                  {videoData ? (
                     <ShotVideo
                       videoData={videoData}
                       chapterIndex={chapterIndex}
                       sceneIndex={sceneIndex}
                       shotIndex={shotIndex}
                     />
-
-                    {/* Video Generation Progress */}
-                    {isGeneratingVideo && (
-                      <Box mt={2}>
-                        <Progress size="xs" isIndeterminate colorScheme={buttonColorScheme} />
-                        <Text fontSize="sm" color="gray.600" mt={1} textAlign="center">
-                          Generating video... This may take a few minutes
-                        </Text>
+                  ) : (
+                    <AspectRatio ratio={16/9}>
+                      <Box
+                        borderWidth={1}
+                        borderStyle="dashed"
+                        borderColor={borderColor}
+                        borderRadius="md"
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        bg={placeholderBgColor}
+                      >
+                        <VStack spacing={2}>
+                          <Icon as={FaVideo} boxSize={8} color="gray.400" />
+                          <Text color="gray.500">No video generated yet</Text>
+                        </VStack>
                       </Box>
-                    )}
-                  </TabPanel>
-                )}
+                    </AspectRatio>
+                  )}
+
+                  {/* Video Generation Progress */}
+                  {isGeneratingVideo && (
+                    <Box mt={2}>
+                      <Progress size="xs" isIndeterminate colorScheme={buttonColorScheme} />
+                      <Text fontSize="sm" color="gray.600" mt={1} textAlign="center">
+                        Generating video... This may take a few minutes
+                      </Text>
+                    </Box>
+                  )}
+                </TabPanel>
               </TabPanels>
             </Tabs>
           </Box>
