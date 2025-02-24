@@ -30,6 +30,7 @@ import {
   ModalFooter,
   Textarea,
   useDisclosure,
+  Icon,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
 import { createIcon } from '@chakra-ui/react';
@@ -70,6 +71,17 @@ const HomeIcon = createIcon({
   ),
 });
 
+const PlayIcon = createIcon({
+  displayName: 'PlayIcon',
+  viewBox: '0 0 24 24',
+  path: (
+    <path
+      fill="currentColor"
+      d="M8 5v14l11-7z"
+    />
+  ),
+});
+
 const ScriptReview: React.FC<ScriptReviewProps> = ({
   script,
   setScript,
@@ -95,6 +107,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const { isOpen: isChapterModalOpen, onClose: onChapterModalClose } = useDisclosure();
   const { isOpen: isSceneModalOpen, onClose: onSceneModalClose } = useDisclosure();
+  const { isOpen: isMovieModalOpen, onOpen: onMovieModalOpen, onClose: onMovieModalClose } = useDisclosure();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const timelineBg = useColorModeValue('gray.50', 'gray.700');
@@ -104,6 +117,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const leftPanelRef = React.useRef<HTMLDivElement>(null);
   const containerRef = React.useRef<HTMLElement | null>(null);
   const [videoKey, setVideoKey] = useState<number>(0);
+  const [finalMovieExists, setFinalMovieExists] = useState(false);
+  const [isGeneratingFinalMovie, setIsGeneratingFinalMovie] = useState(false);
 
   React.useEffect(() => {
     isMounted.current = true;
@@ -708,6 +723,24 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     });
   }, [setScript, toast]);
 
+  // Add function to check if final movie exists
+  const checkFinalMovie = React.useCallback(async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/check-final-movie/${projectName}`, {
+        method: 'GET'
+      });
+      const data = await response.json();
+      setFinalMovieExists(data.exists);
+    } catch (error) {
+      console.error('Error checking final movie:', error);
+      setFinalMovieExists(false);
+    }
+  }, [projectName]);
+
+  React.useEffect(() => {
+    checkFinalMovie();
+  }, [checkFinalMovie]);
+
   if (!script) {
     return (
       <Box p={4}>
@@ -734,6 +767,34 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
   return (
     <Box height="100vh" overflow="hidden" bg={bgColor}>
+      {isGeneratingFinalMovie && (
+        <Modal isOpen={true} onClose={() => {}} isCentered closeOnOverlayClick={false} closeOnEsc={false}>
+          <ModalOverlay
+            bg='blackAlpha.600'
+            backdropFilter='blur(10px)'
+          />
+          <ModalContent bg="transparent" boxShadow="none">
+            <Center>
+              <VStack spacing={4}>
+                <Spinner
+                  thickness='4px'
+                  speed='0.65s'
+                  emptyColor='gray.200'
+                  color='blue.500'
+                  size='xl'
+                />
+                <Text color="white" fontSize="lg" fontWeight="bold">
+                  Generating Final Movie...
+                </Text>
+                <Text color="white" fontSize="sm">
+                  This may take several minutes
+                </Text>
+              </VStack>
+            </Center>
+          </ModalContent>
+        </Modal>
+      )}
+
       <Box position="fixed" top={0} left={0} right={0} zIndex={100}>
         <Flex
           p={4}
@@ -775,6 +836,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               colorScheme="blue"
               onClick={async () => {
                 try {
+                  setIsGeneratingFinalMovie(true);
                   const response = await fetch(
                     `http://localhost:8000/api/generate-full-film/${projectName}`,
                     {
@@ -795,7 +857,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                   // Create a temporary link element
                   const a = document.createElement('a');
                   a.href = url;
-                  a.download = 'full_film.mp4';
+                  a.download = 'final_movie.mp4';
                   
                   // Append to the document and click
                   document.body.appendChild(a);
@@ -804,6 +866,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                   // Clean up
                   document.body.removeChild(a);
                   window.URL.revokeObjectURL(url);
+
+                  await checkFinalMovie(); // Check if final movie exists after generation
 
                   toast({
                     title: 'Success',
@@ -821,6 +885,8 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                     duration: 5000,
                     isClosable: true,
                   });
+                } finally {
+                  setIsGeneratingFinalMovie(false);
                 }
               }}
               size="sm"
@@ -871,6 +937,17 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                   </Button>
                 ))}
               </HStack>
+              {finalMovieExists && (
+                <Button
+                  colorScheme="green"
+                  size="sm"
+                  leftIcon={<Icon as={PlayIcon} />}
+                  onClick={onMovieModalOpen}
+                  mx={2}
+                >
+                  Watch Final Movie
+                </Button>
+              )}
               <IconButton
                 aria-label="Next chapter"
                 icon={<ChevronRightIcon />}
@@ -1084,6 +1161,44 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
               loadingText="Regenerating Scene"
             >
               Regenerate
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal 
+        isOpen={isMovieModalOpen} 
+        onClose={onMovieModalClose}
+        size="6xl"
+        isCentered
+      >
+        <ModalOverlay />
+        <ModalContent maxW="90vw" maxH="90vh">
+          <ModalHeader>Final Movie</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody p={0}>
+            <Box 
+              as="video"
+              controls
+              width="100%"
+              height="auto"
+              maxH="calc(90vh - 120px)"
+              src={`http://localhost:8000/api/get-final-movie/${projectName}`}
+              borderRadius="md"
+              outline="none"
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="blue" mr={3} onClick={onMovieModalClose}>
+              Close
+            </Button>
+            <Button
+              as="a"
+              href={`http://localhost:8000/api/get-final-movie/${projectName}`}
+              download="final_movie.mp4"
+              colorScheme="green"
+            >
+              Download
             </Button>
           </ModalFooter>
         </ModalContent>

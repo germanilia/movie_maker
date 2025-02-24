@@ -1425,6 +1425,42 @@ async def get_scene_background_music(project_name: str, chapter_number: int, sce
         logger.error(f"Error getting scene background music: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/check-final-movie/{project_name}")
+async def check_final_movie(project_name: str):
+    """Check if final movie exists in the project's root directory"""
+    try:
+        movie_path = Path("temp") / project_name / "final_movie.mp4"
+        exists = movie_path.exists() and movie_path.stat().st_size > 0
+        return {"status": "success", "exists": exists}
+    except Exception as e:
+        logger.error(f"Error checking final movie: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-final-movie/{project_name}")
+async def get_final_movie(project_name: str):
+    """Get the final movie file"""
+    try:
+        movie_path = Path("temp") / project_name / "final_movie.mp4"
+        if not movie_path.exists() or movie_path.stat().st_size == 0:
+            raise HTTPException(status_code=404, detail="Final movie not found")
+
+        return FileResponse(
+            path=str(movie_path),
+            media_type="video/mp4",
+            filename="final_movie.mp4",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+                "Access-Control-Allow-Origin": "http://localhost:3000",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error getting final movie: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/generate-full-film/{project_name}")
 async def generate_full_film(project_name: str):
     """Generate a full film by combining all scene videos in order"""
@@ -1451,7 +1487,7 @@ async def generate_full_film(project_name: str):
             raise HTTPException(status_code=400, detail="No scene videos found to combine")
 
         # Generate the full film
-        output_path = Path("temp") / project_name / "full_film.mp4"
+        output_path = Path("temp") / project_name / "final_movie.mp4"
         success = await video_service.combine_videos(scene_videos, str(output_path))
 
         if not success:
@@ -1460,7 +1496,7 @@ async def generate_full_film(project_name: str):
         return FileResponse(
             path=str(output_path),
             media_type="video/mp4",
-            filename="full_film.mp4"
+            filename="final_movie.mp4"
         )
 
     except Exception as e:

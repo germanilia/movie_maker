@@ -408,3 +408,75 @@ class BaseVideoService(ABC):
         except Exception as e:
             logger.error("Error generating scene video: %s", str(e))
             return False, None
+
+    async def combine_videos(self, video_paths: List[str], output_path: str) -> bool:
+        """Combine multiple videos into a single video file using ffmpeg"""
+        try:
+            if not video_paths:
+                logger.error("No video paths provided")
+                return False
+
+            # Create a directory for temporary files
+            temp_dir = Path(output_path).parent / "temp_combine"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+
+            try:
+                # First normalize all videos with consistent dimensions and framerate
+                normalized_videos = []
+                for i, video in enumerate(video_paths):
+                    normalized_path = temp_dir / f"normalized_{i}.mp4"
+                    normalized_videos.append(normalized_path)
+                    
+                    # Normalize video
+                    subprocess.run([
+                        "ffmpeg", "-y",
+                        "-i", str(video),
+                        "-vf", "scale=1280:768:force_original_aspect_ratio=decrease,"
+                               "pad=1280:768:(ow-iw)/2:(oh-ih)/2,"
+                               "fps=30,"
+                               "setsar=1:1",
+                        "-c:v", "libx264",
+                        "-preset", "medium",
+                        "-crf", "23",
+                        "-c:a", "aac",
+                        "-b:a", "192k",
+                        str(normalized_path)
+                    ], check=True, capture_output=True)
+
+                # Create concat file with absolute paths
+                concat_file = temp_dir / "concat.txt"
+                with open(concat_file, "w") as f:
+                    for video in normalized_videos:
+                        # Use absolute paths to avoid path resolution issues
+                        f.write(f"file '{video.absolute()}'\n")
+
+                # Concatenate all normalized videos
+                subprocess.run([
+                    "ffmpeg", "-y",
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", str(concat_file),
+                    "-c", "copy",
+                    str(output_path)
+                ], check=True, capture_output=True)
+
+                if Path(output_path).exists():
+                    logger.info("Successfully combined videos")
+                    return True
+                else:
+                    raise ValueError("Output file was not created")
+
+            finally:
+                # Clean up temporary files
+                import shutil
+                if temp_dir.exists():
+                    shutil.rmtree(temp_dir)
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"FFmpeg error: {e}")
+            if hasattr(e, "stderr"):
+                logger.error(f"FFmpeg stderr: {e.stderr.decode()}")
+            return False
+        except Exception as e:
+            logger.error(f"Error combining videos: {str(e)}")
+            return False
