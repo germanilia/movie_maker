@@ -61,13 +61,13 @@ class RunwayMLVideoService(BaseVideoService):
         logger.info(f"Starting video generation for shot {chapter}/{scene}/{shot}")
 
         try:
-            local_path = self.get_local_path(video_path)
+            # local_path = self.get_local_path(video_path)
 
-            if not overwrite and local_path.exists():
-                logger.info(
-                    f"Video file already exists at {video_path}, skipping generation"
-                )
-                return True, str(local_path)
+            # if not overwrite and local_path.exists():
+            #     logger.info(
+            #         f"Video file already exists at {video_path}, skipping generation"
+            #     )
+            #     return True, str(local_path)
 
             # Prepare both opening and closing frames
             frames = [("opening", "first")]
