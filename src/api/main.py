@@ -1424,3 +1424,45 @@ async def get_scene_background_music(project_name: str, chapter_number: int, sce
     except Exception as e:
         logger.error(f"Error getting scene background music: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/generate-full-film/{project_name}")
+async def generate_full_film(project_name: str):
+    """Generate a full film by combining all scene videos in order"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        video_service = VideoServiceFactory.create_video_service(VideoProvider.REPLICATE, aws_service)
+        director = DirectorService(aws_service=aws_service, project_name=project_name)
+        script = await director.get_script()
+
+        if not script or not script.chapters:
+            raise HTTPException(status_code=404, detail="Script not found")
+
+        # Get all scene videos in order
+        scene_videos = []
+        for chapter in script.chapters:
+            chapter_num = chapter.chapter_number
+            for scene in (chapter.scenes or []):
+                scene_num = scene.scene_number
+                video_path = Path("temp") / project_name / f"chapter_{chapter_num}" / f"scene_{scene_num}" / "final_scene.mp4"
+                if video_path.exists():
+                    scene_videos.append(str(video_path))
+
+        if not scene_videos:
+            raise HTTPException(status_code=400, detail="No scene videos found to combine")
+
+        # Generate the full film
+        output_path = Path("temp") / project_name / "full_film.mp4"
+        success = await video_service.combine_videos(scene_videos, str(output_path))
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to generate full film")
+
+        return FileResponse(
+            path=str(output_path),
+            media_type="video/mp4",
+            filename="full_film.mp4"
+        )
+
+    except Exception as e:
+        logger.error(f"Error generating full film: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

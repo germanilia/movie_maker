@@ -771,8 +771,62 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
             >
               Generate All Music
             </Button>
-            <Button onClick={onBack} size="sm">Back</Button>
-            <Button colorScheme="blue" onClick={onNext} size="sm">Next</Button>
+            <Button
+              colorScheme="blue"
+              onClick={async () => {
+                try {
+                  const response = await fetch(
+                    `http://localhost:8000/api/generate-full-film/${projectName}`,
+                    {
+                      method: 'POST',
+                    }
+                  );
+
+                  if (!response.ok) {
+                    throw new Error('Failed to generate full film');
+                  }
+
+                  // Create a blob from the response
+                  const blob = await response.blob();
+                  
+                  // Create a URL for the blob
+                  const url = window.URL.createObjectURL(blob);
+                  
+                  // Create a temporary link element
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'full_film.mp4';
+                  
+                  // Append to the document and click
+                  document.body.appendChild(a);
+                  a.click();
+                  
+                  // Clean up
+                  document.body.removeChild(a);
+                  window.URL.revokeObjectURL(url);
+
+                  toast({
+                    title: 'Success',
+                    description: 'Full film generated successfully',
+                    status: 'success',
+                    duration: 5000,
+                    isClosable: true,
+                  });
+                } catch (error) {
+                  console.error('Error generating full film:', error);
+                  toast({
+                    title: 'Error',
+                    description: 'Failed to generate full film',
+                    status: 'error',
+                    duration: 5000,
+                    isClosable: true,
+                  });
+                }
+              }}
+              size="sm"
+            >
+              Generate Full Film
+            </Button>
             <IconButton
               aria-label="Home"
               icon={<HomeIcon />}
