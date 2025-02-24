@@ -13,6 +13,9 @@ import {
   AspectRatio,
   Box,
   useToast,
+  Switch,
+  FormControl,
+  FormLabel,
 } from '@chakra-ui/react';
 import { FaRedo } from 'react-icons/fa';
 import { Script } from '../../models/models';
@@ -48,6 +51,7 @@ const SceneVideoTab: React.FC<SceneVideoTabProps> = ({
 }) => {
   const toast = useToast();
   const [generatingVideoFor, setGeneratingVideoFor] = useState<{ chapter: number; scene: number } | null>(null);
+  const [isBlackAndWhite, setIsBlackAndWhite] = useState<boolean>(script?.project_details?.black_and_white || false);
 
   const handleGenerateSceneVideo = async () => {
     if (generatingVideoFor) return;
@@ -58,7 +62,7 @@ const SceneVideoTab: React.FC<SceneVideoTabProps> = ({
       const request: GenerateSceneVideoRequest = {
         chapter_number: activeChapterIndex + 1,
         scene_number: activeSceneIndex + 1,
-        black_and_white: script?.project_details?.black_and_white || false
+        black_and_white: isBlackAndWhite
       };
 
       const response = await fetch(
@@ -103,28 +107,41 @@ const SceneVideoTab: React.FC<SceneVideoTabProps> = ({
     <VStack spacing={6} align="stretch">
       <Card variant="outline" bg={bgColor}>
         <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
-          <HStack justify="space-between">
-            <Heading size="sm">Final Scene Video</Heading>
-            <Button
-              colorScheme="blue"
-              size="sm"
-              leftIcon={
-                generatingVideoFor?.chapter === activeChapterIndex && 
-                generatingVideoFor?.scene === activeSceneIndex ? 
-                  <Spinner size="sm" /> : 
-                  <Icon as={FaRedo} />
-              }
-              onClick={handleGenerateSceneVideo}
-              isLoading={
-                generatingVideoFor?.chapter === activeChapterIndex && 
-                generatingVideoFor?.scene === activeSceneIndex
-              }
-              loadingText="Generating"
-              isDisabled={generatingVideoFor !== null}
-            >
-              Generate Video
-            </Button>
-          </HStack>
+          <VStack spacing={4} align="stretch">
+            <HStack justify="space-between">
+              <Heading size="sm">Final Scene Video</Heading>
+              <Button
+                colorScheme="blue"
+                size="sm"
+                leftIcon={
+                  generatingVideoFor?.chapter === activeChapterIndex && 
+                  generatingVideoFor?.scene === activeSceneIndex ? 
+                    <Spinner size="sm" /> : 
+                    <Icon as={FaRedo} />
+                }
+                onClick={handleGenerateSceneVideo}
+                isLoading={
+                  generatingVideoFor?.chapter === activeChapterIndex && 
+                  generatingVideoFor?.scene === activeSceneIndex
+                }
+                loadingText="Generating"
+                isDisabled={generatingVideoFor !== null}
+              >
+                Generate Video
+              </Button>
+            </HStack>
+            <FormControl display="flex" alignItems="center">
+              <FormLabel htmlFor="black-and-white" mb="0" fontSize="sm">
+                Black & White
+              </FormLabel>
+              <Switch
+                id="black-and-white"
+                size="sm"
+                isChecked={isBlackAndWhite}
+                onChange={(e) => setIsBlackAndWhite(e.target.checked)}
+              />
+            </FormControl>
+          </VStack>
         </CardHeader>
         <CardBody>
           <AspectRatio ratio={16/9}>
@@ -137,16 +154,6 @@ const SceneVideoTab: React.FC<SceneVideoTabProps> = ({
               >
                 Your browser does not support the video tag.
               </video>
-              <Text
-                position="absolute"
-                top="50%"
-                left="50%"
-                transform="translate(-50%, -50%)"
-                color="gray.500"
-                display={videoKey === 0 ? 'block' : 'none'}
-              >
-                No video generated yet
-              </Text>
             </Box>
           </AspectRatio>
         </CardBody>

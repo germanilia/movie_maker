@@ -708,7 +708,7 @@ class SceneVideoRequest(BaseModel):
     chapter_number: int
     scene_number: int
     provider: VideoProvider = VideoProvider.REPLICATE
-    black_and_white: bool = True
+    black_and_white: bool = False
 
 @app.post("/api/generate-scene-video/{project_name}")
 async def generate_scene_video(project_name: str, request: SceneVideoRequest):
