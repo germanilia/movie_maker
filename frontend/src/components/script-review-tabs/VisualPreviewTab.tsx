@@ -50,6 +50,7 @@ const VisualPreviewTab: React.FC<VisualPreviewTabProps> = ({
   const [videoData, setVideoData] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [selectedModel, setSelectedModel] = useState<string>('replicate');
+  const [blackAndWhite, setBlackAndWhite] = useState<boolean>(false);
 
   const getImageKey = (chapterIndex: number, sceneIndex: number, shotIndex: number, type: string) =>
     `${chapterIndex + 1}-${sceneIndex + 1}-${shotIndex + 1}-${type}`;
@@ -162,6 +163,7 @@ const VisualPreviewTab: React.FC<VisualPreviewTabProps> = ({
             scene_number: activeSceneIndex + 1,
             shot_number: shotIndex + 1,
             provider: selectedModel,
+            black_and_white: blackAndWhite,
           }),
         }
       );

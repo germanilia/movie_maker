@@ -111,9 +111,29 @@ class BaseVideoService(ABC):
         overwrite: bool = False,
         poll_interval: int = 10,
         prompt: str = "",
+        black_and_white: bool = False,
     ) -> Tuple[bool, str | None]:
         """Generate video for a specific shot using the implemented service"""
         pass
+
+    def _apply_black_and_white(self, input_path: Path, output_path: Path) -> bool:
+        """Apply black and white filter to a video"""
+        try:
+            subprocess.run([
+                "ffmpeg", "-y",
+                "-i", str(input_path),
+                "-vf", "hue=s=0",
+                "-c:v", "libx264",
+                "-preset", "medium",
+                "-crf", "23",
+                str(output_path)
+            ], check=True, capture_output=True)
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Error applying black and white filter: {e}")
+            if hasattr(e, "stderr"):
+                logger.error(f"FFmpeg stderr: {e.stderr.decode()}")
+            return False
 
     async def generate_scene_video(
         self,

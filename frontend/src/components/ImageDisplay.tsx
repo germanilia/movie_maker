@@ -36,6 +36,9 @@ import {
   TabPanel,
   useDisclosure,
   AspectRatio,
+  FormControl,
+  FormLabel,
+  Switch,
 } from '@chakra-ui/react';
 import { RepeatIcon, CheckIcon, CloseIcon, AttachmentIcon, ChevronDownIcon, Icon } from '@chakra-ui/icons';
 import { FaImage, FaUserAlt, FaVideo } from 'react-icons/fa';
@@ -185,6 +188,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const [sourceImages, setSourceImages] = useState<SourceImage[]>([]);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
   const [faceMapping, setFaceMapping] = useState<Record<number, string>>({});
+  const [blackAndWhite, setBlackAndWhite] = useState(false);
 
   const modelOptions = [
     { value: 'flux_ultra_model', label: 'Flux Ultra Model' },
@@ -888,17 +892,31 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
 
                 <TabPanel p={0} pt={4}>
                   {/* Video Controls */}
-                  <HStack spacing={2} mb={4}>
-                    <Select
-                      size="sm"
-                      value={selectedModel}
-                      onChange={(e) => onModelChange?.(e.target.value)}
-                      variant="outline"
-                      width="auto"
-                    >
-                      <option value="replicate">Replicate</option>
-                      <option value="runwayml">Runway ML</option>
-                    </Select>
+                  <HStack spacing={2} mb={4} justify="space-between" width="100%">
+                    <HStack spacing={2}>
+                      <Select
+                        size="sm"
+                        value={selectedModel}
+                        onChange={(e) => onModelChange?.(e.target.value)}
+                        variant="outline"
+                        width="auto"
+                      >
+                        <option value="replicate">Replicate</option>
+                        <option value="runwayml">Runway ML</option>
+                      </Select>
+                      <FormControl display="flex" alignItems="center">
+                        <FormLabel htmlFor="black-and-white" mb="0" fontSize="sm">
+                          Black & White
+                        </FormLabel>
+                        <Switch
+                          id="black-and-white"
+                          size="sm"
+                          colorScheme={buttonColorScheme}
+                          isChecked={blackAndWhite}
+                          onChange={(e) => setBlackAndWhite(e.target.checked)}
+                        />
+                      </FormControl>
+                    </HStack>
                     <Button
                       size="sm"
                       colorScheme={buttonColorScheme}
@@ -907,6 +925,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                       isLoading={isGeneratingVideo}
                       loadingText="Generating"
                       isDisabled={!imageData}
+                      minWidth="120px"
                     >
                       {videoData ? 'Regenerate' : 'Generate'}
                     </Button>

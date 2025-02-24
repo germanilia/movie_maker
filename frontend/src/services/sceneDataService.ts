@@ -108,7 +108,8 @@ export const generateVideo = async (
   chapterIndex: number,
   sceneIndex: number,
   shotIndex: number,
-  modelType: string = 'default_model'
+  modelType: string = 'default_model',
+  blackAndWhite: boolean = false
 ): Promise<void> => {
   try {
     const controller = new AbortController();
@@ -126,6 +127,7 @@ export const generateVideo = async (
           scene_number: sceneIndex + 1,
           shot_number: shotIndex + 1,
           model_type: modelType,
+          black_and_white: blackAndWhite,
         }),
         signal: controller.signal
       }

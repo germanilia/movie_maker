@@ -546,6 +546,7 @@ class VideoGenerationRequest(BaseModel):
     shot_number: int
     overwrite: bool = False
     provider: str = 'runwayml'
+    black_and_white: bool = False
 
 @app.post("/api/generate-shot-video/{project_name}")
 async def generate_shot_video(project_name: str, request: VideoGenerationRequest) -> FileResponse:
@@ -583,7 +584,8 @@ async def generate_shot_video(project_name: str, request: VideoGenerationRequest
                 scene=str(request.scene_number),
                 shot=str(request.shot_number),
                 overwrite=request.overwrite,
-                prompt=prompt
+                prompt=prompt,
+                black_and_white=request.black_and_white
             )
 
             if not success or not video_path:
@@ -591,6 +593,17 @@ async def generate_shot_video(project_name: str, request: VideoGenerationRequest
                     status_code=500,
                     detail="Failed to generate video - no video path returned"
                 )
+
+            # If black and white is requested, apply the filter
+            if request.black_and_white:
+                original_path = Path(video_path)
+                bw_path = original_path.parent / f"{original_path.stem}_bw{original_path.suffix}"
+                if video_service._apply_black_and_white(original_path, bw_path):
+                    video_path = str(bw_path)
+                    # Remove the original color video
+                    original_path.unlink(missing_ok=True)
+                else:
+                    logger.warning("Failed to apply black and white filter, using original video")
 
             return FileResponse(
                 path=video_path,
