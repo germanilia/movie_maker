@@ -24,7 +24,7 @@ export interface Scene {
 
 export interface Chapter {
   chapter_number: number;
-  title: string;
+  chapter_title: string;
   chapter_description: string;
   scenes?: Scene[];
 }
@@ -51,6 +51,6 @@ export interface VideoGenerationResponse {
 export interface VideosListResponse {
   status: string;
   videos: {
-    [key: string]: string;  // key format: "chapter-scene-shot", value: video file path
+    [key: string]: string;  
   };
 }

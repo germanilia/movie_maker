@@ -27,10 +27,10 @@ The response must start with a {{ and end with }} nothing is allowed before or a
 Output Structure:
 {{
   "chapter": {{
+    "reasoning": "[Reasoning for the chapter]",
     "chapter_number": "{next_chapter_number}",
     "chapter_title": "[Chapter title that follows the story progression]",
     "chapter_description": "[Chapter description that builds upon previous chapters]",
-    "key_events": "[Key events that advance the story]",
     "main_characters": "[Main characters, including both returning and new characters]"
   }}
 }}

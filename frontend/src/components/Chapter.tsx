@@ -168,7 +168,7 @@ const Chapter: React.FC<ChapterProps> = ({
                   Regenerate
                 </Button>
               </HStack>
-              <Text fontSize="sm" color="blue.600" noOfLines={1}>{chapter.title}</Text>
+              <Text fontSize="sm" color="blue.600" noOfLines={1}>{chapter.chapter_title}</Text>
             </VStack>
           </Box>
 

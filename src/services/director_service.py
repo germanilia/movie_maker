@@ -147,8 +147,8 @@ class DirectorService:
         script: Script,
         max_retries: int = 10,
         regenerate: bool = False,
-        specific_chapter_index: int | None = None,
-        specific_scene_index: int | None = None,
+        specific_chapter_index: Optional[int] = None,
+        specific_scene_index: Optional[int] = None,
     ) -> Script:
         """Generate shots for scenes with retry mechanism.
         If specific_chapter_index and specific_scene_index are provided, only generate shots for that scene.

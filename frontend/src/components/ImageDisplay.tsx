@@ -524,7 +524,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       )}
 
       <VStack spacing={4} align="stretch">
-        {/* Header Section */}
+        {/* Header Section - Only Type Badge */}
         <HStack justify="space-between">
           <Badge 
             colorScheme={buttonColorScheme}
@@ -534,83 +534,6 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           >
             {type === 'opening' ? 'Opening Shot' : 'Closing Shot'}
           </Badge>
-          
-          <HStack spacing={2}>
-            {onUpdateDescription && !isEditing && (
-              <Tooltip label="Edit description">
-                <IconButton
-                  aria-label="Edit description"
-                  icon={<EditIcon />}
-                  size="sm"
-                  colorScheme={buttonColorScheme}
-                  variant="ghost"
-                  onClick={() => setIsEditing(true)}
-                />
-              </Tooltip>
-            )}
-            
-            <Tooltip label="Regenerate shot">
-              <IconButton
-                aria-label="Regenerate shot"
-                icon={<Icon as={FaRedo} />}
-                size="sm"
-                colorScheme={buttonColorScheme}
-                variant="ghost"
-                onClick={onRegenerateModalOpen}
-              />
-            </Tooltip>
-            
-            <Menu>
-              <MenuButton
-                as={Button}
-                size="sm"
-                rightIcon={<ChevronDownIcon />}
-                leftIcon={<ChakraIcon icon={FaImage} />}
-                variant="outline"
-                colorScheme={buttonColorScheme}
-              >
-                {modelOptions.find(opt => opt.value === localModelType)?.label}
-              </MenuButton>
-              <MenuList>
-                {modelOptions.map(option => (
-                  <MenuItem 
-                    key={option.value}
-                    onClick={() => {
-                      setLocalModelType(option.value);
-                      if (option.value !== 'flux_ultra_model') {
-                        setReferenceImage(null);
-                      }
-                    }}
-                  >
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </MenuList>
-            </Menu>
-
-            <NumberInput
-              size="sm"
-              width="100px"
-              value={seed}
-              min={0}
-              max={999999}
-              defaultValue={333}
-              onChange={(valueString) => setSeed(parseInt(valueString))}
-            >
-              <NumberInputField />
-            </NumberInput>
-
-            <Button
-              size="sm"
-              colorScheme={buttonColorScheme}
-              onClick={handleGenerateWithReference}
-              isLoading={isGenerating}
-              loadingText="Generating"
-              leftIcon={<RepeatIcon />}
-            >
-              Generate
-            </Button>
-          </HStack>
         </HStack>
 
         {/* Description Section */}
@@ -673,52 +596,6 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           <Text color={accentTextColor}>{localDescription}</Text>
         )}
 
-        {/* Reference Image Upload Section */}
-        {localModelType === 'flux_ultra_model' && (
-          <Box
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            borderWidth={2}
-            borderStyle="dashed"
-            borderRadius="md"
-            p={4}
-            borderColor={isDragging ? `${buttonColorScheme}.500` : 'gray.300'}
-            bg={isDragging ? `${buttonColorScheme}.50` : 'transparent'}
-            transition="all 0.2s"
-          >
-            <input
-              type="file"
-              accept="image/*"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
-            <VStack spacing={2}>
-              <IconButton
-                aria-label="Add reference image"
-                icon={<AttachmentIcon />}
-                size="sm"
-                colorScheme={referenceImage ? 'green' : buttonColorScheme}
-                onClick={() => fileInputRef.current?.click()}
-              />
-              <Text fontSize="sm" color="gray.600">
-                {referenceImage ? 'Reference image loaded' : 'Drop reference image here or click to upload'}
-              </Text>
-              {referenceImage && (
-                <Image
-                  src={referenceImage}
-                  alt="Reference"
-                  maxH="100px"
-                  objectFit="contain"
-                  borderRadius="md"
-                />
-              )}
-            </VStack>
-          </Box>
-        )}
-
         {/* Media Display Section */}
         {(localImageData || videoData) && (
           <Box>
@@ -748,6 +625,63 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
 
               <TabPanels>
                 <TabPanel p={0} pt={4}>
+                  {/* Image Controls */}
+                  <HStack justify="space-between" mb={4}>
+                    <Menu>
+                      <MenuButton
+                        as={Button}
+                        size="sm"
+                        rightIcon={<ChevronDownIcon />}
+                        leftIcon={<ChakraIcon icon={FaImage} />}
+                        variant="outline"
+                        colorScheme={buttonColorScheme}
+                      >
+                        {modelOptions.find(opt => opt.value === localModelType)?.label}
+                      </MenuButton>
+                      <MenuList>
+                        {modelOptions.map(option => (
+                          <MenuItem 
+                            key={option.value}
+                            onClick={() => {
+                              setLocalModelType(option.value);
+                              if (option.value !== 'flux_ultra_model') {
+                                setReferenceImage(null);
+                              }
+                            }}
+                          >
+                            {option.label}
+                          </MenuItem>
+                        ))}
+                      </MenuList>
+                    </Menu>
+
+                    <HStack spacing={2}>
+                      <NumberInput
+                        size="sm"
+                        width="100px"
+                        value={seed}
+                        min={0}
+                        max={999999}
+                        defaultValue={333}
+                        onChange={(valueString) => setSeed(parseInt(valueString))}
+                      >
+                        <NumberInputField />
+                      </NumberInput>
+
+                      <Button
+                        size="sm"
+                        colorScheme={buttonColorScheme}
+                        onClick={handleGenerateWithReference}
+                        isLoading={isGenerating}
+                        loadingText="Generating"
+                        leftIcon={<RepeatIcon />}
+                      >
+                        Generate
+                      </Button>
+                    </HStack>
+                  </HStack>
+
+                  {/* Image Display and Face Tools */}
                   <Box 
                     position="relative" 
                     borderWidth={1}
@@ -843,65 +777,112 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                       </>
                     )}
                   </HStack>
+
+                  {/* Reference Image Upload Section */}
+                  {localModelType === 'flux_ultra_model' && (
+                    <Box
+                      onDragEnter={handleDragEnter}
+                      onDragLeave={handleDragLeave}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      borderWidth={2}
+                      borderStyle="dashed"
+                      borderRadius="md"
+                      p={4}
+                      borderColor={isDragging ? `${buttonColorScheme}.500` : 'gray.300'}
+                      bg={isDragging ? `${buttonColorScheme}.50` : 'transparent'}
+                      transition="all 0.2s"
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        style={{ display: 'none' }}
+                      />
+                      <VStack spacing={2}>
+                        <IconButton
+                          aria-label="Add reference image"
+                          icon={<AttachmentIcon />}
+                          size="sm"
+                          colorScheme={referenceImage ? 'green' : buttonColorScheme}
+                          onClick={() => fileInputRef.current?.click()}
+                        />
+                        <Text fontSize="sm" color="gray.600">
+                          {referenceImage ? 'Reference image loaded' : 'Drop reference image here or click to upload'}
+                        </Text>
+                        {referenceImage && (
+                          <Image
+                            src={referenceImage}
+                            alt="Reference"
+                            maxH="100px"
+                            objectFit="contain"
+                            borderRadius="md"
+                          />
+                        )}
+                      </VStack>
+                    </Box>
+                  )}
                 </TabPanel>
 
                 {videoData && (
                   <TabPanel p={0} pt={4}>
+                    {/* Video Controls */}
+                    <HStack justify="space-between" mb={4}>
+                      <Menu>
+                        <MenuButton
+                          as={Button}
+                          size="sm"
+                          rightIcon={<ChevronDownIcon />}
+                          variant="outline"
+                          colorScheme={buttonColorScheme}
+                        >
+                          {videoProvider === 'runwayml' ? 'Runway ML' : 'Kling (Replicate)'}
+                        </MenuButton>
+                        <MenuList>
+                          <MenuItem onClick={() => setVideoProvider('runwayml')}>
+                            Runway ML
+                          </MenuItem>
+                          <MenuItem onClick={() => setVideoProvider('replicate')}>
+                            Kling (Replicate)
+                          </MenuItem>
+                        </MenuList>
+                      </Menu>
+
+                      <Button
+                        size="sm"
+                        colorScheme={buttonColorScheme}
+                        leftIcon={<Icon as={BiMoviePlay} />}
+                        onClick={() => onGenerateVideo?.(videoProvider)}
+                        isLoading={isGeneratingVideo}
+                        loadingText="Generating Video"
+                        isDisabled={!imageData || isGeneratingVideo}
+                      >
+                        {videoData ? 'Regenerate Video' : 'Generate Video'}
+                      </Button>
+                    </HStack>
+
+                    {/* Video Player */}
                     <ShotVideo
                       videoData={videoData}
                       chapterIndex={chapterIndex}
                       sceneIndex={sceneIndex}
                       shotIndex={shotIndex}
                     />
+
+                    {/* Video Generation Progress */}
+                    {isGeneratingVideo && (
+                      <Box mt={2}>
+                        <Progress size="xs" isIndeterminate colorScheme={buttonColorScheme} />
+                        <Text fontSize="sm" color="gray.600" mt={1} textAlign="center">
+                          Generating video... This may take a few minutes
+                        </Text>
+                      </Box>
+                    )}
                   </TabPanel>
                 )}
               </TabPanels>
             </Tabs>
-          </Box>
-        )}
-
-        {/* Video Generation Controls */}
-        <HStack justify="flex-end" mt={2} spacing={2}>
-          <Menu>
-            <MenuButton
-              as={Button}
-              size="sm"
-              rightIcon={<ChevronDownIcon />}
-              variant="outline"
-              colorScheme={buttonColorScheme}
-            >
-              {videoProvider === 'runwayml' ? 'Runway ML' : 'Kling (Replicate)'}
-            </MenuButton>
-            <MenuList>
-              <MenuItem onClick={() => setVideoProvider('runwayml')}>
-                Runway ML
-              </MenuItem>
-              <MenuItem onClick={() => setVideoProvider('replicate')}>
-                Kling (Replicate)
-              </MenuItem>
-            </MenuList>
-          </Menu>
-
-          <Button
-            size="sm"
-            colorScheme={buttonColorScheme}
-            leftIcon={<Icon as={BiMoviePlay} />}
-            onClick={() => onGenerateVideo?.(videoProvider)}
-            isLoading={isGeneratingVideo}
-            loadingText="Generating Video"
-            isDisabled={!imageData || isGeneratingVideo}
-          >
-            {videoData ? 'Regenerate Video' : 'Generate Video'}
-          </Button>
-        </HStack>
-
-        {/* Video Generation Progress */}
-        {isGeneratingVideo && (
-          <Box mt={2}>
-            <Progress size="xs" isIndeterminate colorScheme={buttonColorScheme} />
-            <Text fontSize="sm" color="gray.600" mt={1} textAlign="center">
-              Generating video... This may take a few minutes
-            </Text>
           </Box>
         )}
       </VStack>

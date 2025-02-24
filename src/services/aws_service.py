@@ -35,18 +35,18 @@ class AWSService:
         )
         
         # Initialize S3 client
-        # self.s3_client = session.client('s3')
+        self.s3_client = session.client('s3')
         
         # Initialize voice service
         # self.voice_service = VoiceService()
         
         # Configure S3 paths
-        # self.s3_bucket = os.getenv('S3_BUCKET')
+        self.s3_bucket = os.getenv('S3_BUCKET')
         # if not self.s3_bucket:
             # raise ValueError("S3_BUCKET environment variable must be set")
             #https://moviemaker-videos.s3.us-east-1.amazonaws.com/my_early_years/chapter_1/scene_1/shot_1_opening.png
         self.project_path = f"{project_name.lower().replace(' ', '_')}"
-        # self.s3_base_uri = f"s3://{self.s3_bucket}/{self.project_path}"
+        self.s3_base_uri = f"s3://{self.s3_bucket}/{self.project_path}"
         # self.s3_object_uri = f"https://moviemaker-videos.s3.us-east-1.amazonaws.com/{self.project_path}"
         
         # Add temp directory configuration

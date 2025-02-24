@@ -1058,7 +1058,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                     colorScheme={index === activeChapterIndex ? "blue" : "gray"}
                     onClick={() => setActiveChapterIndex(index)}
                   >
-                    Chapter {index + 1}
+                    {chapter.chapter_title || `Chapter ${index + 1}`}
                   </Button>
                 ))}
               </HStack>
@@ -1130,9 +1130,9 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
           </Box>
 
           {/* Main Content Area */}
-          <Box flex={1} p={4} overflowY="auto" bg={bgColor}>
-            <Tabs variant="enclosed" colorScheme="blue">
-              <TabList>
+          <Box flex={1} display="flex" flexDirection="column" height="100%">
+            <Tabs variant="enclosed" colorScheme="blue" display="flex" flexDirection="column" height="100%">
+              <TabList position="sticky" top={0} bg={bgColor} zIndex={1} borderBottomWidth={1} borderColor={borderColor}>
                 <Tab>Scene Overview</Tab>
                 <Tab>Visual Preview</Tab>
                 <Tab>Script & Audio</Tab>
@@ -1140,7 +1140,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                 <Tab>Scene Video</Tab>
               </TabList>
 
-              <TabPanels>
+              <TabPanels flex={1} overflow="auto">
                 <TabPanel>
                   <VStack spacing={6} align="stretch">
                     <Card variant="outline" bg={bgColor}>
@@ -1150,10 +1150,13 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
                       <CardBody>
                         <VStack spacing={4} align="stretch">
                           <Box>
+                            <Heading size="xs" mb={2}>Chapter Description</Heading>
+                            <Text>{currentChapter.chapter_description}</Text>
+                          </Box>
+                          <Box>
                             <Heading size="xs" mb={2}>Main Story</Heading>
                             <Text>{currentChapter.scenes?.[activeSceneIndex]?.main_story}</Text>
                           </Box>
-                          
                         </VStack>
                       </CardBody>
                     </Card>

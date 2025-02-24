@@ -1121,8 +1121,13 @@ async def regenerate_chapter(
             custom_instructions=request.instructions
         )
         
-        await director.save_script(script)
-        
+        scenes = await director.generate_scenes(script.project_details,script.chapters, script.chapters[chapter_idx])
+        script.chapters[chapter_idx].scenes = scenes
+        for scene in scenes:
+            ### TODO: This is a workaround due to indexing issue, sometimes the indexes start with 0 and sometimes with 1
+            ### TODO: Need to fix this properly
+            script = await director.generate_shots(script, specific_scene_index=scene.scene_number-1, specific_chapter_index=chapter_idx)
+            await director.save_script(script)
         return script
         
     except Exception as e:
