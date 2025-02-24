@@ -38,11 +38,12 @@ import {
   Tab,
   TabPanel,
   useDisclosure,
+  AspectRatio,
+  Input,
 } from '@chakra-ui/react';
 import { RepeatIcon, EditIcon, CheckIcon, CloseIcon, AttachmentIcon, ChevronDownIcon, Icon } from '@chakra-ui/icons';
 import { FaImage, FaUserAlt, FaVideo, FaRedo } from 'react-icons/fa';
 import { ChakraIcon } from './utils/ChakraIcon';
-import ShotVideo from './ShotVideo';
 import { BiMoviePlay } from 'react-icons/bi';
 
 const dragDropStyles = {
@@ -68,22 +69,23 @@ interface FaceDetectionResult {
 
 interface ImageDisplayProps {
   imageKey: string;
-  imageData: string | undefined;
+  imageData: string;
+  videoData?: string;
   description: string;
-  type: 'opening' | 'closing';
+  type: string;
   isGenerating: boolean;
+  isGeneratingVideo?: boolean;
   onGenerateImage: (referenceImage?: string, modelType?: string, seed?: number) => void;
-  onUpdateDescription?: (newDescription: string) => Promise<void>;
-  modelType?: string;
+  onGenerateVideo?: () => void;
+  onUpdateDescription: (newDescription: string) => void;
+  onShotRegenerated: (newDescription: string, newInstructions: string) => void;
+  directorInstructions: string;
   chapterIndex: number;
   sceneIndex: number;
   shotIndex: number;
   projectName: string;
-  videoData?: string;
-  directorInstructions?: string;
-  onShotRegenerated?: (newDescription: string, newInstructions: string) => void;
-  onGenerateVideo?: (provider: 'replicate' | 'runwayml') => Promise<void>;
-  isGeneratingVideo?: boolean;
+  selectedModel?: string;
+  onModelChange?: (model: string) => void;
 }
 
 interface SourceImage {
@@ -92,26 +94,91 @@ interface SourceImage {
   file: File;  // Add the File type
 }
 
+interface VideoPlayerProps {
+  src: string;
+  className?: string;
+}
+
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkVideo = async () => {
+      try {
+        const response = await fetch(`http://localhost:8000${src}`);
+        if (!response.ok) {
+          throw new Error(`Failed to load video: ${response.status} ${response.statusText}`);
+        }
+        // Check if the response is video content
+        const contentType = response.headers.get('content-type');
+        if (!contentType?.includes('video/')) {
+          throw new Error('Invalid video content received');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load video');
+      }
+    };
+    
+    if (src) {
+      checkVideo();
+    }
+  }, [src]);
+
+  if (error) {
+    return (
+      <Box p={4} bg="red.50" color="red.800" borderRadius="md">
+        <Text>{error}</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <video 
+      className={className}
+      controls
+      src={`http://localhost:8000${src}`}
+    >
+      Your browser does not support the video tag.
+    </video>
+  );
+};
+
+const ShotVideo: React.FC<{
+  videoData: string;
+  chapterIndex: number;
+  sceneIndex: number;
+  shotIndex: number;
+}> = ({ videoData, chapterIndex, sceneIndex, shotIndex }) => {
+  return (
+    <AspectRatio ratio={16/9}>
+      <VideoPlayer
+        src={videoData}
+        className="w-full h-full object-contain"
+      />
+    </AspectRatio>
+  );
+};
 
 // Update the component to manage its own modelType state
 const ImageDisplay: React.FC<ImageDisplayProps> = ({
   imageKey,
   imageData,
+  videoData,
   description,
   type,
   isGenerating,
+  isGeneratingVideo,
   onGenerateImage,
+  onGenerateVideo,
   onUpdateDescription,
-  modelType: initialModelType = 'flux_ultra_model',
+  onShotRegenerated,
+  directorInstructions,
   chapterIndex,
   sceneIndex,
   shotIndex,
   projectName,
-  videoData,
-  directorInstructions = '',
-  onShotRegenerated,
-  onGenerateVideo,
-  isGeneratingVideo,
+  selectedModel,
+  onModelChange,
 }) => {
   // Add local state for description and instructions
   const [localDescription, setLocalDescription] = useState(description);
@@ -127,7 +194,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   }, [directorInstructions]);
 
   // Add local modelType state
-  const [localModelType, setLocalModelType] = useState(initialModelType);
+  const [localModelType, setLocalModelType] = useState('flux_ultra_model');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
@@ -165,7 +232,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     { value: 'flux_dev_realism', label: 'Flux Dev Realism' },
   ];
 
-  const [activeTab, setActiveTab] = useState(() => videoData ? 1 : 0);
+  const [activeTab, setActiveTab] = useState(0);
 
   useEffect(() => {
     if (videoData) {
@@ -501,7 +568,9 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     }
   };
 
-  const [videoProvider, setVideoProvider] = useState<'replicate' | 'runwayml'>('runwayml');
+  const handleImageClick = () => {
+    // Image click handler implementation
+  };
 
   return (
     <Box 
@@ -828,37 +897,27 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                 {videoData && (
                   <TabPanel p={0} pt={4}>
                     {/* Video Controls */}
-                    <HStack justify="space-between" mb={4}>
-                      <Menu>
-                        <MenuButton
-                          as={Button}
-                          size="sm"
-                          rightIcon={<ChevronDownIcon />}
-                          variant="outline"
-                          colorScheme={buttonColorScheme}
-                        >
-                          {videoProvider === 'runwayml' ? 'Runway ML' : 'Kling (Replicate)'}
-                        </MenuButton>
-                        <MenuList>
-                          <MenuItem onClick={() => setVideoProvider('runwayml')}>
-                            Runway ML
-                          </MenuItem>
-                          <MenuItem onClick={() => setVideoProvider('replicate')}>
-                            Kling (Replicate)
-                          </MenuItem>
-                        </MenuList>
-                      </Menu>
-
+                    <HStack spacing={2} mb={4}>
+                      <Select
+                        size="sm"
+                        value={selectedModel}
+                        onChange={(e) => onModelChange?.(e.target.value)}
+                        variant="outline"
+                        width="auto"
+                      >
+                        <option value="replicate">Replicate</option>
+                        <option value="runwayml">Runway ML</option>
+                      </Select>
                       <Button
                         size="sm"
                         colorScheme={buttonColorScheme}
-                        leftIcon={<Icon as={BiMoviePlay} />}
-                        onClick={() => onGenerateVideo?.(videoProvider)}
+                        leftIcon={<Icon as={FaVideo} />}
+                        onClick={onGenerateVideo}
                         isLoading={isGeneratingVideo}
-                        loadingText="Generating Video"
-                        isDisabled={!imageData || isGeneratingVideo}
+                        loadingText="Generating"
+                        isDisabled={!imageData}
                       >
-                        {videoData ? 'Regenerate Video' : 'Generate Video'}
+                        {videoData ? 'Regenerate' : 'Generate'}
                       </Button>
                     </HStack>
 

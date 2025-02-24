@@ -145,7 +145,7 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
   const handleDownload = () => {
     if (videoData) {
       const link = document.createElement('a');
-      link.href = videoData;
+      link.href = videoData.startsWith('data:') ? videoData : `data:video/mp4;base64,${videoData}`;
       link.download = `shot-${chapterIndex + 1}-${sceneIndex + 1}-${shotIndex + 1}.mp4`;
       document.body.appendChild(link);
       link.click();
@@ -177,7 +177,7 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
 
       <video
         ref={videoRef}
-        src={videoData}
+        src={videoData.startsWith('data:') ? videoData : `data:video/mp4;base64,${videoData}`}
         style={{ 
           width: '100%',
           backgroundColor: 'black',

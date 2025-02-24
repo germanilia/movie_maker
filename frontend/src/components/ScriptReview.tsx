@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Script, Shot } from '../models/models';
+import { Script } from '../models/models';
 import {
   Box,
   Button,
@@ -20,10 +20,6 @@ import {
   Progress,
   IconButton,
   useColorModeValue,
-  Card,
-  CardHeader,
-  CardBody,
-  Icon,
   Modal,
   ModalOverlay,
   ModalContent,
@@ -33,16 +29,15 @@ import {
   ModalFooter,
   Textarea,
   useDisclosure,
-  AspectRatio,
 } from '@chakra-ui/react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@chakra-ui/icons';
-import { FaRedo } from 'react-icons/fa';
-import ImageDisplay from './ImageDisplay';
-import NarrationBox from './NarrationBox';
-import BackgroundMusic from './BackgroundMusic';
-import DirectorInstructions from './DirectorInstructions';
-import Chapter from './Chapter';
 import { createIcon } from '@chakra-ui/react';
+import ScriptTimeline from './ScriptTimeline';
+import SceneOverviewTab from './script-review-tabs/SceneOverviewTab';
+import VisualPreviewTab from './script-review-tabs/VisualPreviewTab';
+import ScriptAudioTab from './script-review-tabs/ScriptAudioTab';
+import ShotInstructionsTab from './script-review-tabs/ShotInstructionsTab';
+import SceneVideoTab from './script-review-tabs/SceneVideoTab';
 
 interface ScriptReviewProps {
   script: Script | null;
@@ -61,11 +56,6 @@ interface VideoApiResponse {
 
 
 
-interface GenerateSceneVideoRequest {
-  chapter_number: number;
-  scene_number: number;
-  black_and_white: boolean;
-}
 
 const HomeIcon = createIcon({
   displayName: 'HomeIcon',
@@ -111,9 +101,7 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   const isMounted = useRef(true);
   const leftPanelRef = React.useRef<HTMLDivElement>(null);
   const containerRef = React.useRef<HTMLElement | null>(null);
-  const [generatingVideoFor, setGeneratingVideoFor] = useState<{chapter: number, scene: number} | null>(null);
   const [videoKey, setVideoKey] = useState<number>(0);
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState<boolean>(false);
 
   React.useEffect(() => {
     isMounted.current = true;
@@ -131,7 +119,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     []
   );
 
-  // Function to load all videos including final scene videos
   const loadAllVideos = React.useCallback(async () => {
     try {
       const response = await fetch(
@@ -163,52 +150,24 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
   React.useEffect(() => {
     let mounted = true;
 
-    const fetchAllData = async () => {
-      if (!script) return;
-
+    const fetchScript = async () => {
       setIsLoading(true);
       try {
-        const endpoints = [
-          'get-all-images',
-          'get-all-narrations',
-          'get-all-background-music'
-        ];
-
-        const responses = await Promise.all(
-          endpoints.map(endpoint =>
-            fetch(`http://localhost:8000/api/${endpoint}/${projectName}`, { cache: 'no-store' })
-          )
-        );
-
-        if (!mounted) return;
-
-        const [imageData, narrData, musicData] = await Promise.all(
-          responses.map(r => r.json())
-        );
-
-        if (!mounted) return;
-
-        if (imageData.status === 'success' && imageData.images) {
-          setImageData(imageData.images);
+        // Only fetch the script data here
+        const scriptResponse = await fetch(`http://localhost:8000/api/script/${projectName}`);
+        if (!scriptResponse.ok) {
+          throw new Error(`Failed to fetch script: ${scriptResponse.status} ${scriptResponse.statusText}`);
         }
-
-        if (narrData.status === 'success' && narrData.narrations) {
-          setNarrationData(narrData.narrations);
+        const scriptData = await scriptResponse.json();
+        if (mounted) {
+          setScript(scriptData);
         }
-
-        if (musicData.status === 'success' && musicData.background_music) {
-          setBackgroundMusicData(musicData.background_music);
-        }
-
-        // Load videos separately since they might be larger
-        await loadAllVideos();
-
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching script:', error);
         if (mounted) {
           toast({
             title: 'Error',
-            description: 'Failed to fetch data',
+            description: error instanceof Error ? error.message : 'Failed to fetch script data',
             status: 'error',
             duration: 5000,
             isClosable: true,
@@ -221,42 +180,14 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       }
     };
 
-    fetchAllData();
+    fetchScript();
 
     return () => {
       mounted = false;
     };
-  }, [script, projectName, toast, loadAllVideos]);
+  }, [projectName, toast, setScript]);
 
-  // Add a handler for shot updates
-  const handleShotRegenerated = (
-    chapterIndex: number,
-    sceneIndex: number,
-    shotIndex: number,
-    newDescription: string,
-    newInstructions: string
-  ) => {
-    if (!script) return;
 
-    // Update local state for the specific shot
-    const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, 'opening');
-    setImageData(prevImageData => {
-      const newImageData = { ...prevImageData };
-      delete newImageData[imageKey];
-      return newImageData;
-    });
-
-    // Update script without triggering a full re-render
-    const updatedScript = JSON.parse(JSON.stringify(script));
-    const shot = updatedScript.chapters[chapterIndex]?.scenes?.[sceneIndex]?.shots?.[shotIndex];
-    if (shot) {
-      shot.opening_frame = newDescription;
-      shot.director_instructions = newInstructions;
-      setScript(updatedScript);
-    }
-  };
-
-  // Update onVideoGenerated to use loadAllVideos
   const onVideoGenerated = async () => {
     await loadAllVideos();
   };
@@ -610,37 +541,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     }
   };
 
-  const handleUpdateShotInstructions = async (
-    chapterIndex: number,
-    sceneIndex: number,
-    shotIndex: number,
-    newInstructions: string
-  ) => {
-    try {
-      const updatedScript = JSON.parse(JSON.stringify(script));
-
-      // Update the instructions in the script
-      updatedScript.chapters[chapterIndex].scenes[sceneIndex].shots[shotIndex].director_instructions = newInstructions;
-
-      // Call the API to update the script
-      const response = await fetch(`http://localhost:8000/api/update-script/${projectName}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedScript),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update shot instructions');
-      }
-
-      setScript(updatedScript);
-    } catch (error) {
-      console.error('Error updating shot instructions:', error);
-      throw error;
-    }
-  };
 
   const handleRegenerateChapter = async () => {
     if (activeChapterForRegeneration === null) return;
@@ -776,126 +676,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
     };
   }, []);
 
-  const handleGenerateSceneVideo = async (chapterIndex: number, sceneIndex: number) => {
-    if (generatingVideoFor) return;
-
-    setGeneratingVideoFor({ chapter: chapterIndex, scene: sceneIndex });
-
-    try {
-      const request: GenerateSceneVideoRequest = {
-        chapter_number: chapterIndex + 1,
-        scene_number: sceneIndex + 1,
-        black_and_white: script?.project_details?.black_and_white || false
-      };
-
-      const response = await fetch(
-        `http://localhost:8000/api/generate-scene-video/${projectName}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(request),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to generate scene video');
-      }
-
-      // Update video data and force video reload
-      await loadAllVideos();
-      setVideoKey(prev => prev + 1);
-
-      toast({
-        title: 'Success',
-        description: 'Scene video generation completed',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-
-    } catch (error) {
-      console.error('Error generating scene video:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate scene video',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setGeneratingVideoFor(null);
-    }
-  };
-
-  const handleGenerateVideo = async (provider: 'replicate' | 'runwayml', shot: Shot) => {
-    setIsGeneratingVideo(true);
-    try {
-      const response = await fetch(
-        `http://localhost:8000/api/generate-shot-video/${projectName}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chapter_number: activeChapterIndex + 1,
-            scene_number: activeSceneIndex + 1,
-            shot_number: activeSceneIndex + 1,
-            provider: provider.toUpperCase(),
-            overwrite: true
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to generate video');
-      }
-
-      // Reload the video data
-      await loadVideoData(activeChapterIndex + 1, activeSceneIndex + 1, activeSceneIndex + 1);
-
-      toast({
-        title: 'Success',
-        description: 'Video generated successfully',
-        status: 'success',
-        duration: 3000,
-      });
-    } catch (error) {
-      console.error('Error generating video:', error);
-      toast({
-        title: 'Error',
-        description: (error as Error).message || 'Failed to generate video',
-        status: 'error',
-        duration: 3000,
-      });
-    } finally {
-      setIsGeneratingVideo(false);
-    }
-  };
-
-  const loadVideoData = async (chapterNum: number, sceneNum: number, shotNum: number) => {
-    try {
-      const response = await fetch(
-        `http://localhost:8000/api/get-video/${projectName}?` +
-        `chapter_number=${chapterNum}&scene_number=${sceneNum}&shot_number=${shotNum}`
-      );
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const videoUrl = URL.createObjectURL(blob);
-        const videoKey = `${chapterNum}-${sceneNum}-${shotNum}`;
-        setVideoData(prevData => ({
-          ...prevData,
-          [videoKey]: videoUrl
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading video:', error);
-    }
-  };
 
   if (!script) {
     return (
@@ -916,60 +696,6 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       </Center>
     );
   }
-
-  // First, update the renderSceneDescription function to accept the seed parameter
-  const renderSceneDescription = (
-    shot: Shot,
-    chapterIndex: number,
-    sceneIndex: number,
-    shotIndex: number,
-    type: 'opening' | 'closing'
-  ) => {
-    const imageKey = getImageKey(chapterIndex, sceneIndex, shotIndex, type);
-    const description = shot.opening_frame;
-    const videoKey = `${chapterIndex + 1}-${sceneIndex + 1}-${shotIndex + 1}`;
-
-    return (
-      <ImageDisplay
-        imageKey={imageKey}
-        imageData={imageData[imageKey]}
-        description={description || ''}
-        type={type}
-        isGenerating={generatingImages.has(imageKey)}
-        onGenerateImage={(referenceImage?: string, modelType?: string, seed?: number) => {
-          if (description) {
-            handleGenerateImage(
-              chapterIndex,
-              sceneIndex,
-              shotIndex,
-              type,
-              description,
-              true,
-              referenceImage,
-              modelType || 'flux_ultra_model',
-              seed
-            );
-          }
-        }}
-        onUpdateDescription={(newDescription) =>
-          handleUpdateDescription(chapterIndex, sceneIndex, shotIndex, type, newDescription)
-        }
-        onShotRegenerated={(newDescription, newInstructions) => 
-          handleShotRegenerated(chapterIndex, sceneIndex, shotIndex, newDescription, newInstructions)
-        }
-        directorInstructions={shot.director_instructions}
-        chapterIndex={chapterIndex}
-        sceneIndex={sceneIndex}
-        shotIndex={shotIndex}
-        projectName={projectName}
-        videoData={videoData[videoKey]}
-        onGenerateVideo={async (provider) => {
-          await handleGenerateVideo(provider, shot);
-        }}
-        isGeneratingVideo={isGeneratingVideo}
-      />
-    );
-  };
 
   const totalChapters = script.chapters.length;
   const currentChapter = script.chapters[activeChapterIndex];
@@ -1083,51 +809,24 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
       >
         <Flex height="calc(100vh - 180px)">
           {/* Left Panel */}
-          <Box
-            ref={leftPanelRef}
-            width="350px"
-            borderRightWidth={1}
-            borderColor={borderColor}
-            p={4}
-            overflowY="auto"
-            bg={bgColor}
-            css={{
-              '&::-webkit-scrollbar': {
-                width: '4px',
-              },
-              '&::-webkit-scrollbar-track': {
-                background: 'transparent',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                background: 'rgba(0, 0, 0, 0.1)',
-                borderRadius: '2px',
-              },
-            }}
-          >
-            {script.chapters.map((chapter, chapterIndex) => (
-              <Box key={chapterIndex} mb={6}>
-                <Chapter
-                  chapter={chapter}
-                  chapterIndex={chapterIndex}
-                  projectName={projectName}
-                  script={script}
-                  setScript={setScript}
-                  imageData={imageData}
-                  narrationData={narrationData}
-                  backgroundMusicData={backgroundMusicData}
-                  videoData={videoData}
-                  generatingImages={generatingImages}
-                  generatingMusic={generatingMusic}
-                  handleGenerateImage={handleGenerateImage}
-                  handleGenerateBackgroundMusic={handleGenerateBackgroundMusic}
-                  handleUpdateDescription={handleUpdateDescription}
-                  getImageKey={getImageKey}
-                  onVideoGenerated={onVideoGenerated}
-                  onScriptUpdate={onScriptUpdate}
-                />
-              </Box>
-            ))}
-          </Box>
+          <ScriptTimeline
+            script={script}
+            projectName={projectName}
+            setScript={setScript}
+            imageData={imageData}
+            narrationData={narrationData}
+            backgroundMusicData={backgroundMusicData}
+            videoData={videoData}
+            generatingImages={generatingImages}
+            generatingMusic={generatingMusic}
+            handleGenerateImage={handleGenerateImage}
+            handleGenerateBackgroundMusic={handleGenerateBackgroundMusic}
+            handleUpdateDescription={handleUpdateDescription}
+            getImageKey={getImageKey}
+            onVideoGenerated={onVideoGenerated}
+            onScriptUpdate={onScriptUpdate}
+            timelineRef={leftPanelRef}
+          />
 
           {/* Main Content Area */}
           <Box flex={1} display="flex" flexDirection="column" height="100%">
@@ -1142,166 +841,63 @@ const ScriptReview: React.FC<ScriptReviewProps> = ({
 
               <TabPanels flex={1} overflow="auto">
                 <TabPanel>
-                  <VStack spacing={6} align="stretch">
-                    <Card variant="outline" bg={bgColor}>
-                      <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
-                        <Heading size="sm">Scene Details</Heading>
-                      </CardHeader>
-                      <CardBody>
-                        <VStack spacing={4} align="stretch">
-                          <Box>
-                            <Heading size="xs" mb={2}>Chapter Description</Heading>
-                            <Text>{currentChapter.chapter_description}</Text>
-                          </Box>
-                          <Box>
-                            <Heading size="xs" mb={2}>Main Story</Heading>
-                            <Text>{currentChapter.scenes?.[activeSceneIndex]?.main_story}</Text>
-                          </Box>
-                        </VStack>
-                      </CardBody>
-                    </Card>
-                  </VStack>
+                  <SceneOverviewTab
+                    currentChapter={currentChapter}
+                    activeSceneIndex={activeSceneIndex}
+                    cardBg={cardBg}
+                    bgColor={bgColor}
+                    borderColor={borderColor}
+                  />
                 </TabPanel>
 
                 <TabPanel>
-                  <VStack spacing={6} align="stretch">
-                    {currentChapter.scenes?.[activeSceneIndex]?.shots?.map((shot, shotIndex) => (
-                      <Card key={shotIndex} variant="outline" bg={bgColor}>
-                        <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
-                          <HStack justify="space-between">
-                            <Heading size="sm">Shot {shotIndex + 1}</Heading>
-                            <Badge
-                              colorScheme={videoData[`${activeChapterIndex + 1}-${activeSceneIndex + 1}-${shotIndex + 1}`] ? 'green' : 'gray'}
-                            >
-                              {videoData[`${activeChapterIndex + 1}-${activeSceneIndex + 1}-${shotIndex + 1}`] ? 'Rendered' : 'Pending'}
-                            </Badge>
-                          </HStack>
-                        </CardHeader>
-                        <CardBody>
-                          <VStack spacing={4} align="stretch">
-                            {renderSceneDescription(
-                              shot,
-                              activeChapterIndex,
-                              activeSceneIndex,
-                              shotIndex,
-                              'opening'
-                            )}
-                          </VStack>
-                        </CardBody>
-                      </Card>
-                    ))}
-                  </VStack>
+                  <VisualPreviewTab
+                    shots={currentChapter.scenes?.[activeSceneIndex]?.shots || []}
+                    activeChapterIndex={activeChapterIndex}
+                    activeSceneIndex={activeSceneIndex}
+                    projectName={projectName}
+                    cardBg={cardBg}
+                    bgColor={bgColor}
+                    borderColor={borderColor}
+                  />
                 </TabPanel>
 
                 <TabPanel>
-                  <VStack spacing={6} align="stretch">
-                    <Card variant="outline" bg={bgColor}>
-                      <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
-                        <Heading size="sm">Scene Audio</Heading>
-                      </CardHeader>
-                      <CardBody>
-                        <VStack spacing={6}>
-                          <Box width="100%">
-                            <Heading size="xs" mb={4}>Background Music</Heading>
-                            <BackgroundMusic
-                              audioData={backgroundMusicData}
-                              isGenerating={generatingMusic.has(`${activeChapterIndex + 1}-${activeSceneIndex + 1}`)}
-                              onGenerateMusic={(style) => handleGenerateBackgroundMusic(activeChapterIndex + 1, activeSceneIndex + 1, style)}
-                              chapterIndex={activeChapterIndex}
-                              sceneIndex={activeSceneIndex}
-                              projectName={projectName}
-                            />
-                          </Box>
-                          <Box width="100%">
-                            <Heading size="xs" mb={4}>Narration</Heading>
-                            <NarrationBox
-                              audioData={narrationData}
-                              chapterIndex={activeChapterIndex}
-                              sceneIndex={activeSceneIndex}
-                              projectName={projectName}
-                              narrationText={currentChapter.scenes?.[activeSceneIndex]?.narration_text || ''}
-                            />
-                          </Box>
-                        </VStack>
-                      </CardBody>
-                    </Card>
-                  </VStack>
+                  <ScriptAudioTab
+                    activeChapterIndex={activeChapterIndex}
+                    activeSceneIndex={activeSceneIndex}
+                    projectName={projectName}
+                    cardBg={cardBg}
+                    bgColor={bgColor}
+                    borderColor={borderColor}
+                    narrationText={currentChapter.scenes?.[activeSceneIndex]?.narration_text || ''}
+                  />
                 </TabPanel>
 
                 <TabPanel>
-                  <VStack spacing={6} align="stretch">
-                    {currentChapter.scenes?.[activeSceneIndex]?.shots?.map((shot, index) => (
-                      <Card key={index} variant="outline" bg={bgColor}>
-                        <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
-                          <Heading size="sm">Shot {index + 1} Instructions</Heading>
-                        </CardHeader>
-                        <CardBody>
-                          <DirectorInstructions
-                            instructions={shot.director_instructions || ''}
-                            handleUpdate={(newInstructions) =>
-                              handleUpdateShotInstructions(activeChapterIndex, activeSceneIndex, index, newInstructions)
-                            }
-                            reasoning={shot.reasoning || ''}
-                          />
-                        </CardBody>
-                      </Card>
-                    ))}
-                  </VStack>
+                  <ShotInstructionsTab
+                    shots={currentChapter.scenes?.[activeSceneIndex]?.shots || []}
+                    activeChapterIndex={activeChapterIndex}
+                    activeSceneIndex={activeSceneIndex}
+                    projectName={projectName}
+                    cardBg={cardBg}
+                    bgColor={bgColor}
+                    borderColor={borderColor}
+                  />
                 </TabPanel>
 
                 <TabPanel>
-                  <VStack spacing={6} align="stretch">
-                    <Card variant="outline" bg={bgColor}>
-                      <CardHeader bg={cardBg} borderBottomWidth={1} borderColor={borderColor}>
-                        <HStack justify="space-between">
-                          <Heading size="sm">Final Scene Video</Heading>
-                          <Button
-                            colorScheme="blue"
-                            size="sm"
-                            leftIcon={
-                              generatingVideoFor?.chapter === activeChapterIndex && 
-                              generatingVideoFor?.scene === activeSceneIndex ? 
-                                <Spinner size="sm" /> : 
-                                <Icon as={FaRedo} />
-                            }
-                            onClick={() => handleGenerateSceneVideo(activeChapterIndex, activeSceneIndex)}
-                            isLoading={
-                              generatingVideoFor?.chapter === activeChapterIndex && 
-                              generatingVideoFor?.scene === activeSceneIndex
-                            }
-                            loadingText="Generating"
-                            isDisabled={generatingVideoFor !== null}
-                          >
-                            Generate Video
-                          </Button>
-                        </HStack>
-                      </CardHeader>
-                      <CardBody>
-                        <AspectRatio ratio={16/9}>
-                          <Box position="relative">
-                            <video
-                              key={videoKey}
-                              controls
-                              src={`http://localhost:8000/api/get-scene-video/${projectName}/${activeChapterIndex + 1}/${currentChapter.scenes?.[activeSceneIndex]?.scene_number}?v=${videoKey}`}
-                              style={{ width: '100%', borderRadius: '8px' }}
-                            >
-                              Your browser does not support the video tag.
-                            </video>
-                            <Text
-                              position="absolute"
-                              top="50%"
-                              left="50%"
-                              transform="translate(-50%, -50%)"
-                              color="gray.500"
-                              display={videoData[`final_scene_${activeChapterIndex + 1}_${activeSceneIndex + 1}`] ? 'none' : 'block'}
-                            >
-                              No video generated yet
-                            </Text>
-                          </Box>
-                        </AspectRatio>
-                      </CardBody>
-                    </Card>
-                  </VStack>
+                  <SceneVideoTab
+                    activeChapterIndex={activeChapterIndex}
+                    activeSceneIndex={activeSceneIndex}
+                    projectName={projectName}
+                    cardBg={cardBg}
+                    bgColor={bgColor}
+                    borderColor={borderColor}
+                    script={script}
+                    videoKey={videoKey}
+                    setVideoKey={setVideoKey}
+                  />
                 </TabPanel>
 
               </TabPanels>

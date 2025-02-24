@@ -628,27 +628,22 @@ async def get_video(
         aws_service = AWSService(project_name=project_name)
         video_service = VideoServiceFactory.create_video_service(provider, aws_service)
 
-        video_exists = video_service.video_exists(
-            chapter=str(chapter_number),
-            scene=str(scene_number),
-            shot=str(shot_number)
-        )
-
-        if not video_exists:
-            return {
-                "status": "not_found",
-                "message": "Video not found",
-                "chapter": chapter_number,
-                "scene": scene_number,
-                "shot": shot_number
-            }
-
         video_path = video_service.get_shot_path(
             chapter=str(chapter_number),
             scene=str(scene_number),
             shot=str(shot_number)
         )
         local_path = video_service.get_local_path(video_path)
+
+        if not local_path.exists():
+            return {
+                "status": "not_found",
+                "message": f"Video file not found at path: {local_path}",
+                "chapter": chapter_number,
+                "scene": scene_number,
+                "shot": shot_number,
+                "path": str(local_path)
+            }
 
         return FileResponse(
             path=str(local_path),
@@ -658,7 +653,10 @@ async def get_video(
 
     except Exception as e:
         logger.error(f"Error getting video: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error getting video: {str(e)}, Path: {video_path if 'video_path' in locals() else 'unknown'}"
+        )
 
 @app.get("/api/get-all-videos/{project_name}")
 async def get_all_videos(project_name: str) -> dict:
@@ -1066,11 +1064,13 @@ async def get_scene_video(
         video_path = Path("temp") / project_name / f"chapter_{chapter_number}" / f"scene_{scene_number}" / "final_scene.mp4"
         
         if not video_path.exists():
-            raise HTTPException(
-                status_code=404,
-                detail=f"Video not found for chapter {chapter_number}, scene {scene_number}"
-            )
+            return {
+                "status": "not_found",
+                "message": f"Video not found for chapter {chapter_number}, scene {scene_number}",
+                "video_path": str(video_path)
+            }
 
+        # Return the video file with proper headers
         return CustomFileResponse(
             path=str(video_path),
             media_type="video/mp4",
@@ -1086,7 +1086,11 @@ async def get_scene_video(
 
     except Exception as e:
         logger.error(f"Error getting scene video: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "status": "error",
+            "message": str(e),
+            "video_path": str(video_path) if 'video_path' in locals() else None
+        }
 
 class RegenerateChapterRequest(BaseModel):
     chapter_index: int
@@ -1262,4 +1266,106 @@ async def update_narration(project_name: str, request: UpdateNarrationRequest):
 
     except Exception as e:
         logger.error(f"Error updating narration: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-scene-images/{project_name}/{chapter_number}/{scene_number}")
+async def get_scene_images(project_name: str, chapter_number: int, scene_number: int):
+    """Get all images for a specific scene"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        director = DirectorService(aws_service=aws_service, project_name=project_name)
+        script = await director.get_script()
+        image_service = ImageService(
+            aws_service=aws_service,
+            black_and_white=script.project_details.black_and_white,
+        )
+
+        # Get all image files for this scene
+        image_data = {}
+        scene_dir = image_service.temp_dir / f"chapter_{chapter_number}" / f"scene_{scene_number}"
+        
+        if scene_dir.exists():
+            for image_file in scene_dir.glob("shot_*.png"):
+                # Parse shot number and type from filename
+                filename_parts = image_file.stem.split("_")
+                shot_num = int(filename_parts[1])
+                shot_type = filename_parts[2]  # 'opening' or 'closing'
+
+                image_key = f"{chapter_number}-{scene_number}-{shot_num}-{shot_type}"
+                image_data[image_key] = image_service.encode_image_to_base64(image_file)
+
+        return {"status": "success", "images": image_data}
+    except Exception as e:
+        logger.error(f"Error getting scene images: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-scene-videos/{project_name}/{chapter_number}/{scene_number}")
+async def get_scene_videos(project_name: str, chapter_number: int, scene_number: int):
+    """Get all videos for a specific scene"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        video_service = VideoServiceFactory.create_video_service(VideoProvider.REPLICATE, aws_service)
+        
+        # Get all videos for this scene
+        videos = {}
+        scene_dir = Path("temp") / project_name / f"chapter_{chapter_number}" / f"scene_{scene_number}"
+        
+        if scene_dir.exists():
+            # Get individual shot videos
+            for video_file in scene_dir.glob("shot_*.mp4"):
+                shot_num = int(video_file.stem.split("_")[1])
+                # Return URL instead of base64
+                videos[f"{chapter_number}-{scene_number}-{shot_num}"] = f"/temp/{project_name}/chapter_{chapter_number}/scene_{scene_number}/{video_file.name}"
+            
+            # Get final scene video if it exists
+            final_scene_path = scene_dir / "final_scene.mp4"
+            if final_scene_path.exists():
+                # Return URL for final scene video
+                videos[f"final_scene_{chapter_number}_{scene_number}"] = f"/temp/{project_name}/chapter_{chapter_number}/scene_{scene_number}/final_scene.mp4"
+
+        return {"status": "success", "videos": videos}
+    except Exception as e:
+        logger.error(f"Error getting scene videos: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-scene-narrations/{project_name}/{chapter_number}/{scene_number}")
+async def get_scene_narrations(project_name: str, chapter_number: int, scene_number: int):
+    """Get narration for a specific scene"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        narration_path = (
+            Path("temp") / project_name / f"chapter_{chapter_number}" / 
+            f"scene_{scene_number}" / "narration.wav"
+        )
+        
+        narrations = {}
+        if narration_path.exists():
+            with open(narration_path, "rb") as f:
+                audio_data = base64.b64encode(f.read()).decode("utf-8")
+                narrations[f"{chapter_number}-{scene_number}"] = audio_data
+
+        return {"status": "success", "narrations": narrations}
+    except Exception as e:
+        logger.error(f"Error getting scene narrations: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get-scene-background-music/{project_name}/{chapter_number}/{scene_number}")
+async def get_scene_background_music(project_name: str, chapter_number: int, scene_number: int):
+    """Get background music for a specific scene"""
+    try:
+        aws_service = AWSService(project_name=project_name)
+        music_path = (
+            Path("temp") / project_name / f"chapter_{chapter_number}" / 
+            f"scene_{scene_number}" / "background_music.mp3"
+        )
+        
+        background_music = {}
+        if music_path.exists():
+            with open(music_path, "rb") as f:
+                audio_data = base64.b64encode(f.read()).decode("utf-8")
+                background_music[f"{chapter_number}-{scene_number}"] = audio_data
+
+        return {"status": "success", "background_music": background_music}
+    except Exception as e:
+        logger.error(f"Error getting scene background music: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
