@@ -23,6 +23,7 @@ Output format should be a JSON object containing an array of chapters:
   "chapters": [
     {{
       "chapter_number": 1,
+      "reasoning": "The explanation and reasoning for the selection",
       "chapter_title": "Title of chapter 1",
       "chapter_description": "Detailed description of what this chapter covers"
     }}

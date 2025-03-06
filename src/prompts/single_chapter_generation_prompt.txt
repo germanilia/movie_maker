@@ -31,6 +31,5 @@ Output Structure:
     "chapter_number": "{next_chapter_number}",
     "chapter_title": "[Chapter title that follows the story progression]",
     "chapter_description": "[Chapter description that builds upon previous chapters]",
-    "main_characters": "[Main characters, including both returning and new characters]"
   }}
 }}
