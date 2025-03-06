@@ -221,6 +221,7 @@ class DirectorService:
                                         f"Failed to generate shot {shot_number + 1} after {max_retries} attempts"
                                     )
 
+        await self._save_script(script)
         return script
 
     async def _ensure_temp_dir(self, project_name: str) -> Path:
@@ -349,6 +350,7 @@ class DirectorService:
         # Save the script at the end
         await self._save_script(script)
         script = await self.generate_shots(script, request.number_of_shots)
+        await self._save_script(script)
 
         return script
 
