@@ -585,7 +585,6 @@ async def generate_shot_video(project_name: str, request: VideoGenerationRequest
                 shot=str(request.shot_number),
                 overwrite=request.overwrite,
                 prompt=prompt,
-                black_and_white=request.black_and_white
             )
 
             if not success or not video_path:

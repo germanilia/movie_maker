@@ -11,6 +11,10 @@ from src.services.video_service_base import BaseVideoService, VideoModel
 
 logger = logging.getLogger(__name__)
 
+# Set environment variable to control replicate client timeout
+# Default is 600 seconds (10 minutes), increase it to 1800 seconds (30 minutes)
+os.environ["REPLICATE_CLIENT_TIMEOUT"] = "1800"
+
 class ReplicateVideoService(BaseVideoService):
     def __init__(self, aws_service: AWSService):
         super().__init__(aws_service)
@@ -40,7 +44,6 @@ class ReplicateVideoService(BaseVideoService):
         shot: str,
         overwrite: bool = False,
         poll_interval: int = 10,
-        frame_mode: str = "opening"
     ) -> Tuple[bool, str | None]:
         """Generate video for a specific shot using Replicate"""
         video_path = self.get_shot_path(chapter, scene, shot)
@@ -91,8 +94,12 @@ class ReplicateVideoService(BaseVideoService):
             video_url = next(output)
             logger.info(f"Got video URL from Replicate: {video_url}")
 
-            # Download video from URL
-            async with aiohttp.ClientSession() as session:
+            # Download video from URL with increased timeout
+            # Create a timeout object with long timeouts
+            timeout = aiohttp.ClientTimeout(total=1800, connect=60, sock_connect=60, sock_read=1800)
+            
+            # Use the timeout in the client session
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(video_url) as response:
                     response.raise_for_status()
                     with open(downloaded_path, 'wb') as f:

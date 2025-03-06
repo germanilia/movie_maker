@@ -663,316 +663,332 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         </Box>
 
 
-        {/* Media Display Section */}
-        {(localImageData || videoData) && (
-          <Box>
-            <Tabs 
-              variant="enclosed"
-              colorScheme={buttonColorScheme}
-              index={activeTab}
-              onChange={setActiveTab}
-              isLazy
-            >
-              <TabList>
-                <Tab>
-                  <HStack spacing={2}>
-                    <ChakraIcon icon={FaImage} />
-                    <Text>Image</Text>
-                  </HStack>
-                </Tab>
-                <Tab>
-                  <HStack spacing={2}>
-                    <ChakraIcon icon={FaVideo} />
-                    <Text>Video</Text>
-                  </HStack>
-                </Tab>
-              </TabList>
+        {/* Media Display Section - Always rendered regardless of image/video presence */}
+        <Box>
+          <Tabs 
+            variant="enclosed"
+            colorScheme={buttonColorScheme}
+            index={activeTab}
+            onChange={setActiveTab}
+            isLazy
+          >
+            <TabList>
+              <Tab>
+                <HStack spacing={2}>
+                  <ChakraIcon icon={FaImage} />
+                  <Text>Image</Text>
+                </HStack>
+              </Tab>
+              <Tab>
+                <HStack spacing={2}>
+                  <ChakraIcon icon={FaVideo} />
+                  <Text>Video</Text>
+                </HStack>
+              </Tab>
+            </TabList>
 
-              <TabPanels>
-                <TabPanel p={0} pt={4}>
-                  {/* Image Controls */}
-                  <HStack justify="space-between" mb={4}>
-                    <Menu>
-                      <MenuButton
-                        as={Button}
-                        size="sm"
-                        rightIcon={<ChevronDownIcon />}
-                        leftIcon={<ChakraIcon icon={FaImage} />}
-                        variant="outline"
-                        colorScheme={buttonColorScheme}
-                      >
-                        {modelOptions.find(opt => opt.value === localModelType)?.label}
-                      </MenuButton>
-                      <MenuList>
-                        {modelOptions.map(option => (
-                          <MenuItem 
-                            key={option.value}
-                            onClick={() => {
-                              setLocalModelType(option.value);
-                              if (option.value !== 'flux_ultra_model') {
-                                setReferenceImage(null);
-                              }
-                            }}
-                          >
-                            {option.label}
-                          </MenuItem>
-                        ))}
-                      </MenuList>
-                    </Menu>
-
-                    <HStack spacing={2}>
-                      <NumberInput
-                        size="sm"
-                        width="100px"
-                        value={seed}
-                        min={0}
-                        max={999999}
-                        defaultValue={333}
-                        onChange={(valueString) => setSeed(parseInt(valueString))}
-                      >
-                        <NumberInputField />
-                      </NumberInput>
-
-                      <Button
-                        size="sm"
-                        colorScheme={buttonColorScheme}
-                        onClick={handleGenerateWithReference}
-                        isLoading={isGenerating}
-                        loadingText="Generating"
-                        leftIcon={<RepeatIcon />}
-                      >
-                        Generate
-                      </Button>
-                    </HStack>
-                  </HStack>
-
-                  {/* Image Display and Face Tools */}
-                  <Box 
-                    position="relative" 
-                    borderWidth={1}
-                    borderColor={borderColor}
-                    borderRadius="md"
-                    overflow="hidden"
-                  >
-                    {faceDetectionResult ? (
-                      <canvas
-                        ref={canvasRef}
-                        style={{
-                          maxHeight: '400px',
-                          width: '100%',
-                          objectFit: 'contain',
-                        }}
-                      />
-                    ) : (
-                      <Image
-                        src={localImageData?.startsWith('data:') ? localImageData : `data:image/png;base64,${localImageData}`}
-                        alt={`${type} frame`}
-                        maxH="400px"
-                        w="100%"
-                        objectFit="contain"
-                      />
-                    )}
-                  </Box>
-
-                  {/* Face Tools */}
-                  <HStack justify="flex-end" mt={2} spacing={2}>
-                    {!showFaceTools ? (
-                      <Button
-                        size="sm"
-                        colorScheme={buttonColorScheme}
-                        variant="outline"
-                        leftIcon={<ChakraIcon icon={FaUserAlt} />}
-                        onClick={() => setShowFaceTools(true)}
-                      >
-                        Face Tools
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          size="sm"
-                          colorScheme={buttonColorScheme}
-                          onClick={detectFaces}
-                          isLoading={isDetectingFaces}
-                          loadingText="Detecting"
-                          variant="outline"
-                        >
-                          Detect Faces
-                        </Button>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={handleSourceFileUpload}
-                          style={{ display: 'none' }}
-                          ref={swapFileInputRef}
-                          disabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
-                        />
-                        <Button
-                          size="sm"
-                          colorScheme={buttonColorScheme}
-                          onClick={() => swapFileInputRef.current?.click()}
-                          isDisabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
-                          variant="outline"
-                        >
-                          Upload Faces
-                        </Button>
-                        {sourceImages.length > 0 && faceDetectionResult && (
-                          <Button
-                            size="sm"
-                            colorScheme={buttonColorScheme}
-                            onClick={() => setIsSwapModalOpen(true)}
-                            isDisabled={isSwapping}
-                            variant="outline"
-                          >
-                            Map & Swap
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
+            <TabPanels>
+              <TabPanel p={0} pt={4}>
+                {/* Image Controls */}
+                <HStack justify="space-between" mb={4}>
+                  <Menu>
+                    <MenuButton
+                      as={Button}
+                      size="sm"
+                      rightIcon={<ChevronDownIcon />}
+                      leftIcon={<ChakraIcon icon={FaImage} />}
+                      variant="outline"
+                      colorScheme={buttonColorScheme}
+                    >
+                      {modelOptions.find(opt => opt.value === localModelType)?.label}
+                    </MenuButton>
+                    <MenuList>
+                      {modelOptions.map(option => (
+                        <MenuItem 
+                          key={option.value}
                           onClick={() => {
-                            setShowFaceTools(false);
-                            setFaceDetectionResult(null);
-                            setSourceImages([]);
-                            setFaceMapping({});
+                            setLocalModelType(option.value);
+                            if (option.value !== 'flux_ultra_model') {
+                              setReferenceImage(null);
+                            }
                           }}
                         >
-                          Hide Tools
-                        </Button>
-                      </>
-                    )}
-                  </HStack>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </MenuList>
+                  </Menu>
 
-                  {/* Reference Image Upload Section */}
-                  {localModelType === 'flux_ultra_model' && (
-                    <Box
-                      onDragEnter={handleDragEnter}
-                      onDragLeave={handleDragLeave}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      borderWidth={2}
-                      borderStyle="dashed"
-                      borderRadius="md"
-                      p={4}
-                      borderColor={isDragging ? `${buttonColorScheme}.500` : 'gray.300'}
-                      bg={isDragging ? `${buttonColorScheme}.50` : 'transparent'}
-                      transition="all 0.2s"
+                  <HStack spacing={2}>
+                    <NumberInput
+                      size="sm"
+                      width="100px"
+                      value={seed}
+                      min={0}
+                      max={999999}
+                      defaultValue={333}
+                      onChange={(valueString) => setSeed(parseInt(valueString))}
                     >
-                      <input
-                        type="file"
-                        accept="image/*"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        style={{ display: 'none' }}
-                      />
-                      <VStack spacing={2}>
-                        <IconButton
-                          aria-label="Add reference image"
-                          icon={<AttachmentIcon />}
-                          size="sm"
-                          colorScheme={referenceImage ? 'green' : buttonColorScheme}
-                          onClick={() => fileInputRef.current?.click()}
-                        />
-                        <Text fontSize="sm" color="gray.600">
-                          {referenceImage ? 'Reference image loaded' : 'Drop reference image here or click to upload'}
-                        </Text>
-                        {referenceImage && (
-                          <Image
-                            src={referenceImage}
-                            alt="Reference"
-                            maxH="100px"
-                            objectFit="contain"
-                            borderRadius="md"
-                          />
-                        )}
-                      </VStack>
-                    </Box>
-                  )}
-                </TabPanel>
+                      <NumberInputField />
+                    </NumberInput>
 
-                <TabPanel p={0} pt={4}>
-                  {/* Video Controls */}
-                  <HStack spacing={2} mb={4} justify="space-between" width="100%">
-                    <HStack spacing={2}>
-                      <Select
-                        size="sm"
-                        value={selectedModel}
-                        onChange={(e) => onModelChange?.(e.target.value)}
-                        variant="outline"
-                        width="auto"
-                      >
-                        <option value="replicate">Replicate</option>
-                        <option value="runwayml">Runway ML</option>
-                      </Select>
-                      <FormControl display="flex" alignItems="center">
-                        <FormLabel htmlFor="black-and-white" mb="0" fontSize="sm">
-                          Black & White
-                        </FormLabel>
-                        <Switch
-                          id="black-and-white"
-                          size="sm"
-                          colorScheme={buttonColorScheme}
-                          isChecked={blackAndWhite}
-                          onChange={(e) => setBlackAndWhite(e.target.checked)}
-                        />
-                      </FormControl>
-                    </HStack>
                     <Button
                       size="sm"
                       colorScheme={buttonColorScheme}
-                      leftIcon={<Icon as={FaVideo} />}
-                      onClick={onGenerateVideo}
-                      isLoading={isGeneratingVideo}
+                      onClick={handleGenerateWithReference}
+                      isLoading={isGenerating}
                       loadingText="Generating"
-                      isDisabled={!imageData}
-                      minWidth="120px"
+                      leftIcon={<RepeatIcon />}
                     >
-                      {videoData ? 'Regenerate' : 'Generate'}
+                      Generate
                     </Button>
                   </HStack>
+                </HStack>
 
-                  {/* Video Player or Placeholder */}
-                  {videoData ? (
-                    <ShotVideo
-                      videoData={videoData}
-                      chapterIndex={chapterIndex}
-                      sceneIndex={sceneIndex}
-                      shotIndex={shotIndex}
+                {/* Image Display and Face Tools */}
+                <Box 
+                  position="relative" 
+                  borderWidth={1}
+                  borderColor={borderColor}
+                  borderRadius="md"
+                  overflow="hidden"
+                >
+                  {faceDetectionResult ? (
+                    <canvas
+                      ref={canvasRef}
+                      style={{
+                        maxHeight: '400px',
+                        width: '100%',
+                        objectFit: 'contain',
+                      }}
+                    />
+                  ) : localImageData ? (
+                    <Image
+                      src={localImageData?.startsWith('data:') ? localImageData : `data:image/png;base64,${localImageData}`}
+                      alt={`${type} frame`}
+                      maxH="400px"
+                      w="100%"
+                      objectFit="contain"
                     />
                   ) : (
                     <AspectRatio ratio={16/9}>
                       <Box
-                        borderWidth={1}
-                        borderStyle="dashed"
-                        borderColor={borderColor}
-                        borderRadius="md"
                         display="flex"
                         alignItems="center"
                         justifyContent="center"
                         bg={placeholderBgColor}
+                        height="100%"
+                        width="100%"
                       >
                         <VStack spacing={2}>
-                          <Icon as={FaVideo} boxSize={8} color="gray.400" />
-                          <Text color="gray.500">No video generated yet</Text>
+                          <Icon as={FaImage} boxSize={8} color="gray.400" />
+                          <Text color="gray.500">No image generated yet</Text>
+                          <Text color="gray.500" fontSize="sm">
+                            Click "Generate" to create the first image
+                          </Text>
                         </VStack>
                       </Box>
                     </AspectRatio>
                   )}
+                </Box>
 
-                  {/* Video Generation Progress */}
-                  {isGeneratingVideo && (
-                    <Box mt={2}>
-                      <Progress size="xs" isIndeterminate colorScheme={buttonColorScheme} />
-                      <Text fontSize="sm" color="gray.600" mt={1} textAlign="center">
-                        Generating video... This may take a few minutes
-                      </Text>
-                    </Box>
+                {/* Face Tools */}
+                <HStack justify="flex-end" mt={2} spacing={2}>
+                  {!showFaceTools ? (
+                    <Button
+                      size="sm"
+                      colorScheme={buttonColorScheme}
+                      variant="outline"
+                      leftIcon={<ChakraIcon icon={FaUserAlt} />}
+                      onClick={() => setShowFaceTools(true)}
+                    >
+                      Face Tools
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        colorScheme={buttonColorScheme}
+                        onClick={detectFaces}
+                        isLoading={isDetectingFaces}
+                        loadingText="Detecting"
+                        variant="outline"
+                      >
+                        Detect Faces
+                      </Button>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={handleSourceFileUpload}
+                        style={{ display: 'none' }}
+                        ref={swapFileInputRef}
+                        disabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
+                      />
+                      <Button
+                        size="sm"
+                        colorScheme={buttonColorScheme}
+                        onClick={() => swapFileInputRef.current?.click()}
+                        isDisabled={!faceDetectionResult || Object.keys(faceDetectionResult).length === 0}
+                        variant="outline"
+                      >
+                        Upload Faces
+                      </Button>
+                      {sourceImages.length > 0 && faceDetectionResult && (
+                        <Button
+                          size="sm"
+                          colorScheme={buttonColorScheme}
+                          onClick={() => setIsSwapModalOpen(true)}
+                          isDisabled={isSwapping}
+                          variant="outline"
+                        >
+                          Map & Swap
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setShowFaceTools(false);
+                          setFaceDetectionResult(null);
+                          setSourceImages([]);
+                          setFaceMapping({});
+                        }}
+                      >
+                        Hide Tools
+                      </Button>
+                    </>
                   )}
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
-          </Box>
-        )}
+                </HStack>
+
+                {/* Reference Image Upload Section */}
+                {localModelType === 'flux_ultra_model' && (
+                  <Box
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                    borderWidth={2}
+                    borderStyle="dashed"
+                    borderRadius="md"
+                    p={4}
+                    borderColor={isDragging ? `${buttonColorScheme}.500` : 'gray.300'}
+                    bg={isDragging ? `${buttonColorScheme}.50` : 'transparent'}
+                    transition="all 0.2s"
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      style={{ display: 'none' }}
+                    />
+                    <VStack spacing={2}>
+                      <IconButton
+                        aria-label="Add reference image"
+                        icon={<AttachmentIcon />}
+                        size="sm"
+                        colorScheme={referenceImage ? 'green' : buttonColorScheme}
+                        onClick={() => fileInputRef.current?.click()}
+                      />
+                      <Text fontSize="sm" color="gray.600">
+                        {referenceImage ? 'Reference image loaded' : 'Drop reference image here or click to upload'}
+                      </Text>
+                      {referenceImage && (
+                        <Image
+                          src={referenceImage}
+                          alt="Reference"
+                          maxH="100px"
+                          objectFit="contain"
+                          borderRadius="md"
+                        />
+                      )}
+                    </VStack>
+                  </Box>
+                )}
+              </TabPanel>
+
+              <TabPanel p={0} pt={4}>
+                {/* Video Controls */}
+                <HStack spacing={2} mb={4} justify="space-between" width="100%">
+                  <HStack spacing={2}>
+                    <Select
+                      size="sm"
+                      value={selectedModel}
+                      onChange={(e) => onModelChange?.(e.target.value)}
+                      variant="outline"
+                      width="auto"
+                    >
+                      <option value="replicate">Replicate</option>
+                      <option value="runwayml">Runway ML</option>
+                    </Select>
+                    <FormControl display="flex" alignItems="center">
+                      <FormLabel htmlFor="black-and-white" mb="0" fontSize="sm">
+                        Black & White
+                      </FormLabel>
+                      <Switch
+                        id="black-and-white"
+                        size="sm"
+                        colorScheme={buttonColorScheme}
+                        isChecked={blackAndWhite}
+                        onChange={(e) => setBlackAndWhite(e.target.checked)}
+                      />
+                    </FormControl>
+                  </HStack>
+                  <Button
+                    size="sm"
+                    colorScheme={buttonColorScheme}
+                    leftIcon={<Icon as={FaVideo} />}
+                    onClick={onGenerateVideo}
+                    isLoading={isGeneratingVideo}
+                    loadingText="Generating"
+                    minWidth="120px"
+                  >
+                    {videoData ? 'Regenerate' : 'Generate'}
+                  </Button>
+                </HStack>
+
+                {/* Video Player or Placeholder */}
+                {videoData ? (
+                  <ShotVideo
+                    videoData={videoData}
+                    chapterIndex={chapterIndex}
+                    sceneIndex={sceneIndex}
+                    shotIndex={shotIndex}
+                  />
+                ) : (
+                  <AspectRatio ratio={16/9}>
+                    <Box
+                      borderWidth={1}
+                      borderStyle="dashed"
+                      borderColor={borderColor}
+                      borderRadius="md"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      bg={placeholderBgColor}
+                    >
+                      <VStack spacing={2}>
+                        <Icon as={FaVideo} boxSize={8} color="gray.400" />
+                        <Text color="gray.500">No video generated yet</Text>
+                      </VStack>
+                    </Box>
+                  </AspectRatio>
+                )}
+
+                {/* Video Generation Progress */}
+                {isGeneratingVideo && (
+                  <Box mt={2}>
+                    <Progress size="xs" isIndeterminate colorScheme={buttonColorScheme} />
+                    <Text fontSize="sm" color="gray.600" mt={1} textAlign="center">
+                      Generating video... This may take a few minutes
+                    </Text>
+                  </Box>
+                )}
+              </TabPanel>
+            </TabPanels>
+          </Tabs>
+        </Box>
       </VStack>
 
       {/* Face Mapping Modal */}

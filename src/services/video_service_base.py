@@ -111,7 +111,6 @@ class BaseVideoService(ABC):
         overwrite: bool = False,
         poll_interval: int = 10,
         prompt: str = "",
-        black_and_white: bool = False,
     ) -> Tuple[bool, str | None]:
         """Generate video for a specific shot using the implemented service"""
         pass

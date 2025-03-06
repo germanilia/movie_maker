@@ -113,7 +113,7 @@ export const generateVideo = async (
 ): Promise<void> => {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for generation request
+    const timeoutId = setTimeout(() => controller.abort(), 1800000); // 30 minute timeout for generation request
 
     const response = await fetch(
       `http://localhost:8000/api/generate-shot-video/${projectName}?t=${Date.now()}`,
