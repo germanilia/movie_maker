@@ -8,7 +8,7 @@ story background:
 {story_background}
 ####
 complete script context (if regenerating):
-{complete_script}
+{script}
 ####
 Previous Generation Error:
 {previous_generation_error}
@@ -19,13 +19,13 @@ The response must start with a {{ and end with }} nothing is allowed before or a
 Based on the story background, number of scenes, and complete script context (if regenerating), create detailed chapter descriptions that follow a clear narrative arc.
 
 Output format should be a JSON object containing an array of chapters:
-{
+{{
   "chapters": [
-    {
+    {{
       "chapter_number": 1,
       "chapter_title": "Title of chapter 1",
       "chapter_description": "Detailed description of what this chapter covers"
-    }
+    }}
     // ... more chapters
   ]
-}
+}}
