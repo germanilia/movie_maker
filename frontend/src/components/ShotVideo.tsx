@@ -154,19 +154,19 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
   };
 
   return (
-    <Box 
+    <Box
       ref={containerRef}
-      borderWidth={1} 
-      borderRadius="md" 
+      borderWidth={1}
+      borderRadius="md"
       overflow="hidden"
       bg={bgColor}
       borderColor={borderColor}
       position="relative"
     >
       {isLoading && videoData && (
-        <Progress 
-          size="xs" 
-          isIndeterminate 
+        <Progress
+          size="xs"
+          isIndeterminate
           position="absolute"
           top={0}
           left={0}
@@ -177,8 +177,8 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
 
       <video
         ref={videoRef}
-        src={videoData.startsWith('data:') ? videoData : `data:video/mp4;base64,${videoData}`}
-        style={{ 
+        src={videoData.startsWith('data:') ? videoData : videoData.startsWith('/') ? `${videoData}?t=${Date.now()}` : `data:video/mp4;base64,${videoData}`}
+        style={{
           width: '100%',
           backgroundColor: 'black',
           display: videoData ? 'block' : 'none'
@@ -188,6 +188,7 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
         onEnded={handleEnded}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
+        key={Date.now()} // Force re-render when component is updated
       />
 
       {!videoData ? (
@@ -219,7 +220,7 @@ const ShotVideo: React.FC<ShotVideoProps> = ({
                 size="sm"
                 colorScheme="blue"
               />
-              
+
               <Text fontSize="sm" minWidth="100px">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </Text>

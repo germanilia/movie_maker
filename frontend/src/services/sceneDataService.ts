@@ -38,7 +38,7 @@ export const fetchSceneData = async (
 
     // Add timestamp to URLs to prevent caching
     const timestamp = Date.now();
-    const baseUrl = `http://localhost:8000/api`;
+    const baseUrl = `/api`;
 
     const requestInit: RequestInit = {
       signal: controller.signal,

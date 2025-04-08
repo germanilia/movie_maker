@@ -32,6 +32,12 @@ class ImageService:
         black_and_white: bool = False,
         genre: str = "documentary",
     ):
+        # Always update the temp_dir if aws_service is provided, even if already initialized
+        if aws_service:
+            self.aws_service = aws_service
+            self.temp_dir = Path(aws_service.temp_dir)
+            logger.info(f"Setting ImageService temp_dir to: {self.temp_dir}")
+            
         if self._initialized:
             return
             
@@ -97,9 +103,11 @@ class ImageService:
         black_and_white: bool = False,
         genre: str = "documentary"
     ) -> 'ImageService':
-        if not cls._instance:
-            cls._instance = cls(aws_service, black_and_white, genre)
-        return cls._instance
+        instance = cls(aws_service, black_and_white, genre)
+        # Even if the instance exists, update its temp_dir if aws_service is provided
+        if aws_service and instance.aws_service != aws_service:
+            instance.update_config(aws_service=aws_service)
+        return instance
 
     def update_config(
         self,
@@ -111,6 +119,7 @@ class ImageService:
         if aws_service:
             self.aws_service = aws_service
             self.temp_dir = Path(aws_service.temp_dir)
+            logger.info(f"Updated ImageService temp_dir to: {self.temp_dir}")
         if black_and_white is not None:
             self.black_and_white = black_and_white
         if genre:

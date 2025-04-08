@@ -40,8 +40,7 @@ class DirectorService:
         self.prompts_base_path = Path("src/prompts")
         self.temp_base_path = Path("temp")
         self.project_name = to_snake_case(project_name)
-        self.temp_dir = self.temp_base_path / self.project_name
-        self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.temp_dir = self.aws_service.temp_dir
 
     async def _load_prompt(self, prompt_name: str) -> str:
         """Load a prompt file based on genre and name."""
@@ -225,10 +224,8 @@ class DirectorService:
         return script
 
     async def _ensure_temp_dir(self, project_name: str) -> Path:
-        """Ensure the temporary directory exists for the project."""
-        temp_dir = self.temp_base_path / project_name
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        return temp_dir
+        """Return the temporary directory for the project."""
+        return self.aws_service.temp_dir
 
     async def generate_chapters(
         self,
@@ -371,8 +368,7 @@ class DirectorService:
 
     async def _save_script(self, script: Script) -> None:
         """Save script to temp directory and S3."""
-        temp_dir = self.temp_base_path / self.project_name
-        script_path = temp_dir / "script.json"
+        script_path = self.aws_service.temp_dir / "script.json"
 
         # Save locally
         script_path.parent.mkdir(parents=True, exist_ok=True)
@@ -386,9 +382,7 @@ class DirectorService:
     async def get_script(self) -> Script:
         """Get the current script for the project."""
         try:
-            script = await self._try_load_script(
-                self.temp_base_path / self.project_name
-            )
+            script = await self._try_load_script(self.aws_service.temp_dir)
             if not script:
                 raise FileNotFoundError("Script not found")
             return script

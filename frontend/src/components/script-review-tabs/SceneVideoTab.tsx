@@ -149,7 +149,7 @@ const SceneVideoTab: React.FC<SceneVideoTabProps> = ({
               <video
                 key={videoKey}
                 controls
-                src={`http://localhost:8000/api/get-scene-video/${projectName}/${activeChapterIndex + 1}/${script.chapters[activeChapterIndex]?.scenes?.[activeSceneIndex]?.scene_number}?v=${videoKey}`}
+                src={`/api/get-scene-video/${projectName}/${activeChapterIndex + 1}/${script.chapters[activeChapterIndex]?.scenes?.[activeSceneIndex]?.scene_number}?v=${videoKey}`}
                 style={{ width: '100%', borderRadius: '8px' }}
               >
                 Your browser does not support the video tag.

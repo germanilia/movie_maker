@@ -17,8 +17,16 @@ class VideoModel(BaseModel):
 
 class BaseVideoService(ABC):
     def __init__(self, aws_service: AWSService):
+        self.aws_service = aws_service
         self.temp_dir = Path(aws_service.temp_dir)
         logger.info(f"VideoService initialized. Using temp directory: {self.temp_dir}")
+
+    def update_aws_service(self, aws_service: AWSService):
+        """Update the AWS service reference and temp directory"""
+        if self.aws_service != aws_service:
+            self.aws_service = aws_service
+            self.temp_dir = Path(aws_service.temp_dir)
+            logger.info(f"Updated VideoService temp_dir to: {self.temp_dir}")
 
     def get_local_path(self, video_path: str) -> Path:
         """Get the local path for a video file"""

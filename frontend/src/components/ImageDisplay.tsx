@@ -89,11 +89,13 @@ interface VideoPlayerProps {
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
   const [error, setError] = useState<string | null>(null);
+  // Add a timestamp for cache busting
+  const cacheBustedSrc = src.includes('?') ? `${src}&t=${Date.now()}` : `${src}?t=${Date.now()}`;
 
   useEffect(() => {
     const checkVideo = async () => {
       try {
-        const response = await fetch(`http://localhost:8000${src}`);
+        const response = await fetch(cacheBustedSrc);
         if (!response.ok) {
           throw new Error(`Failed to load video: ${response.status} ${response.statusText}`);
         }
@@ -106,11 +108,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
         setError(err instanceof Error ? err.message : 'Failed to load video');
       }
     };
-    
+
     if (src) {
       checkVideo();
     }
-  }, [src]);
+  }, [src, cacheBustedSrc]);
 
   if (error) {
     return (
@@ -121,10 +123,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ src, className }) => {
   }
 
   return (
-    <video 
+    <video
       className={className}
       controls
-      src={`http://localhost:8000${src}`}
+      src={cacheBustedSrc}
+      key={cacheBustedSrc} // Add key to force re-render when src changes
     >
       Your browser does not support the video tag.
     </video>
@@ -194,7 +197,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
     { value: 'flux_ultra_model', label: 'Flux Ultra Model' },
     { value: 'flux_dev_realism', label: 'Flux Dev Realism' },
   ];
-  
+
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -318,7 +321,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const detectFaces = async () => {
     setIsDetectingFaces(true);
     setShowFaceTools(false); // Hide tools during detection
-    
+
     try {
       const response = await fetch(
         `http://localhost:8000/api/detect-faces/${projectName}?` +
@@ -329,12 +332,12 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       );
 
       if (!response.ok) throw new Error('Face detection failed');
-      
+
       const data = await response.json();
       if (data.status === 'success' && data.face_detection_result) {
         setFaceDetectionResult(data.face_detection_result);
         setShowFaceTools(true);
-        
+
         if (Object.keys(data.face_detection_result).length === 0) {
           toast({
             title: 'No faces detected',
@@ -366,8 +369,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
         const reader = new FileReader();
         reader.onload = (e) => {
           const base64 = e.target?.result as string;
-          setSourceImages(prev => [...prev, { 
-            base64, 
+          setSourceImages(prev => [...prev, {
+            base64,
             name: file.name,  // Keep the original filename
             file: file  // Store the original file object
           }]);
@@ -388,7 +391,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       });
       return;
     }
-  
+
     setIsSwapping(true);
     try {
       const swapInstructions = Object.entries(faceMapping).map(([targetIdx, sourceName]) => {
@@ -400,7 +403,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           source_idx: sourceIdx // Use the actual index from the array
         };
       });
-  
+
       const response = await fetch(
         `http://localhost:8000/api/swap-faces-custom/${projectName}?` +
         `chapter_index=${chapterIndex+1}&scene_index=${sceneIndex+1}&` +
@@ -416,25 +419,25 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
           }),
         }
       );
-  
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Custom face swapping failed');
       }
-      
+
       const data = await response.json();
       if (data.status === 'success' && data.base64_image) {
         // Clear face detection result
         setFaceDetectionResult(null);
-        
+
         // Update image data directly without triggering regeneration
         setLocalImageData(data.base64_image);
-  
+
         // Reset states
         setIsSwapModalOpen(false);
         setSourceImages([]);
         setFaceMapping({});
-        
+
         toast({
           title: 'Success',
           description: 'Face swap completed successfully',
@@ -465,26 +468,26 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
 
     const img = new window.Image();
     img.src = localImageData.startsWith('data:') ? localImageData : `data:image/png;base64,${localImageData}`;
-    
+
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
-      
+
       if (faceDetectionResult) {
         ctx.strokeStyle = 'red';
         ctx.lineWidth = 4;
         ctx.font = '48px Arial'; // Increased font size to 48px
         ctx.fillStyle = 'red';
-        
+
         Object.entries(faceDetectionResult).forEach(([faceIdx, face]) => {
           const [x1, y1, x2, y2] = face.bbox;
           const width = x2 - x1;
           const height = y2 - y1;
-          
+
           // Draw rectangle around face
           ctx.strokeRect(x1, y1, width, height);
-          
+
           // Draw face index (starting from 1)
           const displayNumber = (parseInt(faceIdx) + 1).toString();
           ctx.fillText(displayNumber, x1, y1 - 15); // Increased y-offset for larger text
@@ -524,14 +527,14 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       }
 
       const updatedScript = await response.json();
-      
+
       // Get the updated shot from the response
       const updatedShot = updatedScript.chapters[chapterIndex]?.scenes?.[sceneIndex]?.shots?.[shotIndex];
       if (updatedShot) {
         // Update local state
         setLocalDescription(updatedShot.opening_frame);
         setLocalDirectorInstructions(updatedShot.director_instructions);
-        
+
         // Notify parent component
         if (onShotRegenerated) {
           onShotRegenerated(updatedShot.opening_frame, updatedShot.director_instructions);
@@ -560,18 +563,18 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
   };
 
   return (
-    <Box 
-      bg={bgColor} 
-      p={4} 
-      borderWidth={1} 
+    <Box
+      bg={bgColor}
+      p={4}
+      borderWidth={1}
       borderRadius="md"
       borderColor={borderColor}
       position="relative"
     >
       {(isGenerating || isDetectingFaces || isSwapping || isSaving) && (
-        <Progress 
-          size="xs" 
-          isIndeterminate 
+        <Progress
+          size="xs"
+          isIndeterminate
           position="absolute"
           top={0}
           left={0}
@@ -582,7 +585,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       <VStack spacing={4} align="stretch">
         {/* Header Section - Only Type Badge */}
         <HStack justify="space-between">
-          <Badge 
+          <Badge
             colorScheme={buttonColorScheme}
             variant="subtle"
             px={2}
@@ -637,8 +640,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
             />
           ) : (
             <VStack align="stretch" spacing={2}>
-              <Text 
-                color={accentTextColor} 
+              <Text
+                color={accentTextColor}
                 onClick={() => setIsEditing(true)}
                 cursor="pointer"
                 p={2}
@@ -665,7 +668,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
 
         {/* Media Display Section - Always rendered regardless of image/video presence */}
         <Box>
-          <Tabs 
+          <Tabs
             variant="enclosed"
             colorScheme={buttonColorScheme}
             index={activeTab}
@@ -704,7 +707,7 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                     </MenuButton>
                     <MenuList>
                       {modelOptions.map(option => (
-                        <MenuItem 
+                        <MenuItem
                           key={option.value}
                           onClick={() => {
                             setLocalModelType(option.value);
@@ -746,8 +749,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                 </HStack>
 
                 {/* Image Display and Face Tools */}
-                <Box 
-                  position="relative" 
+                <Box
+                  position="relative"
                   borderWidth={1}
                   borderColor={borderColor}
                   borderRadius="md"
@@ -992,8 +995,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       </VStack>
 
       {/* Face Mapping Modal */}
-      <Modal 
-        isOpen={isSwapModalOpen} 
+      <Modal
+        isOpen={isSwapModalOpen}
         onClose={() => setIsSwapModalOpen(false)}
         closeOnOverlayClick={!isSwapping}
         closeOnEsc={!isSwapping}
@@ -1007,11 +1010,11 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
             <VStack spacing={4} align="stretch">
               <Text>Select a source image for each detected face:</Text>
               {faceDetectionResult && Object.entries(faceDetectionResult).map(([faceIdx, face]) => (
-                <Box 
-                  key={faceIdx} 
-                  p={4} 
-                  borderWidth={1} 
-                  borderRadius="md" 
+                <Box
+                  key={faceIdx}
+                  p={4}
+                  borderWidth={1}
+                  borderRadius="md"
                   borderColor={borderColor}
                   bg={bgColor}
                 >
@@ -1025,8 +1028,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
                   >
                     <Stack>
                       {sourceImages.map((img, idx) => (
-                        <Radio 
-                          key={idx} 
+                        <Radio
+                          key={idx}
                           value={img.name}
                           colorScheme={buttonColorScheme}
                         >
@@ -1049,9 +1052,9 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
             </VStack>
           </ModalBody>
           <ModalFooter>
-            <Button 
-              variant="ghost" 
-              mr={3} 
+            <Button
+              variant="ghost"
+              mr={3}
               onClick={() => setIsSwapModalOpen(false)}
               isDisabled={isSwapping}
             >
@@ -1070,8 +1073,8 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({
       </Modal>
 
       {/* Shot Regeneration Modal */}
-      <Modal 
-        isOpen={isRegenerateModalOpen} 
+      <Modal
+        isOpen={isRegenerateModalOpen}
         onClose={() => {
           setRegenerateInstructions('');
           onRegenerateModalClose();

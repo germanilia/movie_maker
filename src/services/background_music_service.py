@@ -5,6 +5,7 @@ import replicate
 from pathlib import Path
 import time
 from typing import Any, Tuple, Optional, Union, BinaryIO, Iterator
+import requests
 
 from src.services.aws_service import AWSService
 
@@ -24,6 +25,12 @@ class BackgroundMusicService:
         return cls._instance
 
     def __init__(self, aws_service: Optional[AWSService] = None):
+        # Always update temp_dir if aws_service is provided, even if already initialized
+        if aws_service:
+            self.aws_service = aws_service
+            self.temp_dir = Path(aws_service.temp_dir)
+            logger.info(f"Setting BackgroundMusicService temp_dir to: {self.temp_dir}")
+            
         if self._initialized:
             return
             
@@ -33,6 +40,7 @@ class BackgroundMusicService:
             logger.error("Missing Replicate API token. Required: REPLICATE_API_TOKEN")
             raise ValueError("Missing required Replicate API token in environment variables")
 
+        self.aws_service = aws_service
         self.temp_dir = Path(aws_service.temp_dir) if aws_service else Path("temp")
         logger.info(f"BackgroundMusicService initialized. Using temp directory: {self.temp_dir}")
 
@@ -57,9 +65,12 @@ class BackgroundMusicService:
 
     @classmethod
     def get_instance(cls, aws_service: Optional[AWSService] = None) -> 'BackgroundMusicService':
-        if not cls._instance:
-            cls._instance = cls(aws_service)
-        return cls._instance
+        instance = cls(aws_service)
+        # If aws_service is provided, update temp_dir even if instance already exists
+        if aws_service and hasattr(instance, 'aws_service') and instance.aws_service != aws_service:
+            instance.temp_dir = Path(aws_service.temp_dir)
+            logger.info(f"Updated BackgroundMusicService temp_dir to: {instance.temp_dir}")
+        return instance
 
     def update_config(self, aws_service: Optional[AWSService] = None):
         """Update the service configuration after initialization"""
@@ -117,6 +128,10 @@ class BackgroundMusicService:
                 logger.error("Replicate API failed to return valid response")
                 raise Exception("Failed to generate music with Replicate")
 
+            # Log the output type and details
+            logger.info(f"Received output from Replicate with type: {type(output)}")
+            logger.debug(f"Output details: {str(output)[:500]}...")  # Limit logging length
+
             save_path = self.get_download_path(music_path)
             downloaded_path = save_path / f"{Path(str(music_path)).stem}.mp3"
 
@@ -124,15 +139,51 @@ class BackgroundMusicService:
             with open(downloaded_path, "wb") as file:
                 # Handle different types of output from replicate.run
                 if isinstance(output, (bytes, bytearray)):
+                    logger.info("Processing output as bytes/bytearray")
                     file.write(output)
                 elif isinstance(output, BinaryIO):
+                    logger.info("Processing output as BinaryIO")
                     file.write(output.read())
                 elif isinstance(output, Iterator):
+                    logger.info("Processing output as Iterator")
+                    chunks_processed = 0
                     for chunk in output:
+                        chunks_processed += 1
                         if isinstance(chunk, (bytes, bytearray)):
                             file.write(chunk)
+                        else:
+                            logger.warning(f"Iterator contains non-bytes chunk of type: {type(chunk)}")
+                    logger.info(f"Processed {chunks_processed} chunks from iterator")
+                elif str(type(output)).find("replicate.helpers.FileOutput") > -1:
+                    logger.info("Processing output as replicate.helpers.FileOutput")
+                    # Specific handling for replicate.helpers.FileOutput
+                    if hasattr(output, "read"):
+                        logger.info("Using FileOutput.read() method")
+                        file.write(output.read())
+                    elif hasattr(output, "url") and output.url:
+                        logger.info(f"Downloading from FileOutput.url: {output.url}")
+                        response = requests.get(output.url)
+                        response.raise_for_status()
+                        file.write(response.content)
+                    else:
+                        # Try download from FileOutput directly
+                        logger.info(f"Downloading from FileOutput string representation: {str(output)}")
+                        response = requests.get(str(output))
+                        response.raise_for_status()
+                        file.write(response.content)
+                elif hasattr(output, "read"):  # Handle objects with a read() method
+                    logger.info("Processing output using read() method")
+                    file.write(output.read())
+                elif hasattr(output, "url") and output.url:  # Handle objects with a URL property
+                    logger.info(f"Downloading from URL: {output.url}")
+                    response = requests.get(output.url)
+                    response.raise_for_status()
+                    file.write(response.content)
                 else:
-                    raise ValueError(f"Unexpected output type from Replicate: {type(output)}")
+                    error_msg = f"Unexpected output type from Replicate: {type(output)}"
+                    logger.error(error_msg)
+                    logger.error(f"Output has the following attributes: {dir(output)}")
+                    raise ValueError(error_msg)
 
             generation_time = time.time() - start_time
             logger.info(f"Successfully generated and saved music to {downloaded_path} in {generation_time:.2f} seconds")
@@ -140,4 +191,11 @@ class BackgroundMusicService:
 
         except Exception as e:
             logger.error(f"Music generation failed after {time.time() - start_time:.2f} seconds: {str(e)}")
+            logger.exception("Detailed exception information:")
+            if 'output' in locals():
+                logger.error(f"Output type was: {type(output) if output else 'None'}")
+                try:
+                    logger.error(f"Output representation: {str(output)[:1000]}")
+                except:
+                    logger.error("Could not convert output to string")
             return False, None

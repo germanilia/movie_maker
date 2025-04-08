@@ -45,7 +45,13 @@ app = FastAPI(title="Video Creator API")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React development server
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://10.20.0.123:3000",
+        "http://10.20.0.123:3001",
+        "*"  # Allow all origins for development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,8 +70,11 @@ if not temp_dir.exists():
     temp_dir.mkdir(parents=True)
 
 
+# We can't easily modify StaticFiles to add cache headers, so we'll rely on the CustomFileResponse
+# for specific video endpoints and browser cache busting in the frontend
+
 # Mount static directories
-app.mount("/temp", StaticFiles(directory=str(temp_dir)), name="temp")
+app.mount("/temp", StaticFiles(directory=str(temp_dir), html=False), name="temp")
 
 # Mount the static frontend files
 frontend_dir = os.path.join(
@@ -94,19 +103,19 @@ async def list_projects():
         # Get the workspace root and temp directory
         workspace_root = get_workspace_root()
         temp_dir = workspace_root / "temp"
-        
+
         logger.info(f"Looking for projects in directory: {temp_dir}")
-        
+
         if not temp_dir.exists():
             logger.warning(f"Temp directory does not exist, creating it: {temp_dir}")
             temp_dir.mkdir(parents=True)
-        
+
         # Get all directories in temp folder
         projects = [
-            d.name for d in temp_dir.iterdir() 
+            d.name for d in temp_dir.iterdir()
             if d.is_dir() and not d.name.startswith('.')
         ]
-        
+
         logger.info(f"Found projects: {projects}")
         return {"projects": sorted(projects)}
     except Exception as e:
@@ -153,19 +162,19 @@ async def update_shot_description(project_name: str, update_data: dict):
             project_name=project_name,
         )
         script = await director.get_script()
-        
+
         # Get the indices
         chapter_idx = update_data["chapter_index"] - 1
         scene_idx = update_data["scene_index"] - 1
         shot_idx = update_data["shot_index"] - 1
-        
+
         # Update the appropriate field based on the action
         if update_data["action"] == "director_instructions":
             script.chapters[chapter_idx].scenes[scene_idx].shots[shot_idx].director_instructions = update_data["description"]
         elif update_data["action"] == "opening":
             script.chapters[chapter_idx].scenes[scene_idx].shots[shot_idx].opening_frame = update_data["description"]
-       
-        
+
+
         # Save the updated script
         await director.save_script(script)
         return script
@@ -211,7 +220,7 @@ async def get_image(
         aws_service = AWSService(project_name=project_name)
         director = DirectorService(aws_service=aws_service, project_name=project_name)
         script = await director.get_script()
-        
+
         image_service = ImageService(
             aws_service=aws_service,
             black_and_white=script.project_details.black_and_white,
@@ -280,7 +289,7 @@ async def regenerate_image(
 
         # Ensure correct image path with .png extension
         image_path = f"chapter_{request.chapter_index}/scene_{request.scene_index}/shot_{request.shot_index}_{request.type}.png"
-        
+
         # Generate image
         success, local_path = await image_service.generate_image(
             prompt=request.custom_prompt or "",
@@ -364,19 +373,19 @@ class CustomFileResponse(StarletteFileResponse):
             "Pragma": "no-cache",
             "Expires": "0"
         })
-        
+
 def get_audio_file_response(file_path: str | Path, media_type: str = "audio/wav") -> CustomFileResponse:
     """Helper function to create audio file responses with proper cache headers"""
     if isinstance(file_path, str):
         file_path = Path(file_path)
-        
+
     if not file_path.exists():
         raise HTTPException(status_code=404, detail=f"Audio file not found: {file_path}")
-        
+
     # Generate ETag based on file modification time
     mtime = file_path.stat().st_mtime
     etag = f'"{hash(mtime)}"'
-    
+
     return CustomFileResponse(
         path=str(file_path),
         media_type=media_type,
@@ -393,7 +402,7 @@ async def generate_narration(project_name: str, request: NarrationRequest):
     try:
         aws_service = AWSService(project_name=project_name)
         voice_service = VoiceService.get_instance()
-        
+
         # Get or create cloned voice using the voice sample
         voice_sample_path = f"temp/{project_name}/voice_sample.m4a"
         if os.path.exists(voice_sample_path):
@@ -407,7 +416,7 @@ async def generate_narration(project_name: str, request: NarrationRequest):
                 voice_id = None
         else:
             voice_id = None
-        
+
         # Generate a unique filename for this narration
         audio_path = f"chapter_{request.chapter_number}/scene_{request.scene_number}/narration.wav"
         local_path = aws_service.temp_dir / audio_path
@@ -485,11 +494,11 @@ async def generate_background_music(project_name: str, request: BackgroundMusicR
             script = await director.get_script()
             if not script or not script.chapters:
                 raise HTTPException(status_code=404, detail="Script or chapters not found")
-                
+
             scenes = script.chapters[request.chapter_number - 1].scenes or []
             if request.scene_number > len(scenes):
                 raise HTTPException(status_code=400, detail="Invalid scene number")
-                
+
             scene = scenes[request.scene_number - 1]
             request.prompt = f"Create background music that matches the mood of: {scene.background_music}"
 
@@ -561,22 +570,22 @@ async def generate_shot_video(project_name: str, request: VideoGenerationRequest
         scenes = script.chapters[request.chapter_number - 1].scenes or []
         if request.scene_number > len(scenes):
             raise HTTPException(status_code=400, detail="Invalid scene number")
-        
+
         scene = scenes[request.scene_number - 1]
         if not scene.shots:
             raise HTTPException(status_code=400, detail="No shots found in scene")
-            
+
         if request.shot_number > len(scene.shots):
             raise HTTPException(status_code=400, detail="Invalid shot number")
-            
+
         shot = scene.shots[request.shot_number - 1]
         if not shot:
             raise HTTPException(status_code=400, detail="Shot not found")
-            
+
         prompt = shot.director_instructions
         if not prompt:
             raise HTTPException(status_code=400, detail="No director instructions found for shot")
-            
+
         try:
             # Generate video
             success, video_path = await video_service.generate_video(
@@ -604,7 +613,7 @@ async def generate_shot_video(project_name: str, request: VideoGenerationRequest
                 else:
                     logger.warning("Failed to apply black and white filter, using original video")
 
-            return FileResponse(
+            return CustomFileResponse(
                 path=video_path,
                 media_type="video/mp4",
                 filename=f"video_{request.chapter_number}_{request.scene_number}_{request.shot_number}.mp4"
@@ -657,7 +666,8 @@ async def get_video(
                 "path": str(local_path)
             }
 
-        return FileResponse(
+        # Use CustomFileResponse to prevent caching
+        return CustomFileResponse(
             path=str(local_path),
             media_type="video/mp4",
             filename=f"video_{chapter_number}_{scene_number}_{shot_number}.mp4"
@@ -666,7 +676,7 @@ async def get_video(
     except Exception as e:
         logger.error(f"Error getting video: {str(e)}")
         raise HTTPException(
-            status_code=500, 
+            status_code=500,
             detail=f"Error getting video: {str(e)}, Path: {video_path if 'video_path' in locals() else 'unknown'}"
         )
 
@@ -678,7 +688,7 @@ async def get_all_videos(project_name: str) -> dict:
         video_service = VideoServiceFactory.create_video_service(VideoProvider.REPLICATE, aws_service)
 
         videos = video_service.get_all_videos()
-        
+
         # Add final scene videos
         temp_dir = Path("temp") / project_name
         if temp_dir.exists():
@@ -687,7 +697,7 @@ async def get_all_videos(project_name: str) -> dict:
                 for scene_dir in chapter_dir.glob("scene_*"):
                     scene_num = int(scene_dir.name.split("_")[1])
                     final_scene_path = scene_dir / "final_scene.mp4"
-                    
+
                     if final_scene_path.exists():
                         with open(final_scene_path, "rb") as f:
                             video_data = base64.b64encode(f.read()).decode("utf-8")
@@ -715,7 +725,7 @@ async def generate_scene_video(project_name: str, request: SceneVideoRequest):
     try:
         aws_service = AWSService(project_name=project_name)
         video_service = VideoServiceFactory.create_video_service(VideoProvider.REPLICATE, aws_service)
-        
+
         success, output_path = await video_service.generate_scene_video(
             chapter=str(request.chapter_number),
             scene=str(request.scene_number),
@@ -725,7 +735,7 @@ async def generate_scene_video(project_name: str, request: SceneVideoRequest):
         if not success or not output_path:
             raise HTTPException(status_code=500, detail="Failed to generate scene video")
 
-        return FileResponse(
+        return CustomFileResponse(
             path=output_path,
             media_type="video/mp4",
             filename=f"scene_{request.chapter_number}_{request.scene_number}_final.mp4"
@@ -848,10 +858,10 @@ class CustomFaceSwapRequest(BaseModel):
 
 @app.post("/api/swap-faces-custom/{project_name}")
 async def swap_faces_custom(
-    project_name: str, 
+    project_name: str,
     chapter_index: int,
-    scene_index: int, 
-    shot_index: int, 
+    scene_index: int,
+    shot_index: int,
     type: str,
     request: CustomFaceSwapRequest
 ):
@@ -898,16 +908,16 @@ async def swap_faces_custom(
             # Save the result back to the target path
             result_data = base64.b64decode(result_base64)
             logger.info(f"Writing swapped image to {target_local_path}")
-            
+
             if not result_data:
                 raise ValueError("Empty result data from face swapping")
-                
+
             with open(target_local_path, "wb") as f:
                 f.write(result_data)
-            
+
             if not target_local_path.exists():
                 raise ValueError(f"Failed to write file to {target_local_path}")
-                
+
             # Verify file size
             file_size = target_local_path.stat().st_size
             logger.info(f"Written file size: {file_size} bytes")
@@ -967,25 +977,25 @@ async def regenerate_shot(
             project_name=project_name,
         )
         script = await director.get_script()
-        
+
         if not script or not script.chapters:
             raise HTTPException(status_code=404, detail="Script or chapters not found")
-            
+
         # Convert 1-based indices to 0-based
         chapter_idx = request.chapter_index - 1
         scene_idx = request.scene_index - 1
         shot_idx = request.shot_index - 1
-            
+
         if chapter_idx >= len(script.chapters) or chapter_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid chapter index")
-            
+
         if not script.chapters[chapter_idx].scenes or scene_idx >= len(script.chapters[chapter_idx].scenes or []) or scene_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid scene index")
-            
+
         chapter = script.chapters[chapter_idx]
         if not chapter.scenes or not chapter.scenes[scene_idx].shots or shot_idx >= len(chapter.scenes[scene_idx].shots or []) or shot_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid shot index")
-        
+
         try:
             # Regenerate the shot with custom instructions if provided
             script = await director.regenerate_shot(
@@ -995,14 +1005,14 @@ async def regenerate_shot(
                 shot_index=shot_idx,
                 custom_instructions=request.instructions
             )
-            
+
             await director.save_script(script)
-            
+
             return script
-            
+
         except ValueError as ve:
             raise HTTPException(status_code=500, detail=str(ve))
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1024,20 +1034,20 @@ async def regenerate_scene(
             project_name=project_name,
         )
         script = await director.get_script()
-        
+
         if not script or not script.chapters:
             raise HTTPException(status_code=404, detail="Script or chapters not found")
-            
+
         # Convert 1-based indices to 0-based
         chapter_idx = request.chapter_index - 1
         scene_idx = request.scene_index - 1
-            
+
         if chapter_idx >= len(script.chapters) or chapter_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid chapter index")
-            
+
         if not script.chapters[chapter_idx].scenes or scene_idx >= len(script.chapters[chapter_idx].scenes or []) or scene_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid scene index")
-        
+
         try:
             # Regenerate the scene with custom instructions if provided
             script = await director.regenerate_scene(
@@ -1046,15 +1056,15 @@ async def regenerate_scene(
                 scene_index=scene_idx,
                 custom_instructions=request.instructions
             )
-            
+
             await director.save_script(script)
-            
+
             return script
-            
+
         except ValueError as ve:
             # Convert ValueError to HTTPException with the error message
             raise HTTPException(status_code=500, detail=str(ve))
-        
+
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
@@ -1074,7 +1084,7 @@ async def get_scene_video(
     """Get the final scene video if it exists"""
     try:
         video_path = Path("temp") / project_name / f"chapter_{chapter_number}" / f"scene_{scene_number}" / "final_scene.mp4"
-        
+
         if not video_path.exists():
             return {
                 "status": "not_found",
@@ -1120,23 +1130,23 @@ async def regenerate_chapter(
             project_name=project_name,
         )
         script = await director.get_script()
-        
+
         if not script or not script.chapters:
             raise HTTPException(status_code=404, detail="Script or chapters not found")
-            
+
         # Convert 1-based index to 0-based
         chapter_idx = request.chapter_index - 1
-            
+
         if chapter_idx >= len(script.chapters) or chapter_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid chapter index")
-        
+
         # Regenerate the chapter with custom instructions if provided
         script = await director.regenerate_chapter(
             script=script,
             chapter_index=chapter_idx,
             custom_instructions=request.instructions
         )
-        
+
         scenes = await director.generate_scenes(script.project_details,script.chapters, script.chapters[chapter_idx])
         script.chapters[chapter_idx].scenes = scenes
         for scene in scenes:
@@ -1145,7 +1155,7 @@ async def regenerate_chapter(
             script = await director.generate_shots(script, specific_scene_index=scene.scene_number-1, specific_chapter_index=chapter_idx)
             await director.save_script(script)
         return script
-        
+
     except Exception as e:
         logger.error(f"Failed to regenerate chapter: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1167,17 +1177,17 @@ async def regenerate_narration(project_name: str, request: RegenerateNarrationRe
         aws_service = AWSService(project_name=project_name)
         director = DirectorService(aws_service=aws_service, project_name=project_name)
         script = await director.get_script()
-        
+
         # Convert 1-based indices to 0-based
         chapter_idx = request.chapter_number - 1
         scene_idx = request.scene_number - 1
-        
+
         if not script or not script.chapters:
             raise HTTPException(status_code=404, detail="Script or chapters not found")
-            
+
         if chapter_idx >= len(script.chapters) or chapter_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid chapter index")
-            
+
         chapter = script.chapters[chapter_idx]
         if not chapter.scenes or scene_idx >= len(chapter.scenes) or scene_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid scene index")
@@ -1193,7 +1203,7 @@ async def regenerate_narration(project_name: str, request: RegenerateNarrationRe
 
         # Get LLM response
         response = await aws_service.invoke_llm(prompt)
-        
+
         try:
             narration_data = json.loads(response)
             if not isinstance(narration_data, dict):
@@ -1240,17 +1250,17 @@ async def update_narration(project_name: str, request: UpdateNarrationRequest):
         aws_service = AWSService(project_name=project_name)
         director = DirectorService(aws_service=aws_service, project_name=project_name)
         script = await director.get_script()
-        
+
         # Convert 1-based indices to 0-based
         chapter_idx = request.chapter_number - 1
         scene_idx = request.scene_number - 1
-        
+
         if not script or not script.chapters:
             raise HTTPException(status_code=404, detail="Script or chapters not found")
-            
+
         if chapter_idx >= len(script.chapters) or chapter_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid chapter index")
-            
+
         chapter = script.chapters[chapter_idx]
         if not chapter.scenes or scene_idx >= len(chapter.scenes) or scene_idx < 0:
             raise HTTPException(status_code=400, detail="Invalid scene index")
@@ -1296,7 +1306,7 @@ async def get_scene_images(project_name: str, chapter_number: int, scene_number:
         # Get all image files for this scene
         image_data = {}
         scene_dir = image_service.temp_dir / f"chapter_{chapter_number}" / f"scene_{scene_number}"
-        
+
         if not scene_dir.exists():
             return {"status": "success", "images": {}}
 
@@ -1305,7 +1315,7 @@ async def get_scene_images(project_name: str, chapter_number: int, scene_number:
                 if not image_file.exists() or image_file.stat().st_size == 0:
                     logger.warning(f"Skipping invalid image file: {image_file}")
                     continue
-                    
+
                 # Parse shot number and type from filename
                 filename_parts = image_file.stem.split("_")
                 shot_num = int(filename_parts[1])
@@ -1333,11 +1343,11 @@ async def get_scene_videos(project_name: str, chapter_number: int, scene_number:
     try:
         aws_service = AWSService(project_name=project_name)
         video_service = VideoServiceFactory.create_video_service(VideoProvider.REPLICATE, aws_service)
-        
+
         # Get all videos for this scene
         videos = {}
         scene_dir = Path("temp") / project_name / f"chapter_{chapter_number}" / f"scene_{scene_number}"
-        
+
         if not scene_dir.exists():
             return {"status": "success", "videos": {}}
 
@@ -1351,7 +1361,7 @@ async def get_scene_videos(project_name: str, chapter_number: int, scene_number:
                 shot_num = int(video_file.stem.split("_")[1])
                 # Return URL instead of base64 for better performance
                 videos[f"{chapter_number}-{scene_number}-{shot_num}"] = f"/temp/{project_name}/chapter_{chapter_number}/scene_{scene_number}/{video_file.name}"
-            
+
             # Get final scene video if it exists
             final_scene_path = scene_dir / "final_scene.mp4"
             if final_scene_path.exists() and final_scene_path.stat().st_size > 0:
@@ -1372,10 +1382,10 @@ async def get_scene_narrations(project_name: str, chapter_number: int, scene_num
     try:
         aws_service = AWSService(project_name=project_name)
         narration_path = (
-            Path("temp") / project_name / f"chapter_{chapter_number}" / 
+            Path("temp") / project_name / f"chapter_{chapter_number}" /
             f"scene_{scene_number}" / "narration.wav"
         )
-        
+
         if not narration_path.exists():
             return {"status": "success", "narrations": {}}
 
@@ -1401,10 +1411,10 @@ async def get_scene_background_music(project_name: str, chapter_number: int, sce
     try:
         aws_service = AWSService(project_name=project_name)
         music_path = (
-            Path("temp") / project_name / f"chapter_{chapter_number}" / 
+            Path("temp") / project_name / f"chapter_{chapter_number}" /
             f"scene_{scene_number}" / "background_music.mp3"
         )
-        
+
         if not music_path.exists():
             return {"status": "success", "background_music": {}}
 
@@ -1443,14 +1453,11 @@ async def get_final_movie(project_name: str):
         if not movie_path.exists() or movie_path.stat().st_size == 0:
             raise HTTPException(status_code=404, detail="Final movie not found")
 
-        return FileResponse(
+        return CustomFileResponse(
             path=str(movie_path),
             media_type="video/mp4",
             filename="final_movie.mp4",
             headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0",
                 "Access-Control-Allow-Origin": "http://localhost:3000",
                 "Access-Control-Allow-Methods": "GET, OPTIONS",
                 "Access-Control-Allow-Headers": "*"

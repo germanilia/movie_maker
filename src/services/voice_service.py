@@ -28,14 +28,20 @@ class VoiceService:
             cls._instance = super(VoiceService, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, verify_ssl: bool = False):
+    def __init__(self, verify_ssl: bool = False, temp_dir: Optional[Path] = None):
         """Initialize the Play.HT voice service with credentials from environment variables."""
+        # Always update temp_dir if provided, even if already initialized
+        if temp_dir:
+            self.temp_dir = temp_dir
+            logger.info(f"Setting VoiceService temp_dir to: {self.temp_dir}")
+            
         if self._initialized:
             return
             
         self.user_id = os.getenv('PLAY_HT_USER_ID')
         self.api_key = os.getenv('PLAY_HT_API_KEY')
         self.verify_ssl = verify_ssl
+        self.temp_dir = temp_dir if temp_dir else Path("temp")
         
         if not self.user_id or not self.api_key:
             raise ValueError("PLAY_HT_USER_ID and PLAY_HT_API_KEY must be set in environment variables")
@@ -60,10 +66,13 @@ class VoiceService:
         self._initialized = True
 
     @classmethod
-    def get_instance(cls, verify_ssl: bool = False) -> 'VoiceService':
-        if not cls._instance:
-            cls._instance = cls(verify_ssl)
-        return cls._instance
+    def get_instance(cls, verify_ssl: bool = False, temp_dir: Optional[Path] = None) -> 'VoiceService':
+        instance = cls(verify_ssl, temp_dir)
+        # If temp_dir is provided, update it even if instance already exists
+        if temp_dir and hasattr(instance, 'temp_dir') and instance.temp_dir != temp_dir:
+            instance.temp_dir = temp_dir
+            logger.info(f"Updated VoiceService temp_dir to: {temp_dir}")
+        return instance
 
     def list_cloned_voices(self) -> List[Dict]:
         """List all cloned voices in the account."""

@@ -26,7 +26,9 @@ class RunwayMLVideoService(BaseVideoService):
                 "Missing required RunwayML API token in environment variables"
             )
 
-        self.client = RunwayML(api_key=self.runway_token)
+        # Initialize client with 3-minute timeout
+        logger.info("Initializing RunwayML client with 3-minute timeout")
+        self.client = RunwayML(api_key=self.runway_token, timeout=180)
         self.video_model = VideoModel(model_name="gen3a_turbo", parameters={})
     def _resize_and_encode_image(self, image_path: str, max_size: tuple = (1024, 1024)) -> str:
         """Resize image and encode to base64 with size optimization"""
@@ -129,12 +131,39 @@ class RunwayMLVideoService(BaseVideoService):
             video_url = task.output[0]
             if not video_url:
                 raise Exception("No video URL found in task output")
-            async with aiohttp.ClientSession() as session:
-                async with session.get(video_url) as response:
-                    response.raise_for_status()
-                    with open(downloaded_path, "wb") as f:
-                        async for chunk in response.content.iter_chunked(8192):
-                            f.write(chunk)
+            
+            # Create timeout settings for 3 minutes
+            timeout = aiohttp.ClientTimeout(total=180, connect=30, sock_connect=30, sock_read=180)
+            
+            logger.info(f"Downloading video from URL: {video_url} with 3-minute timeout")
+            # Use session with timeout settings and error handling
+            try:
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    try:
+                        logger.info(f"Starting video download...")
+                        download_start_time = time.time()
+                        async with session.get(video_url) as response:
+                            response.raise_for_status()
+                            logger.info(f"Response status: {response.status}, Content-Length: {response.headers.get('Content-Length', 'unknown')}")
+                            bytes_downloaded = 0
+                            with open(downloaded_path, "wb") as f:
+                                async for chunk in response.content.iter_chunked(8192):
+                                    bytes_downloaded += len(chunk)
+                                    f.write(chunk)
+                                    # Log download progress every 5MB
+                                    if bytes_downloaded % (5 * 1024 * 1024) < 8192:  
+                                        logger.info(f"Downloaded {bytes_downloaded / (1024 * 1024):.2f}MB in {time.time() - download_start_time:.2f} seconds")
+                            
+                            logger.info(f"Download completed: {bytes_downloaded / (1024 * 1024):.2f}MB in {time.time() - download_start_time:.2f} seconds")
+                    except aiohttp.ClientResponseError as e:
+                        logger.error(f"HTTP error during video download: {e.status} - {e.message}")
+                        raise Exception(f"Failed to download video: HTTP {e.status} - {e.message}")
+                    except aiohttp.ClientError as e:
+                        logger.error(f"Network error during video download: {str(e)}")
+                        raise Exception(f"Failed to download video: Network error - {str(e)}")
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout error during video download after {time.time() - download_start_time:.2f} seconds")
+                raise Exception("Video download timed out after 3 minutes - consider increasing the timeout further")
 
             generation_time = time.time() - start_time
             logger.info(
